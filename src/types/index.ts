@@ -34,14 +34,26 @@ export interface Lead {
 
 export type LeadStatus =
   | 'new'
+  | 'claimed'
   | 'contacted'
-  | 'unreachable'
   | 'closed'
-  | 'lost';
+  | 'lost'
+  | 'unreachable';
 
 export interface LeadRow extends Lead {
   rowNumber: number;
+  version: number;
 }
+
+// Valid status values for validation
+export const VALID_LEAD_STATUSES: LeadStatus[] = [
+  'new',
+  'claimed',
+  'contacted',
+  'closed',
+  'lost',
+  'unreachable',
+];
 
 // ===========================================
 // Brevo Webhook Types
@@ -162,6 +174,7 @@ export interface SalesTeamMember {
   name: string;
   email?: string;
   phone?: string;
+  role?: string; // admin | manager | sales
 }
 
 // ===========================================

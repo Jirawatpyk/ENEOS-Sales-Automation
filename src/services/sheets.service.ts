@@ -15,6 +15,7 @@ import {
   SalesTeamMember,
   AppError,
   RaceConditionError,
+  VALID_LEAD_STATUSES,
 } from '../types/index.js';
 
 // ===========================================
@@ -54,9 +55,23 @@ function getSheetRange(sheetName: string, range: string): string {
   return `${sheetName}!${range}`;
 }
 
+/**
+ * แปลง row array เป็น LeadRow object
+ * พร้อม validate status ให้เป็นค่าที่ถูกต้องเท่านั้น
+ */
 function rowToLead(row: string[], rowNumber: number): LeadRow {
+  // Validate status - ถ้าไม่ถูกต้องให้ใช้ 'new' เป็น default
+  const rawStatus = row[8] || 'new';
+  const status: LeadStatus = VALID_LEAD_STATUSES.includes(rawStatus as LeadStatus)
+    ? (rawStatus as LeadStatus)
+    : 'new';
+
+  // Parse version - default เป็น 1 ถ้าไม่มีหรือ parse ไม่ได้
+  const version = parseInt(row[22] || '1', 10) || 1;
+
   return {
     rowNumber,
+    version,
     date: row[0] || '',
     customerName: row[1] || '',
     email: row[2] || '',
@@ -65,7 +80,7 @@ function rowToLead(row: string[], rowNumber: number): LeadRow {
     industryAI: row[5] || '',
     website: row[6] || null,
     capital: row[7] || null,
-    status: (row[8] as LeadStatus) || 'new',
+    status,
     salesOwnerId: row[9] || null,
     salesOwnerName: row[10] || null,
     campaignId: row[11] || '',
@@ -210,10 +225,9 @@ export class SheetsService {
 
       // Check version for optimistic locking (if version checking is enabled)
       if (expectedVersion !== undefined) {
-        const currentVersion = parseInt((currentLead as unknown as Record<string, string>)['version'] || '1', 10);
-        if (currentVersion !== expectedVersion) {
+        if (currentLead.version !== expectedVersion) {
           throw new RaceConditionError(
-            `Version mismatch: expected ${expectedVersion}, got ${currentVersion}`
+            `Version mismatch: expected ${expectedVersion}, got ${currentLead.version}`
           );
         }
       }
@@ -225,7 +239,7 @@ export class SheetsService {
       };
 
       // Increment version
-      const newVersion = (parseInt((currentLead as unknown as Record<string, string>)['version'] || '1', 10)) + 1;
+      const newVersion = currentLead.version + 1;
       const row = leadToRow(updatedLead, newVersion);
 
       await withRetry(async () => {
@@ -239,8 +253,8 @@ export class SheetsService {
         });
       });
 
-      logger.info('Lead updated successfully', { rowNumber });
-      return { ...updatedLead, rowNumber };
+      logger.info('Lead updated successfully', { rowNumber, newVersion });
+      return { ...updatedLead, rowNumber, version: newVersion };
     });
   }
 
@@ -431,6 +445,250 @@ export class SheetsService {
           email: memberRow[2] || undefined,
           phone: memberRow[3] || undefined,
         };
+      });
+    });
+  }
+
+  // ===========================================
+  // Admin Dashboard Methods
+  // ===========================================
+
+  /**
+   * Private helper: ดึง raw leads ทั้งหมดจาก Google Sheets
+   * ใช้ร่วมกันระหว่าง methods เพื่อลด duplicate code
+   */
+  private async _fetchAllLeadsFromSheet(): Promise<LeadRow[]> {
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.leadsSheet, 'A2:W'), // Skip header row
+        });
+
+        const rows = response.data.values || [];
+        return rows.map((row, index) => rowToLead(row, index + 2)); // +2 because row 1 is header
+      });
+    });
+  }
+
+  /**
+   * Get all leads (use with caution - prefer pagination)
+   */
+  async getAllLeads(): Promise<LeadRow[]> {
+    logger.info('Getting all leads');
+    return this._fetchAllLeadsFromSheet();
+  }
+
+  /**
+   * Get leads with pagination and filters
+   * @param page - Page number (1-indexed)
+   * @param limit - Number of items per page
+   * @param filters - Optional filters (status, dateRange, search)
+   */
+  async getLeadsWithPagination(
+    page: number = 1,
+    limit: number = 20,
+    filters?: {
+      status?: LeadStatus;
+      startDate?: string;
+      endDate?: string;
+      search?: string; // Search in email, company, customerName
+      salesOwnerId?: string;
+    }
+  ): Promise<{ leads: LeadRow[]; total: number; page: number; limit: number; totalPages: number }> {
+    logger.info('Getting leads with pagination', { page, limit, filters });
+
+    // Get all leads using helper method (in production, consider caching this)
+    let leads = await this._fetchAllLeadsFromSheet();
+
+    // Apply filters
+    if (filters) {
+      if (filters.status) {
+        leads = leads.filter((lead) => lead.status === filters.status);
+      }
+
+      // Date comparison using Date objects for accuracy
+      if (filters.startDate) {
+        const startTime = new Date(filters.startDate).getTime();
+        leads = leads.filter((lead) => {
+          const leadTime = new Date(lead.date).getTime();
+          return !isNaN(leadTime) && leadTime >= startTime;
+        });
+      }
+
+      if (filters.endDate) {
+        const endTime = new Date(filters.endDate).getTime();
+        leads = leads.filter((lead) => {
+          const leadTime = new Date(lead.date).getTime();
+          return !isNaN(leadTime) && leadTime <= endTime;
+        });
+      }
+
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        leads = leads.filter(
+          (lead) =>
+            lead.email.toLowerCase().includes(searchLower) ||
+            lead.company.toLowerCase().includes(searchLower) ||
+            lead.customerName.toLowerCase().includes(searchLower)
+        );
+      }
+
+      if (filters.salesOwnerId) {
+        leads = leads.filter((lead) => lead.salesOwnerId === filters.salesOwnerId);
+      }
+    }
+
+    // Calculate pagination
+    const total = leads.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedLeads = leads.slice(startIndex, endIndex);
+
+    logger.info('Leads pagination result', {
+      total,
+      page,
+      limit,
+      totalPages,
+      returned: paginatedLeads.length,
+    });
+
+    return {
+      leads: paginatedLeads,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+  /**
+   * Get leads by status
+   */
+  async getLeadsByStatus(status: LeadStatus): Promise<LeadRow[]> {
+    logger.info('Getting leads by status', { status });
+
+    const leads = await this._fetchAllLeadsFromSheet();
+    return leads.filter((lead) => lead.status === status);
+  }
+
+  /**
+   * Get leads by date range
+   * ใช้ Date objects ในการเปรียบเทียบเพื่อความถูกต้อง
+   */
+  async getLeadsByDateRange(startDate: string, endDate: string): Promise<LeadRow[]> {
+    logger.info('Getting leads by date range', { startDate, endDate });
+
+    const leads = await this._fetchAllLeadsFromSheet();
+
+    // Convert to timestamps for accurate comparison
+    const startTime = new Date(startDate).getTime();
+    const endTime = new Date(endDate).getTime();
+
+    return leads.filter((lead) => {
+      const leadTime = new Date(lead.date).getTime();
+      return !isNaN(leadTime) && leadTime >= startTime && leadTime <= endTime;
+    });
+  }
+
+  /**
+   * Get all sales team members
+   */
+  async getSalesTeamAll(): Promise<SalesTeamMember[]> {
+    logger.info('Getting all sales team members');
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, 'A2:E'), // A:E to include Role column
+        });
+
+        const rows = response.data.values || [];
+
+        return rows
+          .filter((row) => row[0]) // Ensure LINE User ID exists
+          .map((row) => ({
+            lineUserId: row[0],
+            name: row[1],
+            email: row[2] || undefined,
+            phone: row[3] || undefined,
+            role: row[4] || 'sales', // Default role is 'sales'
+          }));
+      });
+    });
+  }
+
+  /**
+   * Get user by email (for authentication)
+   * Returns user info with role from Sales_Team sheet
+   */
+  async getUserByEmail(email: string): Promise<(SalesTeamMember & { role: string }) | null> {
+    logger.info('Getting user by email', { email });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, 'A2:E'), // Include Role column (E)
+        });
+
+        const rows = response.data.values || [];
+        const userRow = rows.find((row) => row[2] && row[2].toLowerCase() === email.toLowerCase());
+
+        if (!userRow) {
+          logger.warn('User not found by email', { email });
+          return null;
+        }
+
+        return {
+          lineUserId: userRow[0],
+          name: userRow[1],
+          email: userRow[2],
+          phone: userRow[3] || undefined,
+          role: userRow[4] || 'sales', // Default to 'sales' if not specified
+        };
+      });
+    });
+  }
+
+  /**
+   * Get leads count grouped by status
+   * Returns object with count for each status
+   */
+  async getLeadsCountByStatus(): Promise<Record<LeadStatus, number>> {
+    logger.info('Getting leads count by status');
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.leadsSheet, 'A2:I'), // Only need up to status column
+        });
+
+        const rows = response.data.values || [];
+
+        // Initialize counts
+        const counts: Record<LeadStatus, number> = {
+          new: 0,
+          claimed: 0,
+          contacted: 0,
+          closed: 0,
+          lost: 0,
+          unreachable: 0,
+        };
+
+        // Count each status
+        rows.forEach((row) => {
+          const status = (row[8] as LeadStatus) || 'new'; // Column I (index 8) is status
+          if (status in counts) {
+            counts[status]++;
+          }
+        });
+
+        logger.info('Leads count by status result', counts);
+        return counts;
       });
     });
   }

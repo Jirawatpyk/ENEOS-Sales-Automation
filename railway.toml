@@ -1,0 +1,25 @@
+# Railway Deployment Configuration
+# https://docs.railway.app/deploy/config-as-code
+
+[build]
+builder = "nixpacks"
+buildCommand = "npm ci && npm run build"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Environment variables (set in Railway dashboard for security)
+# - NODE_ENV=production
+# - PORT (auto-assigned by Railway)
+# - BREVO_WEBHOOK_SECRET
+# - GOOGLE_SERVICE_ACCOUNT_EMAIL
+# - GOOGLE_PRIVATE_KEY
+# - GOOGLE_SHEET_ID
+# - GEMINI_API_KEY
+# - LINE_CHANNEL_ACCESS_TOKEN
+# - LINE_CHANNEL_SECRET
+# - LINE_GROUP_ID

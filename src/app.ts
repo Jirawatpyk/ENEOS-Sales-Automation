@@ -1,0 +1,302 @@
+/**
+ * ENEOS Sales Automation - Main Application
+ * Enterprise-grade Express server with all middleware and routes
+ */
+
+import express, { Express } from 'express';
+import { Server } from 'http';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { config } from './config/index.js';
+import { logger } from './utils/logger.js';
+import { initSentry, flushSentry, captureException } from './utils/sentry.js';
+import { redisService } from './services/redis.service.js';
+
+// ===========================================
+// Initialize Sentry (MUST be first)
+// ===========================================
+initSentry();
+import { requestLogger } from './middleware/request-logger.js';
+import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
+import {
+  requestIdMiddleware,
+  timeoutMiddleware,
+  responseTimeMiddleware,
+} from './middleware/request-context.js';
+import webhookRoutes from './routes/webhook.routes.js';
+import lineRoutes from './routes/line.routes.js';
+import { sheetsService } from './services/sheets.service.js';
+import { geminiService } from './services/gemini.service.js';
+import { lineService } from './services/line.service.js';
+import { deduplicationService } from './services/deduplication.service.js';
+import { deadLetterQueue } from './services/dead-letter-queue.service.js';
+import { HealthCheckResponse } from './types/index.js';
+
+// ===========================================
+// Create Express Application
+// ===========================================
+
+const app: Express = express();
+
+// ===========================================
+// Security Middleware
+// ===========================================
+
+// Helmet for security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable for webhooks
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: config.security.rateLimit.windowMs,
+  max: config.security.rateLimit.max,
+  message: {
+    success: false,
+    error: 'Too many requests, please try again later',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(limiter);
+
+// ===========================================
+// Request Context (ID + Timing)
+// ===========================================
+
+app.use(requestIdMiddleware);
+app.use(responseTimeMiddleware);
+
+// ===========================================
+// Request Timeout (30 seconds default)
+// ===========================================
+
+app.use(timeoutMiddleware({
+  timeoutMs: 30000,
+  excludePaths: ['/health', '/ready'], // Don't timeout health checks
+}));
+
+// ===========================================
+// Body Parsing
+// ===========================================
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// ===========================================
+// Request Logging
+// ===========================================
+
+app.use(requestLogger);
+
+// ===========================================
+// Routes
+// ===========================================
+
+// Health check endpoint
+app.get('/health', async (_req, res) => {
+  const [sheetsHealth, geminiHealth, lineHealth] = await Promise.all([
+    sheetsService.healthCheck(),
+    geminiService.healthCheck(),
+    lineService.healthCheck(),
+  ]);
+
+  const allHealthy = sheetsHealth.healthy && geminiHealth.healthy && lineHealth.healthy;
+  const anyDegraded = !sheetsHealth.healthy || !geminiHealth.healthy || !lineHealth.healthy;
+
+  const response: HealthCheckResponse = {
+    status: allHealthy ? 'healthy' : anyDegraded ? 'degraded' : 'unhealthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+    services: {
+      googleSheets: {
+        status: sheetsHealth.healthy ? 'up' : 'down',
+        latency: sheetsHealth.latency,
+      },
+      geminiAI: {
+        status: geminiHealth.healthy ? 'up' : 'down',
+        latency: geminiHealth.latency,
+      },
+      lineAPI: {
+        status: lineHealth.healthy ? 'up' : 'down',
+        latency: lineHealth.latency,
+      },
+    },
+  };
+
+  res.status(allHealthy ? 200 : 503).json(response);
+});
+
+// Readiness check (simpler)
+app.get('/ready', (_req, res) => {
+  res.status(200).json({
+    ready: true,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Liveness check (minimal - just checks if process is alive)
+app.get('/live', (_req, res) => {
+  res.status(200).json({
+    alive: true,
+    uptime: process.uptime(),
+  });
+});
+
+// API info
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'ENEOS Sales Automation API',
+    version: process.env.npm_package_version || '1.0.0',
+    environment: config.env,
+    endpoints: {
+      health: '/health',
+      ready: '/ready',
+      brevoWebhook: '/webhook/brevo',
+      lineWebhook: '/webhook/line',
+    },
+  });
+});
+
+// Webhook routes
+app.use('/webhook', webhookRoutes);
+app.use('/webhook/line', lineRoutes);
+
+// Stats endpoint (development only)
+if (config.isDev) {
+  app.get('/stats', (_req, res) => {
+    res.json({
+      deduplication: deduplicationService.getStats(),
+      deadLetterQueue: deadLetterQueue.getStats(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+    });
+  });
+
+  // DLQ management endpoints
+  app.get('/dlq', (_req, res) => {
+    res.json({
+      success: true,
+      data: deadLetterQueue.getAll(100), // Get last 100 events
+      stats: deadLetterQueue.getStats(),
+    });
+  });
+
+  app.delete('/dlq/:id', (req, res) => {
+    const removed = deadLetterQueue.remove(req.params.id);
+    res.json({ success: removed });
+  });
+
+  app.delete('/dlq', (_req, res) => {
+    const count = deadLetterQueue.clear();
+    res.json({ success: true, clearedCount: count });
+  });
+}
+
+// ===========================================
+// Error Handling
+// ===========================================
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+// ===========================================
+// Server Reference (for graceful shutdown)
+// ===========================================
+
+let server: Server;
+
+// ===========================================
+// Graceful Shutdown
+// ===========================================
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  logger.info(`Received ${signal}, starting graceful shutdown...`);
+
+  // Stop accepting new connections
+  server.close(async (err) => {
+    if (err) {
+      logger.error('Error during server close', { error: err.message });
+      process.exit(1);
+    }
+
+    logger.info('HTTP server closed, no longer accepting connections');
+
+    // Cleanup services
+    try {
+      // Flush Sentry events
+      await flushSentry(2000);
+      logger.info('Sentry events flushed');
+
+      // Disconnect Redis
+      await redisService.disconnect();
+      logger.info('Redis disconnected');
+    } catch (cleanupError) {
+      logger.error('Error during cleanup', {
+        error: cleanupError instanceof Error ? cleanupError.message : 'Unknown error',
+      });
+    }
+
+    // Give ongoing requests time to complete
+    setTimeout(() => {
+      logger.info('Shutdown complete');
+      process.exit(0);
+    }, 2000);
+  });
+
+  // Force exit after 15 seconds if graceful shutdown fails
+  setTimeout(() => {
+    logger.warn('Forced shutdown after timeout');
+    process.exit(1);
+  }, 15000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception', { error: error.message, stack: error.stack });
+  captureException(error, { tags: { type: 'uncaught_exception' } });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled rejection', { reason });
+  if (reason instanceof Error) {
+    captureException(reason, { tags: { type: 'unhandled_rejection' } });
+  }
+  process.exit(1);
+});
+
+// ===========================================
+// Start Server
+// ===========================================
+
+const PORT = config.port;
+
+server = app.listen(PORT, () => {
+  logger.info(`ENEOS Sales Automation API started`, {
+    port: PORT,
+    environment: config.env,
+    nodeVersion: process.version,
+    features: {
+      aiEnrichment: config.features.aiEnrichment,
+      deduplication: config.features.deduplication,
+      lineNotifications: config.features.lineNotifications,
+    },
+  });
+
+  // Log endpoints
+  logger.info('Available endpoints:', {
+    health: `http://localhost:${PORT}/health`,
+    ready: `http://localhost:${PORT}/ready`,
+    live: `http://localhost:${PORT}/live`,
+    brevoWebhook: `http://localhost:${PORT}/webhook/brevo`,
+    lineWebhook: `http://localhost:${PORT}/webhook/line`,
+  });
+});
+
+export default app;
+export { server };

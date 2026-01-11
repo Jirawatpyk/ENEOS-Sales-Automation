@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+# package-lock.json  # Keep this for Railway/CI builds
+
+# Build output
+dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Google credentials (NEVER commit these!)
+*credentials*.json
+*service-account*.json
+*.pem
+eneos-*.json
+
+# Test files
+test-*.json
+
+# Docker
+.docker/

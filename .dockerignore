@@ -1,0 +1,55 @@
+# ===========================================
+# ENEOS Sales Automation - Docker Ignore
+# Files excluded from Docker build context
+# ===========================================
+
+# Dependencies (will be installed fresh in container)
+node_modules
+
+# Build output (will be built in container)
+dist
+
+# Git
+.git
+.gitignore
+
+# Environment files (secrets should be passed as env vars)
+.env
+.env.*
+!.env.example
+
+# Documentation (not needed in production)
+*.md
+docs/
+
+# IDE/Editor
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Test files
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+coverage
+.nyc_output
+
+# Development files
+*.log
+npm-debug.log*
+.DS_Store
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Docker files (prevent recursion)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Misc
+*.tgz
+*.tar.gz

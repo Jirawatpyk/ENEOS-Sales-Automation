@@ -1,0 +1,58 @@
+{
+  "name": "eneos-sales-automation",
+  "version": "1.0.0",
+  "description": "Enterprise-grade Sales Automation System for ENEOS Thailand",
+  "main": "dist/app.js",
+  "scripts": {
+    "dev": "tsx watch src/app.ts",
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "deploy:railway": "railway up",
+    "health": "curl -s http://localhost:3000/health | jq ."
+  },
+  "keywords": [
+    "sales-automation",
+    "line-oa",
+    "brevo",
+    "gemini-ai",
+    "google-sheets"
+  ],
+  "author": "ENEOS Thailand",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@line/bot-sdk": "^9.4.0",
+    "@sentry/node": "^10.32.1",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-rate-limit": "^7.4.1",
+    "googleapis": "^144.0.0",
+    "helmet": "^8.0.0",
+    "ioredis": "^5.9.1",
+    "winston": "^3.15.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/ioredis": "^4.28.10",
+    "@types/node": "^22.7.5",
+    "@typescript-eslint/eslint-plugin": "^8.8.1",
+    "@typescript-eslint/parser": "^8.8.1",
+    "eslint": "^9.12.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.2"
+  }
+}

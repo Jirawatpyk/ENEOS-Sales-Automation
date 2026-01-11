@@ -1,0 +1,62 @@
+# Render Blueprint
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: eneos-sales-automation
+    runtime: node
+    region: singapore # Closest to Thailand
+    plan: starter # or free for testing
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+
+    envVars:
+      # Server
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: LOG_LEVEL
+        value: info
+
+      # Brevo (set in Render dashboard)
+      - key: BREVO_WEBHOOK_SECRET
+        sync: false # Must set manually
+
+      # Google (set in Render dashboard)
+      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+        sync: false
+      - key: GOOGLE_PRIVATE_KEY
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: LEADS_SHEET_NAME
+        value: Leads
+      - key: DEDUP_SHEET_NAME
+        value: Deduplication_Log
+      - key: SALES_TEAM_SHEET_NAME
+        value: Sales_Team
+
+      # Gemini (set in Render dashboard)
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash
+
+      # LINE (set in Render dashboard)
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: LINE_GROUP_ID
+        sync: false
+
+      # Features
+      - key: ENABLE_AI_ENRICHMENT
+        value: "true"
+      - key: ENABLE_DEDUPLICATION
+        value: "true"
+      - key: ENABLE_LINE_NOTIFICATIONS
+        value: "true"

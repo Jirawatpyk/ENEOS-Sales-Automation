@@ -35,7 +35,7 @@ import { HealthCheckResponse } from './types/index.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
 import { metricsMiddleware } from './middleware/metrics.middleware.js';
-import { getMetrics, getMetricsContentType } from './utils/metrics.js';
+import { getMetrics, getMetricsContentType, getMetricsSummary } from './utils/metrics.js';
 
 // ===========================================
 // Create Express Application
@@ -186,13 +186,23 @@ app.get('/api-docs.json', (_req, res) => {
   res.send(swaggerSpec);
 });
 
-// Prometheus Metrics endpoint
+// Prometheus Metrics endpoint (raw format for monitoring tools)
 app.get('/metrics', async (_req, res) => {
   try {
     res.setHeader('Content-Type', getMetricsContentType());
     res.send(await getMetrics());
   } catch (_error) {
     res.status(500).send('Error collecting metrics');
+  }
+});
+
+// Human-readable Metrics Summary (easy to read JSON format)
+app.get('/metrics/summary', async (_req, res) => {
+  try {
+    const summary = await getMetricsSummary();
+    res.json(summary);
+  } catch (_error) {
+    res.status(500).json({ error: 'Error collecting metrics summary' });
   }
 });
 

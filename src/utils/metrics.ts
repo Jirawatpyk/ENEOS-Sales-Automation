@@ -153,3 +153,200 @@ export async function getMetrics(): Promise<string> {
 export function getMetricsContentType(): string {
   return register.contentType;
 }
+
+// ===========================================
+// Human-Readable Metrics Summary
+// ===========================================
+
+interface MetricsSummary {
+  timestamp: string;
+  system: {
+    uptime: string;
+    uptimeSeconds: number;
+    memory: {
+      used: string;
+      total: string;
+      percentage: string;
+    };
+    nodeVersion: string;
+  };
+  business: {
+    leads: {
+      processed: number;
+      duplicates: number;
+    };
+    claims: {
+      total: number;
+    };
+    raceConditions: number;
+    aiAnalysis: {
+      total: number;
+      avgDurationMs: number;
+    };
+    lineNotifications: {
+      total: number;
+    };
+  };
+  http: {
+    totalRequests: number;
+    activeRequests: number;
+    avgResponseTimeMs: number;
+  };
+  deadLetterQueue: {
+    size: number;
+    totalEvents: number;
+  };
+}
+
+/**
+ * Format bytes to human readable string
+ */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/**
+ * Format seconds to human readable duration
+ */
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.floor(seconds)}s`;
+  if (seconds < 3600) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}m ${secs}s`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${mins}m`;
+}
+
+/**
+ * Get counter value safely
+ */
+async function getCounterValue(counter: client.Counter<string>, labels?: Record<string, string>): Promise<number> {
+  try {
+    const metrics = await counter.get();
+    if (labels) {
+      const metric = metrics.values.find(v =>
+        Object.entries(labels).every(([key, val]) => v.labels[key] === val)
+      );
+      return metric?.value || 0;
+    }
+    return metrics.values.reduce((sum, v) => sum + v.value, 0);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Get gauge value safely
+ */
+async function getGaugeValue(gauge: client.Gauge<string>): Promise<number> {
+  try {
+    const metrics = await gauge.get();
+    return metrics.values.reduce((sum, v) => sum + v.value, 0);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Get histogram average safely
+ */
+async function getHistogramAvg(histogram: client.Histogram<string>): Promise<number> {
+  try {
+    const metrics = await histogram.get();
+    let totalSum = 0;
+    let totalCount = 0;
+    for (const v of metrics.values) {
+      if (v.metricName?.endsWith('_sum')) {
+        totalSum += v.value;
+      } else if (v.metricName?.endsWith('_count')) {
+        totalCount += v.value;
+      }
+    }
+    return totalCount > 0 ? (totalSum / totalCount) * 1000 : 0; // Convert to ms
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Get human-readable metrics summary
+ */
+export async function getMetricsSummary(): Promise<MetricsSummary> {
+  const memUsage = process.memoryUsage();
+  const uptime = process.uptime();
+
+  // Get metric values
+  const [
+    totalRequests,
+    activeRequests,
+    avgResponseTime,
+    leadsTotal,
+    duplicatesTotal,
+    claimsTotal,
+    raceCondTotal,
+    aiTotal,
+    aiAvgDuration,
+    lineTotal,
+    dlqSizeVal,
+    dlqEventsVal,
+  ] = await Promise.all([
+    getCounterValue(httpRequestTotal),
+    getGaugeValue(httpActiveRequests),
+    getHistogramAvg(httpRequestDuration),
+    getCounterValue(leadsProcessed),
+    getCounterValue(duplicateLeadsTotal),
+    getCounterValue(leadsClaimedTotal),
+    getCounterValue(raceConditionsTotal),
+    getCounterValue(aiAnalysisTotal),
+    getHistogramAvg(aiAnalysisDuration),
+    getCounterValue(lineNotificationTotal),
+    getGaugeValue(dlqSize),
+    getCounterValue(dlqEventsTotal),
+  ]);
+
+  return {
+    timestamp: new Date().toISOString(),
+    system: {
+      uptime: formatDuration(uptime),
+      uptimeSeconds: Math.floor(uptime),
+      memory: {
+        used: formatBytes(memUsage.heapUsed),
+        total: formatBytes(memUsage.heapTotal),
+        percentage: `${((memUsage.heapUsed / memUsage.heapTotal) * 100).toFixed(1)}%`,
+      },
+      nodeVersion: process.version,
+    },
+    business: {
+      leads: {
+        processed: leadsTotal,
+        duplicates: duplicatesTotal,
+      },
+      claims: {
+        total: claimsTotal,
+      },
+      raceConditions: raceCondTotal,
+      aiAnalysis: {
+        total: aiTotal,
+        avgDurationMs: Math.round(aiAvgDuration),
+      },
+      lineNotifications: {
+        total: lineTotal,
+      },
+    },
+    http: {
+      totalRequests: totalRequests,
+      activeRequests: activeRequests,
+      avgResponseTimeMs: Math.round(avgResponseTime),
+    },
+    deadLetterQueue: {
+      size: dlqSizeVal,
+      totalEvents: dlqEventsVal,
+    },
+  };
+}

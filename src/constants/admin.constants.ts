@@ -1,0 +1,88 @@
+/**
+ * ENEOS Sales Automation - Admin Dashboard Constants
+ * ค่าคงที่สำหรับ Admin Dashboard API
+ */
+
+// ===========================================
+// Pagination
+// ===========================================
+
+export const PAGINATION = {
+  DEFAULT_PAGE: 1,
+  DEFAULT_LIMIT: 20,
+  MAX_LIMIT: 100,
+} as const;
+
+// ===========================================
+// Dashboard
+// ===========================================
+
+export const DASHBOARD = {
+  /** จำนวน top sales ที่แสดง */
+  TOP_SALES_LIMIT: 5,
+  /** จำนวน recent activity ที่แสดง */
+  RECENT_ACTIVITY_LIMIT: 10,
+} as const;
+
+// ===========================================
+// Alerts Thresholds
+// ===========================================
+
+export const ALERTS = {
+  /** จำนวนชั่วโมงที่ lead ไม่มีคนรับ ถือว่าเป็น unclaimed alert */
+  UNCLAIMED_HOURS: 24,
+  /** จำนวนวันที่ lead contacted แต่ไม่มี update ถือว่าเป็น stale */
+  STALE_DAYS: 7,
+} as const;
+
+// ===========================================
+// Default Targets (สำหรับ placeholder ก่อนมีข้อมูลจริง)
+// ===========================================
+
+export const DEFAULT_TARGETS = {
+  /** เป้า claimed leads ต่อเดือน */
+  CLAIMED_PER_MONTH: 30,
+  /** เป้า closed leads ต่อเดือน */
+  CLOSED_PER_MONTH: 10,
+} as const;
+
+// ===========================================
+// Time Periods
+// ===========================================
+
+export const VALID_PERIODS = [
+  'today',
+  'yesterday',
+  'week',
+  'month',
+  'quarter',
+  'year',
+  'custom',
+] as const;
+
+export type PeriodType = typeof VALID_PERIODS[number];
+
+// ===========================================
+// Sort Options
+// ===========================================
+
+export const SORT_OPTIONS = {
+  LEADS: ['date', 'company', 'status'] as const,
+  SALES: ['claimed', 'closed', 'conversionRate'] as const,
+} as const;
+
+export const SORT_ORDERS = ['asc', 'desc'] as const;
+
+// ===========================================
+// Admin Constants Export (All-in-one)
+// ===========================================
+
+export const ADMIN_CONSTANTS = {
+  PAGINATION,
+  DASHBOARD,
+  ALERTS,
+  DEFAULT_TARGETS,
+  VALID_PERIODS,
+  SORT_OPTIONS,
+  SORT_ORDERS,
+} as const;

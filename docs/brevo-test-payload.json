@@ -1,0 +1,24 @@
+{
+  "event": "click",
+  "email": "procurement@cpall.co.th",
+  "id": 99002,
+  "date": "2026-01-12T11:15:00.000Z",
+  "ts": 1736676900,
+  "message-id": "msg-brevo-2026-005",
+  "ts_event": 1736676900,
+  "subject": "ENEOS Premium Lubricant for Retail Operations",
+  "tag": "retail-jan2026",
+  "sending_ip": "185.107.232.1",
+  "ts_epoch": 1736676900,
+  "link": "https://eneos.co.th/products/retail",
+  "sender_email": "sales@eneos.co.th",
+  "campaign_id": 12346,
+  "campaign_name": "Retail Lubricant Campaign Q1-2026",
+  "contact_id": 67891,
+  "contact": {
+    "FIRSTNAME": "Wichai",
+    "LASTNAME": "Srisawat",
+    "PHONE": "089-765-4321",
+    "COMPANY": "CP ALL Public Company Limited"
+  }
+}

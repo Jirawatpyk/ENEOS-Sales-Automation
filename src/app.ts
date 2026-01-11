@@ -34,6 +34,8 @@ import { deadLetterQueue } from './services/dead-letter-queue.service.js';
 import { HealthCheckResponse } from './types/index.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
+import { metricsMiddleware } from './middleware/metrics.middleware.js';
+import { getMetrics, getMetricsContentType } from './utils/metrics.js';
 
 // ===========================================
 // Create Express Application
@@ -79,6 +81,7 @@ app.use(limiter);
 
 app.use(requestIdMiddleware);
 app.use(responseTimeMiddleware);
+app.use(metricsMiddleware);
 
 // ===========================================
 // Request Timeout (30 seconds default)
@@ -181,6 +184,16 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 app.get('/api-docs.json', (_req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
+});
+
+// Prometheus Metrics endpoint
+app.get('/metrics', async (_req, res) => {
+  try {
+    res.setHeader('Content-Type', getMetricsContentType());
+    res.send(await getMetrics());
+  } catch (error) {
+    res.status(500).send('Error collecting metrics');
+  }
 });
 
 // Webhook routes

@@ -56,6 +56,10 @@ Enterprise-grade Sales Automation System for ENEOS Thailand.
         name: 'DLQ',
         description: 'Dead Letter Queue management',
       },
+      {
+        name: 'Metrics',
+        description: 'Prometheus metrics for monitoring',
+      },
     ],
     paths: {
       '/health': {
@@ -233,6 +237,41 @@ Receives postback events from LINE OA when sales team interacts with lead cards.
           responses: {
             200: {
               description: 'List of failed events',
+            },
+          },
+        },
+      },
+      '/metrics': {
+        get: {
+          tags: ['Metrics'],
+          summary: 'Prometheus metrics endpoint',
+          description: `
+Returns Prometheus-format metrics for monitoring and alerting.
+
+**Available Metrics:**
+- \`http_request_duration_seconds\` - HTTP request latency histogram
+- \`http_requests_total\` - Total HTTP requests counter
+- \`leads_processed_total\` - Leads processed by source and status
+- \`leads_claimed_total\` - Leads claimed by sales team
+- \`ai_analysis_duration_seconds\` - Gemini AI analysis latency
+- \`line_notification_total\` - LINE notifications sent
+- \`duplicate_leads_total\` - Duplicate leads detected
+- \`race_conditions_total\` - Race conditions detected
+- \`dead_letter_queue_size\` - Current DLQ size
+
+Plus default Node.js metrics (CPU, memory, event loop, etc.)
+          `,
+          responses: {
+            200: {
+              description: 'Prometheus metrics in text format',
+              content: {
+                'text/plain': {
+                  schema: {
+                    type: 'string',
+                    example: '# HELP http_requests_total Total number of HTTP requests\n# TYPE http_requests_total counter\nhttp_requests_total{method="GET",route="/health",status_code="200"} 42',
+                  },
+                },
+              },
             },
           },
         },

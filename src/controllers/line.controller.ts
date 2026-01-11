@@ -16,6 +16,11 @@ import {
 } from '../validators/line.validator.js';
 import { AppError, RaceConditionError } from '../types/index.js';
 import { config } from '../config/index.js';
+import {
+  leadsClaimedTotal,
+  raceConditionsTotal,
+  lineNotificationTotal,
+} from '../utils/metrics.js';
 
 // ===========================================
 // Main LINE Webhook Handler (Scenario B)
@@ -132,12 +137,14 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
 
     if (result.alreadyClaimed) {
       // Lead was claimed by someone else
+      raceConditionsTotal.inc();
       await lineService.replyClaimed(
         replyToken,
         result.lead.company,
         result.lead.customerName,
         result.owner || 'Unknown'
       );
+      lineNotificationTotal.inc({ status: 'success', type: 'reply' });
       logger.info('Lead already claimed', {
         rowId,
         owner: result.owner,
@@ -152,6 +159,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       const isClosedSale = action === 'closed';
       const isLostSale = action === 'lost';
 
+      leadsClaimedTotal.inc({ status: action });
       await lineService.replyStatusUpdate(
         replyToken,
         result.lead.company,
@@ -159,6 +167,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
         isClosedSale,
         isLostSale
       );
+      lineNotificationTotal.inc({ status: 'success', type: 'reply' });
 
       logger.info('Lead status updated by owner', {
         rowId,
@@ -169,6 +178,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
     }
 
     // New claim successful
+    leadsClaimedTotal.inc({ status: 'contacted' });
     await lineService.replySuccess(
       replyToken,
       userName,
@@ -176,6 +186,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       result.lead.customerName,
       action
     );
+    lineNotificationTotal.inc({ status: 'success', type: 'reply' });
 
     logger.info('Lead claimed successfully', {
       rowId,

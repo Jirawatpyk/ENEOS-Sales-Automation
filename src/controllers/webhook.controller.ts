@@ -16,6 +16,13 @@ import { formatPhone } from '../utils/phone-formatter.js';
 import { formatDateForSheets } from '../utils/date-formatter.js';
 import { Lead, LeadRow, DuplicateLeadError } from '../types/index.js';
 import { config } from '../config/index.js';
+import {
+  leadsProcessed,
+  duplicateLeadsTotal,
+  aiAnalysisDuration,
+  aiAnalysisTotal,
+  lineNotificationTotal,
+} from '../utils/metrics.js';
 
 // ===========================================
 // Main Webhook Handler (Scenario A)
@@ -67,6 +74,7 @@ export async function handleBrevoWebhook(
       await deduplicationService.checkOrThrow(payload.email, payload.campaignId);
     } catch (error) {
       if (error instanceof DuplicateLeadError) {
+        duplicateLeadsTotal.inc();
         logger.info('Duplicate lead detected', {
           email: payload.email,
           campaignId: payload.campaignId,
@@ -92,13 +100,18 @@ export async function handleBrevoWebhook(
     };
 
     if (config.features.aiEnrichment) {
+      const aiStartTime = Date.now();
       try {
         aiAnalysis = await geminiService.analyzeCompany(domain, payload.company);
+        aiAnalysisDuration.observe((Date.now() - aiStartTime) / 1000);
+        aiAnalysisTotal.inc({ status: 'success' });
         logger.info('AI analysis completed', {
           email: payload.email,
           industry: aiAnalysis.industry,
         });
       } catch (aiError) {
+        aiAnalysisDuration.observe((Date.now() - aiStartTime) / 1000);
+        aiAnalysisTotal.inc({ status: 'error' });
         logger.error('AI analysis failed, using defaults', {
           error: aiError instanceof Error ? aiError.message : 'Unknown error',
         });
@@ -128,6 +141,7 @@ export async function handleBrevoWebhook(
     };
 
     const rowNumber = await sheetsService.addLead(lead);
+    leadsProcessed.inc({ status: 'new', source: 'brevo' });
 
     logger.info('Lead saved to Google Sheets', {
       rowNumber,
@@ -149,12 +163,14 @@ export async function handleBrevoWebhook(
           website: aiAnalysis.website,
           registeredCapital: aiAnalysis.registeredCapital,
         });
+        lineNotificationTotal.inc({ status: 'success', type: 'push' });
 
         logger.info('LINE notification sent', {
           rowNumber,
           company: lead.company,
         });
       } catch (lineError) {
+        lineNotificationTotal.inc({ status: 'error', type: 'push' });
         // Log but don't fail the request
         logger.error('Failed to send LINE notification', {
           error: lineError instanceof Error ? lineError.message : 'Unknown error',

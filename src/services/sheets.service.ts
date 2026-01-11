@@ -49,6 +49,24 @@ const circuitBreaker = new CircuitBreaker(5, 60000);
 // Helper Functions
 // ===========================================
 
+/**
+ * Format date for Google Sheets (Thai timezone +7)
+ * Output: "DD/MM/YYYY HH:MM:SS"
+ */
+function formatDateForSheets(date: Date = new Date()): string {
+  // Convert to Thai timezone (+7 hours)
+  const thaiDate = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+
+  const day = String(thaiDate.getUTCDate()).padStart(2, '0');
+  const month = String(thaiDate.getUTCMonth() + 1).padStart(2, '0');
+  const year = thaiDate.getUTCFullYear();
+  const hours = String(thaiDate.getUTCHours()).padStart(2, '0');
+  const minutes = String(thaiDate.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(thaiDate.getUTCSeconds()).padStart(2, '0');
+
+  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+}
+
 function getSheetRange(sheetName: string, range: string): string {
   return `${sheetName}!${range}`;
 }
@@ -83,7 +101,7 @@ function rowToLead(row: string[], rowNumber: number): LeadRow {
 
 function leadToRow(lead: Partial<Lead>, version: number = 1): string[] {
   return [
-    lead.date || new Date().toISOString(),
+    lead.date || formatDateForSheets(),
     lead.customerName || '',
     lead.email || '',
     lead.phone || '',
@@ -277,7 +295,7 @@ export class SheetsService {
     }
 
     // Update timestamp based on status
-    const now = new Date().toISOString();
+    const now = formatDateForSheets();
     const updates: Partial<Lead> = {
       salesOwnerId: salesUserId,
       salesOwnerName: salesUserName,
@@ -327,7 +345,7 @@ export class SheetsService {
       );
     }
 
-    const now = new Date().toISOString();
+    const now = formatDateForSheets();
     const updates: Partial<Lead> = { status: newStatus };
 
     switch (newStatus) {
@@ -381,7 +399,7 @@ export class SheetsService {
           range: getSheetRange(this.dedupSheet, 'A:D'),
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[key, email, campaignId, new Date().toISOString()]],
+            values: [[key, email, campaignId, formatDateForSheets()]],
           },
         });
       });

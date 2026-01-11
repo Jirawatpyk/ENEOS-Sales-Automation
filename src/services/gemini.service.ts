@@ -7,7 +7,7 @@ import { GoogleGenerativeAI, GenerativeModel, HarmCategory, HarmBlockThreshold }
 import { config } from '../config/index.js';
 import { geminiLogger as logger } from '../utils/logger.js';
 import { withRetry, CircuitBreaker } from '../utils/retry.js';
-import { CompanyAnalysis, ExternalServiceError } from '../types/index.js';
+import { CompanyAnalysis } from '../types/index.js';
 
 // ===========================================
 // Gemini Client Setup

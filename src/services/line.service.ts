@@ -3,7 +3,7 @@
  * Enterprise-grade LINE OA integration
  */
 
-import { Client, ClientConfig, FlexMessage, TextMessage, Profile } from '@line/bot-sdk';
+import { Client, ClientConfig, TextMessage } from '@line/bot-sdk';
 import { createHmac } from 'crypto';
 import { config } from '../config/index.js';
 import { lineLogger as logger } from '../utils/logger.js';

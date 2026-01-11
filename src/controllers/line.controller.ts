@@ -14,7 +14,7 @@ import {
   isPostbackEvent,
   LineWebhookEventInput,
 } from '../validators/line.validator.js';
-import { AppError, RaceConditionError, LeadStatus } from '../types/index.js';
+import { AppError, RaceConditionError } from '../types/index.js';
 import { config } from '../config/index.js';
 
 // ===========================================
@@ -28,9 +28,8 @@ import { config } from '../config/index.js';
 export async function handleLineWebhook(
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): Promise<void> {
-  const startTime = Date.now();
 
   try {
     logger.info('Received LINE webhook', {
@@ -249,7 +248,7 @@ export function verifyLineSignature(
  * Test LINE notification
  */
 export async function testLineNotification(
-  req: Request,
+  _req: Request,
   res: Response
 ): Promise<void> {
   if (config.isProd) {

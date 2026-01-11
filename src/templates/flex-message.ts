@@ -3,7 +3,7 @@
  * Beautiful, interactive card messages for sales team
  */
 
-import { FlexMessage, TextMessage, FlexBubble, FlexBox, FlexText, FlexButton, FlexSeparator } from '@line/bot-sdk';
+import { FlexMessage, TextMessage, FlexBubble, FlexBox } from '@line/bot-sdk';
 import { LeadRow } from '../types/index.js';
 import { formatPhoneDisplay, createTelUri } from '../utils/phone-formatter.js';
 
@@ -254,6 +254,7 @@ export function createLeadFlexMessage(
                   align: 'end',
                   action: lead.phone ? {
                     type: 'uri',
+                    label: 'โทร',
                     uri: telUri,
                   } : undefined,
                 },
@@ -280,6 +281,7 @@ export function createLeadFlexMessage(
                   align: 'end',
                   action: lead.email ? {
                     type: 'uri',
+                    label: 'ส่งอีเมล',
                     uri: `mailto:${lead.email}`,
                   } : undefined,
                 },

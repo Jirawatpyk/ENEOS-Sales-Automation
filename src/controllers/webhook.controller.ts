@@ -10,10 +10,10 @@ import { geminiService } from '../services/gemini.service.js';
 import { lineService } from '../services/line.service.js';
 import { deduplicationService } from '../services/deduplication.service.js';
 import { addFailedBrevoWebhook } from '../services/dead-letter-queue.service.js';
-import { validateBrevoWebhook, isClickEvent, BREVO_EVENTS } from '../validators/brevo.validator.js';
+import { validateBrevoWebhook, isClickEvent } from '../validators/brevo.validator.js';
 import { extractDomain } from '../utils/email-parser.js';
 import { formatPhone } from '../utils/phone-formatter.js';
-import { Lead, LeadRow, AppError, DuplicateLeadError } from '../types/index.js';
+import { Lead, LeadRow, DuplicateLeadError } from '../types/index.js';
 import { config } from '../config/index.js';
 
 // ===========================================
@@ -205,7 +205,7 @@ export async function handleBrevoWebhook(
 /**
  * Verify webhook endpoint (GET request for setup)
  */
-export function verifyWebhook(req: Request, res: Response): void {
+export function verifyWebhook(_req: Request, res: Response): void {
   logger.info('Webhook verification request received');
 
   res.status(200).json({

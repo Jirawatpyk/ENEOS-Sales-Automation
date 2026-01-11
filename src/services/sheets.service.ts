@@ -3,7 +3,7 @@
  * Enterprise-grade Google Sheets integration with optimistic locking
  */
 
-import { google, sheets_v4 } from 'googleapis';
+import { google } from 'googleapis';
 import { config } from '../config/index.js';
 import { sheetsLogger as logger } from '../utils/logger.js';
 import { withRetry, CircuitBreaker } from '../utils/retry.js';
@@ -35,33 +35,15 @@ const circuitBreaker = new CircuitBreaker(5, 60000);
 // Column Mapping (1-indexed for Google Sheets API)
 // ===========================================
 
-const LEAD_COLUMNS = {
-  date: 'A',
-  customerName: 'B',
-  email: 'C',
-  phone: 'D',
-  company: 'E',
-  industryAI: 'F',
-  website: 'G',
-  capital: 'H',
-  status: 'I',
-  salesOwnerId: 'J',
-  salesOwnerName: 'K',
-  campaignId: 'L',
-  campaignName: 'M',
-  emailSubject: 'N',
-  source: 'O',
-  leadId: 'P',
-  eventId: 'Q',
-  clickedAt: 'R',
-  talkingPoint: 'S',
-  closedAt: 'T',
-  lostAt: 'U',
-  unreachableAt: 'V',
-  version: 'W', // For optimistic locking
-};
+/**
+ * Column mapping reference (1-indexed for Google Sheets API):
+ * A: date, B: customerName, C: email, D: phone, E: company
+ * F: industryAI, G: website, H: capital, I: status
+ * J: salesOwnerId, K: salesOwnerName, L: campaignId, M: campaignName
+ * N: emailSubject, O: source, P: leadId, Q: eventId, R: clickedAt
+ * S: talkingPoint, T: closedAt, U: lostAt, V: unreachableAt, W: version
+ */
 
-const COLUMN_COUNT = Object.keys(LEAD_COLUMNS).length;
 
 // ===========================================
 // Helper Functions

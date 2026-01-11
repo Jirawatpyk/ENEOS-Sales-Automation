@@ -16,6 +16,7 @@ import { config } from '../config/index.js';
  */
 export function initSentry(): void {
   if (!config.sentry.enabled || !config.sentry.dsn) {
+    // eslint-disable-next-line no-console -- Startup info before logger available
     console.log('Sentry is disabled (no DSN configured)');
     return;
   }
@@ -72,6 +73,7 @@ export function initSentry(): void {
     ],
   });
 
+  // eslint-disable-next-line no-console -- Startup info before logger available
   console.log(`Sentry initialized (environment: ${config.sentry.environment})`);
 }
 

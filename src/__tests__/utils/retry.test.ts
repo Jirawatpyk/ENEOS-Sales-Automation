@@ -43,16 +43,17 @@ describe('Retry Utility', () => {
     it('should throw after max attempts', async () => {
       const fn = vi.fn().mockRejectedValue(new Error('ECONNRESET'));
 
-      // Start the retry and handle the rejection
-      try {
-        const promise = withRetry(fn, { maxAttempts: 3, baseDelayMs: 100 });
-        await vi.runAllTimersAsync();
-        await promise;
-        // Should not reach here
-        expect.fail('Expected error to be thrown');
-      } catch (error) {
-        expect((error as Error).message).toBe('ECONNRESET');
-      }
+      // Create promise and attach rejection handler immediately
+      const promise = withRetry(fn, { maxAttempts: 3, baseDelayMs: 100 });
+
+      // Attach assertion before running timers to prevent unhandled rejection
+      const assertionPromise = expect(promise).rejects.toThrow('ECONNRESET');
+
+      // Run all timers to complete retries
+      await vi.runAllTimersAsync();
+
+      // Wait for the assertion to complete
+      await assertionPromise;
 
       expect(fn).toHaveBeenCalledTimes(3);
     });

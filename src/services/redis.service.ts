@@ -103,6 +103,17 @@ class RedisService {
     return this.enabled && this.isConnected && this.client !== null;
   }
 
+  /**
+   * Get client safely (throws if not available)
+   * Use after isAvailable() check to avoid non-null assertions
+   */
+  private getClient(): Redis {
+    if (!this.client) {
+      throw new Error('Redis client is not initialized');
+    }
+    return this.client;
+  }
+
   // ===========================================
   // Key-Value Operations
   // ===========================================
@@ -115,7 +126,7 @@ class RedisService {
       return null;
     }
     try {
-      return await this.client!.get(key);
+      return await this.getClient().get(key);
     } catch (error) {
       this.redisLogger.error('Redis GET failed', { key, error: (error as Error).message });
       return null;
@@ -131,9 +142,9 @@ class RedisService {
     }
     try {
       if (ttlSeconds) {
-        await this.client!.setex(key, ttlSeconds, value);
+        await this.getClient().setex(key, ttlSeconds, value);
       } else {
-        await this.client!.set(key, value);
+        await this.getClient().set(key, value);
       }
       return true;
     } catch (error) {
@@ -150,7 +161,7 @@ class RedisService {
       return false;
     }
     try {
-      await this.client!.del(key);
+      await this.getClient().del(key);
       return true;
     } catch (error) {
       this.redisLogger.error('Redis DEL failed', { key, error: (error as Error).message });
@@ -166,7 +177,7 @@ class RedisService {
       return false;
     }
     try {
-      const result = await this.client!.exists(key);
+      const result = await this.getClient().exists(key);
       return result === 1;
     } catch (error) {
       this.redisLogger.error('Redis EXISTS failed', { key, error: (error as Error).message });
@@ -182,7 +193,7 @@ class RedisService {
       return false;
     }
     try {
-      await this.client!.expire(key, ttlSeconds);
+      await this.getClient().expire(key, ttlSeconds);
       return true;
     } catch (error) {
       this.redisLogger.error('Redis EXPIRE failed', { key, error: (error as Error).message });
@@ -202,7 +213,7 @@ class RedisService {
       return false;
     }
     try {
-      await this.client!.hset(key, field, value);
+      await this.getClient().hset(key, field, value);
       return true;
     } catch (error) {
       this.redisLogger.error('Redis HSET failed', { key, field, error: (error as Error).message });
@@ -218,7 +229,7 @@ class RedisService {
       return null;
     }
     try {
-      return await this.client!.hget(key, field);
+      return await this.getClient().hget(key, field);
     } catch (error) {
       this.redisLogger.error('Redis HGET failed', { key, field, error: (error as Error).message });
       return null;
@@ -233,7 +244,7 @@ class RedisService {
       return null;
     }
     try {
-      const result = await this.client!.hgetall(key);
+      const result = await this.getClient().hgetall(key);
       return Object.keys(result).length > 0 ? result : null;
     } catch (error) {
       this.redisLogger.error('Redis HGETALL failed', { key, error: (error as Error).message });
@@ -249,7 +260,7 @@ class RedisService {
       return false;
     }
     try {
-      await this.client!.hdel(key, field);
+      await this.getClient().hdel(key, field);
       return true;
     } catch (error) {
       this.redisLogger.error('Redis HDEL failed', { key, field, error: (error as Error).message });
@@ -265,7 +276,7 @@ class RedisService {
       return [];
     }
     try {
-      return await this.client!.hkeys(key);
+      return await this.getClient().hkeys(key);
     } catch (error) {
       this.redisLogger.error('Redis HKEYS failed', { key, error: (error as Error).message });
       return [];
@@ -280,7 +291,7 @@ class RedisService {
       return 0;
     }
     try {
-      return await this.client!.hlen(key);
+      return await this.getClient().hlen(key);
     } catch (error) {
       this.redisLogger.error('Redis HLEN failed', { key, error: (error as Error).message });
       return 0;
@@ -299,7 +310,7 @@ class RedisService {
       return false;
     }
     try {
-      await this.client!.rpush(key, value);
+      await this.getClient().rpush(key, value);
       return true;
     } catch (error) {
       this.redisLogger.error('Redis RPUSH failed', { key, error: (error as Error).message });
@@ -315,7 +326,7 @@ class RedisService {
       return [];
     }
     try {
-      return await this.client!.lrange(key, start, stop);
+      return await this.getClient().lrange(key, start, stop);
     } catch (error) {
       this.redisLogger.error('Redis LRANGE failed', { key, error: (error as Error).message });
       return [];
@@ -330,7 +341,7 @@ class RedisService {
       return 0;
     }
     try {
-      return await this.client!.llen(key);
+      return await this.getClient().llen(key);
     } catch (error) {
       this.redisLogger.error('Redis LLEN failed', { key, error: (error as Error).message });
       return 0;
@@ -345,7 +356,7 @@ class RedisService {
       return false;
     }
     try {
-      await this.client!.lrem(key, count, value);
+      await this.getClient().lrem(key, count, value);
       return true;
     } catch (error) {
       this.redisLogger.error('Redis LREM failed', { key, error: (error as Error).message });
@@ -371,7 +382,7 @@ class RedisService {
 
     try {
       const start = Date.now();
-      await this.client!.ping();
+      await this.getClient().ping();
       const latency = Date.now() - start;
 
       return { healthy: true, latency };
@@ -410,7 +421,7 @@ class RedisService {
       return false;
     }
     try {
-      await this.client!.flushall();
+      await this.getClient().flushall();
       this.redisLogger.warn('Redis FLUSHALL executed');
       return true;
     } catch (error) {
@@ -427,7 +438,7 @@ class RedisService {
       return null;
     }
     try {
-      return await this.client!.info();
+      return await this.getClient().info();
     } catch (error) {
       this.redisLogger.error('Redis INFO failed', { error: (error as Error).message });
       return null;

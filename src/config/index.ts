@@ -69,8 +69,10 @@ const parseEnv = () => {
   const result = envSchema.safeParse(process.env);
 
   if (!result.success) {
+    // eslint-disable-next-line no-console -- Logger not available during config init
     console.error('Environment validation failed:');
     result.error.issues.forEach((issue) => {
+      // eslint-disable-next-line no-console -- Logger not available during config init
       console.error(`  - ${issue.path.join('.')}: ${issue.message}`);
     });
     process.exit(1);
@@ -85,13 +87,16 @@ const parseEnv = () => {
   if (data.NODE_ENV === 'production') {
     // CRITICAL: Prevent security bypass in production
     if (data.SKIP_LINE_SIGNATURE_VERIFICATION) {
+      // eslint-disable-next-line no-console -- Critical security error before logger init
       console.error('CRITICAL SECURITY ERROR: SKIP_LINE_SIGNATURE_VERIFICATION cannot be true in production!');
       process.exit(1);
     }
 
     // Warn about insecure CORS settings
     if (data.CORS_ORIGINS === '*') {
+      // eslint-disable-next-line no-console -- Security warning before logger init
       console.warn('WARNING: CORS_ORIGINS is set to "*" in production. This is insecure!');
+      // eslint-disable-next-line no-console -- Security warning before logger init
       console.warn('         Set CORS_ORIGINS to your specific domains (comma-separated).');
     }
   }

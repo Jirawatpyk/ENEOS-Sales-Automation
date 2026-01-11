@@ -191,7 +191,7 @@ app.get('/metrics', async (_req, res) => {
   try {
     res.setHeader('Content-Type', getMetricsContentType());
     res.send(await getMetrics());
-  } catch (error) {
+  } catch (_error) {
     res.status(500).send('Error collecting metrics');
   }
 });

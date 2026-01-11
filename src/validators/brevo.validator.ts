@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { NormalizedBrevoPayload } from '../types/index.js';
+import { formatDateForSheets } from '../utils/date-formatter.js';
 
 // ===========================================
 // Brevo Webhook Schema
@@ -80,7 +81,7 @@ export function normalizeBrevoPayload(input: BrevoWebhookInput): NormalizedBrevo
     subject: input.subject || '',
     contactId: String(input.contact_id || ''),
     eventId: input['message-id'] || String(input.id || ''),
-    clickedAt: input.date || new Date().toISOString(),
+    clickedAt: formatDateForSheets(input.date || new Date()),
   };
 }
 

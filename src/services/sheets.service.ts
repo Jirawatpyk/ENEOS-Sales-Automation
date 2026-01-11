@@ -7,6 +7,7 @@ import { google } from 'googleapis';
 import { config } from '../config/index.js';
 import { sheetsLogger as logger } from '../utils/logger.js';
 import { withRetry, CircuitBreaker } from '../utils/retry.js';
+import { formatDateForSheets } from '../utils/date-formatter.js';
 import {
   Lead,
   LeadRow,
@@ -48,24 +49,6 @@ const circuitBreaker = new CircuitBreaker(5, 60000);
 // ===========================================
 // Helper Functions
 // ===========================================
-
-/**
- * Format date for Google Sheets (Thai timezone +7)
- * Output: "DD/MM/YYYY HH:MM:SS"
- */
-function formatDateForSheets(date: Date = new Date()): string {
-  // Convert to Thai timezone (+7 hours)
-  const thaiDate = new Date(date.getTime() + 7 * 60 * 60 * 1000);
-
-  const day = String(thaiDate.getUTCDate()).padStart(2, '0');
-  const month = String(thaiDate.getUTCMonth() + 1).padStart(2, '0');
-  const year = thaiDate.getUTCFullYear();
-  const hours = String(thaiDate.getUTCHours()).padStart(2, '0');
-  const minutes = String(thaiDate.getUTCMinutes()).padStart(2, '0');
-  const seconds = String(thaiDate.getUTCSeconds()).padStart(2, '0');
-
-  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
-}
 
 function getSheetRange(sheetName: string, range: string): string {
   return `${sheetName}!${range}`;

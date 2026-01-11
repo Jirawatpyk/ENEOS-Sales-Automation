@@ -285,16 +285,28 @@ export class SheetsService {
       status,
     };
 
-    // Set appropriate timestamp
+    // Set appropriate timestamp and clear others (only one status at a time)
     switch (status) {
       case 'closed':
         updates.closedAt = now;
+        updates.lostAt = '';
+        updates.unreachableAt = '';
         break;
       case 'lost':
+        updates.closedAt = '';
         updates.lostAt = now;
+        updates.unreachableAt = '';
         break;
       case 'unreachable':
+        updates.closedAt = '';
+        updates.lostAt = '';
         updates.unreachableAt = now;
+        break;
+      case 'contacted':
+        // รับเคสครั้งแรก - เคลียร์ทุก timestamp
+        updates.closedAt = '';
+        updates.lostAt = '';
+        updates.unreachableAt = '';
         break;
     }
 

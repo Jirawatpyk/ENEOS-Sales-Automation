@@ -145,7 +145,7 @@ export class SheetsService {
         const response = await sheets.spreadsheets.values.append({
           spreadsheetId: this.spreadsheetId,
           range: getSheetRange(this.leadsSheet, 'A:W'),
-          valueInputOption: 'USER_ENTERED',
+          valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           requestBody: {
             values: [row],
@@ -232,7 +232,7 @@ export class SheetsService {
         await sheets.spreadsheets.values.update({
           spreadsheetId: this.spreadsheetId,
           range: getSheetRange(this.leadsSheet, `A${rowNumber}:W${rowNumber}`),
-          valueInputOption: 'USER_ENTERED',
+          valueInputOption: 'RAW',
           requestBody: {
             values: [row],
           },

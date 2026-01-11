@@ -248,6 +248,31 @@ src/
    - ตรวจสอบ Rate Limit
    - ระบบจะ fallback ใช้ค่า default อัตโนมัติ
 
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture with diagrams |
+| [docs/api-reference.md](docs/api-reference.md) | API endpoints reference |
+| [docs/data-flow.md](docs/data-flow.md) | Data flow documentation |
+| [docs/services.md](docs/services.md) | Services documentation |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Deployment instructions |
+| [CLAUDE.md](CLAUDE.md) | AI assistant context |
+
+### Interactive Documentation
+- **Swagger UI**: `/api-docs`
+- **OpenAPI Spec**: `/api-docs.json`
+
+## 📈 Monitoring
+
+| Endpoint | Description |
+|----------|-------------|
+| `/health` | Full health check with service status |
+| `/ready` | Kubernetes readiness probe |
+| `/live` | Kubernetes liveness probe |
+| `/metrics` | Prometheus metrics |
+| `/metrics/summary` | Human-readable metrics JSON |
+
 ## 📝 License
 
 UNLICENSED - ENEOS Thailand Internal Use Only

@@ -8,7 +8,7 @@
 
 import { sheetsService } from './src/services/sheets.service.js';
 
-const ROW_TO_TEST = 21; // Row ที่จะทดสอบ (ต้องยังไม่มีคนรับ)
+const ROW_TO_TEST = 22; // Row ที่จะทดสอบ (ต้องยังไม่มีคนรับ)
 
 const USER_A = {
   id: 'U_test_user_a_12345',
@@ -148,10 +148,64 @@ async function runTests() {
   console.log('');
 
   // ============================================
-  // Test 5: เช็ครูปแบบวันเวลา
+  // Test 5: เปลี่ยนสถานะหลายครั้ง (ต้องเคลียร์ timestamp อื่น)
   // ============================================
   console.log('-'.repeat(60));
-  console.log('🧪 TEST 5: ตรวจสอบรูปแบบวันเวลา');
+  console.log('🧪 TEST 5: เปลี่ยนเป็น unreachable (ต้องเคลียร์ closed)');
+  console.log('-'.repeat(60));
+
+  try {
+    const result5 = await sheetsService.claimLead(
+      ROW_TO_TEST,
+      USER_A.id,
+      USER_A.name,
+      'unreachable'
+    );
+
+    if (result5.success) {
+      console.log('✅ ผลลัพธ์: อัพเดทสถานะสำเร็จ');
+      console.log(`   สถานะใหม่: ${result5.lead.status}`);
+      console.log(`   Closed At: ${result5.lead.closedAt || '(ว่าง)'} ${result5.lead.closedAt ? '❌ ควรเคลียร์!' : '✅'}`);
+      console.log(`   Lost At: ${result5.lead.lostAt || '(ว่าง)'} ${result5.lead.lostAt ? '❌ ควรเคลียร์!' : '✅'}`);
+      console.log(`   Unreachable At: ${result5.lead.unreachableAt || '(ว่าง)'} ${result5.lead.unreachableAt ? '✅' : '❌ ควรมีค่า!'}`);
+    }
+  } catch (error) {
+    console.error('❌ Error:', error);
+  }
+  console.log('');
+
+  // ============================================
+  // Test 6: เปลี่ยนเป็น lost (ต้องเคลียร์ unreachable)
+  // ============================================
+  console.log('-'.repeat(60));
+  console.log('🧪 TEST 6: เปลี่ยนเป็น lost (ต้องเคลียร์ unreachable)');
+  console.log('-'.repeat(60));
+
+  try {
+    const result6 = await sheetsService.claimLead(
+      ROW_TO_TEST,
+      USER_A.id,
+      USER_A.name,
+      'lost'
+    );
+
+    if (result6.success) {
+      console.log('✅ ผลลัพธ์: อัพเดทสถานะสำเร็จ');
+      console.log(`   สถานะใหม่: ${result6.lead.status}`);
+      console.log(`   Closed At: ${result6.lead.closedAt || '(ว่าง)'} ${result6.lead.closedAt ? '❌ ควรเคลียร์!' : '✅'}`);
+      console.log(`   Lost At: ${result6.lead.lostAt || '(ว่าง)'} ${result6.lead.lostAt ? '✅' : '❌ ควรมีค่า!'}`);
+      console.log(`   Unreachable At: ${result6.lead.unreachableAt || '(ว่าง)'} ${result6.lead.unreachableAt ? '❌ ควรเคลียร์!' : '✅'}`);
+    }
+  } catch (error) {
+    console.error('❌ Error:', error);
+  }
+  console.log('');
+
+  // ============================================
+  // Test 7: เช็ครูปแบบวันเวลา
+  // ============================================
+  console.log('-'.repeat(60));
+  console.log('🧪 TEST 7: ตรวจสอบรูปแบบวันเวลา');
   console.log('-'.repeat(60));
 
   const leadCheck = await sheetsService.getRow(ROW_TO_TEST);

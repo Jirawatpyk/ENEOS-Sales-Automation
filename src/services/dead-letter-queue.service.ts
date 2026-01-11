@@ -157,7 +157,7 @@ class DeadLetterQueueService {
    * Get all failed events (with optional limit) - async version with Redis
    */
   async getAllAsync(limit?: number): Promise<FailedEvent[]> {
-    let events: FailedEvent[] = [];
+    const events: FailedEvent[] = [];
 
     // Try Redis first
     if (redisService.isAvailable()) {
@@ -208,7 +208,7 @@ class DeadLetterQueueService {
    */
   markRetrying(id: string): boolean {
     const event = this.queue.get(id);
-    if (!event) return false;
+    if (!event) {return false;}
 
     event.metadata.retryCount++;
     event.metadata.lastRetryAt = new Date().toISOString();
@@ -256,7 +256,7 @@ class DeadLetterQueueService {
    */
   shouldRetry(id: string): boolean {
     const event = this.queue.get(id);
-    if (!event) return false;
+    if (!event) {return false;}
     return event.metadata.retryCount < this.maxRetries;
   }
 
@@ -342,7 +342,7 @@ class DeadLetterQueueService {
     let imported = 0;
 
     for (const event of events) {
-      if (this.queue.size >= this.maxQueueSize) break;
+      if (this.queue.size >= this.maxQueueSize) {break;}
 
       if (!this.queue.has(event.id)) {
         this.queue.set(event.id, event);

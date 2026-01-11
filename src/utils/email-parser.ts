@@ -80,7 +80,7 @@ export function isFreeEmailProvider(email: string): boolean {
 export function guessCompanyFromEmail(email: string): string {
   const domain = extractDomain(email);
 
-  if (!domain) return '';
+  if (!domain) {return '';}
 
   // Remove common TLDs and subdomains
   const parts = domain.split('.');

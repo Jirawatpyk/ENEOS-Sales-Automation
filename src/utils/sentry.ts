@@ -133,7 +133,7 @@ export function captureMessage(
  * Set user context for subsequent events
  */
 export function setUser(user: { id?: string; email?: string; name?: string } | null): void {
-  if (!config.sentry.enabled) return;
+  if (!config.sentry.enabled) {return;}
   Sentry.setUser(user);
 }
 
@@ -141,7 +141,7 @@ export function setUser(user: { id?: string; email?: string; name?: string } | n
  * Set custom tags for subsequent events
  */
 export function setTags(tags: Record<string, string>): void {
-  if (!config.sentry.enabled) return;
+  if (!config.sentry.enabled) {return;}
   Sentry.setTags(tags);
 }
 
@@ -149,7 +149,7 @@ export function setTags(tags: Record<string, string>): void {
  * Set extra context data
  */
 export function setExtra(key: string, value: unknown): void {
-  if (!config.sentry.enabled) return;
+  if (!config.sentry.enabled) {return;}
   Sentry.setExtra(key, value);
 }
 
@@ -162,7 +162,7 @@ export function addBreadcrumb(breadcrumb: {
   level?: 'fatal' | 'error' | 'warning' | 'info' | 'debug';
   data?: Record<string, unknown>;
 }): void {
-  if (!config.sentry.enabled) return;
+  if (!config.sentry.enabled) {return;}
   Sentry.addBreadcrumb(breadcrumb);
 }
 
@@ -174,7 +174,7 @@ export function addBreadcrumb(breadcrumb: {
  * Start a new transaction for performance monitoring
  */
 export function startTransaction(name: string, op: string): ReturnType<typeof Sentry.startSpan> | null {
-  if (!config.sentry.enabled) return null;
+  if (!config.sentry.enabled) {return null;}
 
   return Sentry.startSpan({ name, op }, (span) => span);
 }
@@ -211,7 +211,7 @@ export async function withTransaction<T>(
  * Flush pending events before shutdown
  */
 export async function flushSentry(timeout: number = 2000): Promise<boolean> {
-  if (!config.sentry.enabled) return true;
+  if (!config.sentry.enabled) {return true;}
   return Sentry.flush(timeout);
 }
 

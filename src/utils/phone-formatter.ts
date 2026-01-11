@@ -16,7 +16,7 @@
  * formatPhone('081 234 5678') // '0812345678'
  */
 export function formatPhone(phone: string | null | undefined): string {
-  if (!phone) return '';
+  if (!phone) {return '';}
 
   return phone
     .replace(/\s+/g, '')      // Remove spaces

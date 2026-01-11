@@ -6,6 +6,7 @@
 import express, { Express } from 'express';
 import { Server } from 'http';
 import helmet from 'helmet';
+import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
@@ -31,6 +32,8 @@ import { lineService } from './services/line.service.js';
 import { deduplicationService } from './services/deduplication.service.js';
 import { deadLetterQueue } from './services/dead-letter-queue.service.js';
 import { HealthCheckResponse } from './types/index.js';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger.js';
 
 // ===========================================
 // Create Express Application
@@ -45,6 +48,15 @@ const app: Express = express();
 // Helmet for security headers
 app.use(helmet({
   contentSecurityPolicy: false, // Disable for webhooks
+}));
+
+// CORS configuration
+const corsOrigins = config.security.corsOrigins;
+app.use(cors({
+  origin: corsOrigins.includes('*') ? '*' : corsOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Line-Signature'],
+  credentials: true,
 }));
 
 // Rate limiting
@@ -159,6 +171,18 @@ app.get('/', (_req, res) => {
   });
 });
 
+// API Documentation (Swagger UI)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'ENEOS Sales Automation API',
+}));
+
+// OpenAPI JSON spec endpoint
+app.get('/api-docs.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
 // Webhook routes
 app.use('/webhook', webhookRoutes);
 app.use('/webhook/line', lineRoutes);
@@ -205,6 +229,7 @@ app.use(errorHandler);
 // Server Reference (for graceful shutdown)
 // ===========================================
 
+// eslint-disable-next-line prefer-const
 let server: Server;
 
 // ===========================================

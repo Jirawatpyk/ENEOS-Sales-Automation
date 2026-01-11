@@ -266,7 +266,7 @@ export class LineService {
    * Send escalation alert for unclaimed leads
    */
   async sendEscalationAlert(leads: LeadRow[], hoursWaiting: number): Promise<void> {
-    if (leads.length === 0) return;
+    if (leads.length === 0) {return;}
 
     logger.warn('Sending escalation alert', {
       leadCount: leads.length,

@@ -189,9 +189,11 @@ expect(response.status).toBe(200);
 
 ### Running Tests
 ```bash
-npm test                  # Run all tests
-npm run test:coverage     # With coverage report
-npm run test:ui           # Visual UI mode
+npm test                                                    # Run all tests
+npm run test:coverage                                       # With coverage report
+npm run test:ui                                             # Visual UI mode
+npm test -- src/__tests__/services/sheets.service.test.ts   # Run specific file
+npm test -- -t "should add lead"                            # Run test by name
 ```
 
 ## Security Best Practices
@@ -254,6 +256,7 @@ if (config.features.aiEnrichment) {
 | GET | `/ready` | Readiness Check |
 | GET | `/live` | Liveness Check |
 | GET | `/metrics` | Prometheus Metrics |
+| GET | `/metrics/summary` | Human-readable Metrics JSON |
 | GET | `/api-docs.json` | OpenAPI Specification |
 | POST | `/webhook/brevo` | Brevo Webhook (Scenario A) |
 | POST | `/webhook/line` | LINE Webhook (Scenario B) |
@@ -296,3 +299,13 @@ if (config.features.aiEnrichment) {
 5. **Email Domain Extraction:**
    - ใช้ `utils/email-parser.ts` แยก domain จาก email
    - ส่งให้ Gemini วิเคราะห์ว่าบริษัทนี้ทำธุรกิจอะไร
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture with Mermaid diagrams |
+| [docs/api-reference.md](docs/api-reference.md) | API endpoints reference |
+| [docs/data-flow.md](docs/data-flow.md) | Data flow and sequence diagrams |
+| [docs/services.md](docs/services.md) | Services layer documentation |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Deployment instructions |

@@ -13,6 +13,7 @@ import { addFailedBrevoWebhook } from '../services/dead-letter-queue.service.js'
 import { validateBrevoWebhook, isClickEvent } from '../validators/brevo.validator.js';
 import { extractDomain } from '../utils/email-parser.js';
 import { formatPhone } from '../utils/phone-formatter.js';
+import { formatDateForSheets } from '../utils/date-formatter.js';
 import { Lead, LeadRow, DuplicateLeadError } from '../types/index.js';
 import { config } from '../config/index.js';
 
@@ -107,7 +108,7 @@ export async function handleBrevoWebhook(
 
     // Step 5: Save to Google Sheets
     const lead: Partial<Lead> = {
-      date: new Date().toISOString(),
+      date: formatDateForSheets(),
       customerName: `${payload.firstname} ${payload.lastname}`.trim() || 'ไม่ระบุ',
       email: payload.email,
       phone: formatPhone(payload.phone),
@@ -244,7 +245,7 @@ export async function testWebhook(req: Request, res: Response): Promise<void> {
     subject: 'Test Email',
     contact_id: 12345,
     'message-id': 'test-event-123',
-    date: new Date().toISOString(),
+    date: formatDateForSheets(),
   };
 
   // Inject mock payload into request body

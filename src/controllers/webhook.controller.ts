@@ -152,6 +152,7 @@ export async function handleBrevoWebhook(
     const leadRow: LeadRow = {
       ...lead as Lead,
       rowNumber,
+      version: 1, // New lead starts with version 1
     };
 
     // Step 6: Send LINE notification

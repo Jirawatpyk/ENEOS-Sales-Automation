@@ -26,6 +26,7 @@ import {
 } from './middleware/request-context.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import lineRoutes from './routes/line.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import { sheetsService } from './services/sheets.service.js';
 import { geminiService } from './services/gemini.service.js';
 import { lineService } from './services/line.service.js';
@@ -170,6 +171,9 @@ app.get('/', (_req, res) => {
       ready: '/ready',
       brevoWebhook: '/webhook/brevo',
       lineWebhook: '/webhook/line',
+      adminDashboard: '/api/admin/dashboard',
+      adminLeads: '/api/admin/leads',
+      adminSalesPerformance: '/api/admin/sales-performance',
     },
   });
 });
@@ -209,6 +213,9 @@ app.get('/metrics/summary', async (_req, res) => {
 // Webhook routes
 app.use('/webhook', webhookRoutes);
 app.use('/webhook/line', lineRoutes);
+
+// Admin Dashboard API routes
+app.use('/api/admin', adminRoutes);
 
 // Stats endpoint (development only)
 if (config.isDev) {

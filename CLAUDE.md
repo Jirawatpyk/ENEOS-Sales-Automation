@@ -302,6 +302,7 @@ if (config.features.aiEnrichment) {
 
 ## Documentation
 
+### Backend API
 | Document | Description |
 |----------|-------------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture with Mermaid diagrams |
@@ -309,3 +310,10 @@ if (config.features.aiEnrichment) {
 | [docs/data-flow.md](docs/data-flow.md) | Data flow and sequence diagrams |
 | [docs/services.md](docs/services.md) | Services layer documentation |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Deployment instructions |
+
+### Planned Features
+| Document | Description |
+|----------|-------------|
+| [docs/admin-dashboard/](docs/admin-dashboard/) | Admin Dashboard (Next.js) - Complete design docs |
+| [docs/admin-dashboard/CLAUDE-CONTEXT.md](docs/admin-dashboard/CLAUDE-CONTEXT.md) | Quick reference for Admin Dashboard development |
+| [docs/liff-plan.md](docs/liff-plan.md) | LIFF App (LINE Frontend) - Plan document |

@@ -178,10 +178,10 @@ router.get('/campaigns/:campaignId', requireViewer, asyncHandler(getCampaignDeta
  * - campaign: Campaign ID (optional)
  * - fields: Comma-separated field names (optional)
  *
- * Access: viewer, manager, admin
+ * Access: manager, admin (Story 1.5 AC#7: Viewers cannot export)
  * Rate Limit: 10 requests per hour
  */
-router.get('/export', exportRateLimiter, requireViewer, asyncHandler(exportData));
+router.get('/export', exportRateLimiter, requireManager, asyncHandler(exportData));
 
 // ===========================================
 // Export

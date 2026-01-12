@@ -33,8 +33,8 @@ export const periodSchema = z.enum(VALID_PERIODS);
 
 export const dashboardQuerySchema = z.object({
   period: periodSchema.optional().default('month'),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  startDate: z.string().trim().optional(),
+  endDate: z.string().trim().optional(),
 }).refine(
   (data) => {
     // ถ้าเลือก custom period ต้องมี startDate และ endDate
@@ -71,11 +71,11 @@ export const leadsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(PAGINATION.DEFAULT_PAGE),
   limit: z.coerce.number().int().min(1).max(PAGINATION.MAX_LIMIT).optional().default(PAGINATION.DEFAULT_LIMIT),
   status: leadStatusSchema.optional(),
-  owner: z.string().optional(),
-  campaign: z.string().optional(),
-  search: z.string().max(100).optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  owner: z.string().trim().optional(),
+  campaign: z.string().trim().optional(),
+  search: z.string().trim().max(100).optional(),
+  startDate: z.string().trim().optional(),
+  endDate: z.string().trim().optional(),
   sortBy: z.enum(SORT_OPTIONS.LEADS).optional().default('date'),
   sortOrder: z.enum(SORT_ORDERS).optional().default('desc'),
 });
@@ -98,8 +98,8 @@ export type LeadIdInput = z.infer<typeof leadIdSchema>;
 
 export const salesPerformanceQuerySchema = z.object({
   period: periodSchema.optional().default('month'),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  startDate: z.string().trim().optional(),
+  endDate: z.string().trim().optional(),
   sortBy: z.enum(SORT_OPTIONS.SALES).optional().default('closed'),
   sortOrder: z.enum(SORT_ORDERS).optional().default('desc'),
 }).refine(
@@ -116,6 +116,62 @@ export const salesPerformanceQuerySchema = z.object({
 );
 
 export type SalesPerformanceQueryInput = z.infer<typeof salesPerformanceQuerySchema>;
+
+// ===========================================
+// Campaigns Query Schema
+// ===========================================
+
+export const campaignsQuerySchema = z.object({
+  period: periodSchema.optional().default('quarter'),
+  startDate: z.string().trim().optional(),
+  endDate: z.string().trim().optional(),
+  sortBy: z.enum(SORT_OPTIONS.CAMPAIGNS).optional().default('closed'),
+  sortOrder: z.enum(SORT_ORDERS).optional().default('desc'),
+}).refine(
+  (data) => {
+    if (data.period === 'custom') {
+      return data.startDate && data.endDate;
+    }
+    return true;
+  },
+  {
+    message: 'startDate และ endDate จำเป็นสำหรับ custom period',
+    path: ['period'],
+  }
+);
+
+export type CampaignsQueryInput = z.infer<typeof campaignsQuerySchema>;
+
+// ===========================================
+// Campaign ID Schema
+// ===========================================
+
+export const campaignIdSchema = z.object({
+  campaignId: z.string().trim().min(1, 'Campaign ID ต้องไม่ว่าง'),
+});
+
+export type CampaignIdInput = z.infer<typeof campaignIdSchema>;
+
+// ===========================================
+// Export Query Schema
+// ===========================================
+
+export const exportQuerySchema = z.object({
+  type: z.enum(['leads', 'sales', 'campaigns', 'all'], {
+    errorMap: () => ({ message: 'type ต้องเป็น leads, sales, campaigns หรือ all' }),
+  }),
+  format: z.enum(['xlsx', 'csv', 'pdf'], {
+    errorMap: () => ({ message: 'format ต้องเป็น xlsx, csv หรือ pdf' }),
+  }),
+  startDate: z.string().trim().optional(),
+  endDate: z.string().trim().optional(),
+  status: leadStatusSchema.optional(),
+  owner: z.string().trim().optional(),
+  campaign: z.string().trim().optional(),
+  fields: z.string().trim().optional(), // comma-separated field names
+});
+
+export type ExportQueryInput = z.infer<typeof exportQuerySchema>;
 
 // ===========================================
 // Validation Helper Functions

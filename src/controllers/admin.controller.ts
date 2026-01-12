@@ -37,12 +37,15 @@ import {
   AvailableFilters,
 } from '../types/admin.types.js';
 import { LeadRow } from '../types/index.js';
-import { DASHBOARD, ALERTS, DEFAULT_TARGETS } from '../constants/admin.constants.js';
+import { DASHBOARD, ALERTS, DEFAULT_TARGETS, EXPORT } from '../constants/admin.constants.js';
 import {
   dashboardQuerySchema,
   leadsQuerySchema,
   leadIdSchema,
   salesPerformanceQuerySchema,
+  campaignsQuerySchema,
+  campaignIdSchema,
+  exportQuerySchema,
   safeValidateQuery,
 } from '../validators/admin.validators.js';
 
@@ -73,20 +76,22 @@ function parsePeriod(
       end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
       break;
 
-    case 'week':
+    case 'week': {
       const dayOfWeek = now.getDay();
       const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
       break;
+    }
 
     case 'month':
       start = new Date(now.getFullYear(), now.getMonth(), 1);
       break;
 
-    case 'quarter':
+    case 'quarter': {
       const currentQuarter = Math.floor(now.getMonth() / 3);
       start = new Date(now.getFullYear(), currentQuarter * 3, 1);
       break;
+    }
 
     case 'year':
       start = new Date(now.getFullYear(), 0, 1);
@@ -116,7 +121,7 @@ function parsePeriod(
  * คำนวณจำนวนนาทีระหว่าง 2 วันที่
  */
 function getMinutesBetween(start: string | null, end: string | null): number {
-  if (!start || !end) return 0;
+  if (!start || !end) {return 0;}
   const startDate = new Date(start);
   const endDate = new Date(end);
   return Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60));
@@ -168,7 +173,7 @@ function countByStatus(leads: LeadRow[]): StatusDistribution {
  * คำนวณ % เปลี่ยนแปลง
  */
 function calculateChange(current: number, previous: number): number {
-  if (previous === 0) return current > 0 ? 100 : 0;
+  if (previous === 0) {return current > 0 ? 100 : 0;}
   return ((current - previous) / previous) * 100;
 }
 
@@ -254,9 +259,9 @@ export async function getDashboard(
       }
       const trend = trendMap.get(dateKey)!;
       trend.leads++;
-      if (lead.status === 'claimed') trend.claimed++;
-      if (lead.status === 'contacted') trend.contacted++;
-      if (lead.status === 'closed') trend.closed++;
+      if (lead.status === 'claimed') {trend.claimed++;}
+      if (lead.status === 'contacted') {trend.contacted++;}
+      if (lead.status === 'closed') {trend.closed++;}
     });
 
     const trend = Array.from(trendMap.values()).sort((a, b) =>
@@ -326,7 +331,7 @@ export async function getDashboard(
 
     // Unclaimed leads (เกิน threshold ชั่วโมง)
     const unclaimedLeads = leads.filter((lead) => {
-      if (lead.status !== 'new') return false;
+      if (lead.status !== 'new') {return false;}
       const hoursSinceCreated = (now.getTime() - new Date(lead.date).getTime()) / (1000 * 60 * 60);
       return hoursSinceCreated > ALERTS.UNCLAIMED_HOURS;
     });
@@ -347,7 +352,7 @@ export async function getDashboard(
 
     // Stale leads (contacted แต่ไม่ update เกิน threshold วัน)
     const staleLeads = leads.filter((lead) => {
-      if (lead.status !== 'contacted') return false;
+      if (lead.status !== 'contacted') {return false;}
       const daysSinceContact = (now.getTime() - new Date(lead.clickedAt || lead.date).getTime()) / (1000 * 60 * 60 * 24);
       return daysSinceContact > ALERTS.STALE_DAYS;
     });
@@ -1008,4 +1013,517 @@ function getWeekNumber(date: Date): number {
   const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
   const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
   return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+}
+
+// ===========================================
+// Campaign Endpoints
+// ===========================================
+
+/**
+ * GET /api/admin/campaigns
+ * ดึงข้อมูล campaign analytics
+ */
+export async function getCampaigns(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const validation = safeValidateQuery(campaignsQuerySchema, req.query);
+    if (!validation.success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'พารามิเตอร์ไม่ถูกต้อง',
+          details: validation.errors,
+        },
+      });
+      return;
+    }
+
+    const { period: periodType, startDate, endDate, sortBy, sortOrder } = validation.data;
+
+    logger.info('getCampaigns called', {
+      period: periodType,
+      user: req.user?.email,
+    });
+
+    const period = parsePeriod(periodType, startDate, endDate);
+    const allLeads = await getAllLeads();
+    const leads = filterByPeriod(allLeads, period);
+
+    // Group by campaign
+    const AVERAGE_DEAL_SIZE = EXPORT.AVERAGE_DEAL_SIZE;
+
+    const campaignMap = new Map<string, LeadRow[]>();
+    leads.forEach((lead) => {
+      if (!campaignMap.has(lead.campaignId)) {
+        campaignMap.set(lead.campaignId, []);
+      }
+      campaignMap.get(lead.campaignId)!.push(lead);
+    });
+
+    // สร้าง campaign items
+    const campaigns: any[] = Array.from(campaignMap.entries()).map(([id, campaignLeads]) => {
+      const totalLeads = campaignLeads.length;
+      const claimed = campaignLeads.filter((l) => l.salesOwnerId).length;
+      const contacted = campaignLeads.filter((l) => l.status === 'contacted').length;
+      const closed = campaignLeads.filter((l) => l.status === 'closed').length;
+      const lost = campaignLeads.filter((l) => l.status === 'lost').length;
+      const unreachable = campaignLeads.filter((l) => l.status === 'unreachable').length;
+
+      const conversionRate = totalLeads > 0 ? (closed / totalLeads) * 100 : 0;
+      const claimRate = totalLeads > 0 ? (claimed / totalLeads) * 100 : 0;
+      const estimatedRevenue = closed * AVERAGE_DEAL_SIZE;
+
+      // Get earliest lead date as startDate
+      const startDateCampaign = campaignLeads.reduce((earliest, lead) => {
+        const leadDate = new Date(lead.date);
+        return leadDate < earliest ? leadDate : earliest;
+      }, new Date(campaignLeads[0].date));
+
+      // Create weekly trend
+      const trendMap = new Map<string, { leads: number; closed: number }>();
+      campaignLeads.forEach((lead) => {
+        const weekNum = getWeekNumber(new Date(lead.date));
+        const weekKey = `W${weekNum}`;
+        if (!trendMap.has(weekKey)) {
+          trendMap.set(weekKey, { leads: 0, closed: 0 });
+        }
+        const trend = trendMap.get(weekKey)!;
+        trend.leads++;
+        if (lead.status === 'closed') {trend.closed++;}
+      });
+
+      const trend = Array.from(trendMap.entries()).map(([week, data]) => ({
+        week,
+        leads: data.leads,
+        closed: data.closed,
+      }));
+
+      return {
+        id,
+        name: campaignLeads[0].campaignName,
+        subject: campaignLeads[0].emailSubject,
+        startDate: startDateCampaign.toISOString(),
+        stats: {
+          leads: totalLeads,
+          claimed,
+          contacted,
+          closed,
+          lost,
+          unreachable,
+          conversionRate: Number(conversionRate.toFixed(2)),
+          claimRate: Number(claimRate.toFixed(2)),
+          estimatedRevenue,
+        },
+        trend,
+      };
+    });
+
+    // Sort campaigns
+    campaigns.sort((a, b) => {
+      let aValue = 0;
+      let bValue = 0;
+
+      switch (sortBy) {
+        case 'leads':
+          aValue = a.stats.leads;
+          bValue = b.stats.leads;
+          break;
+        case 'closed':
+          aValue = a.stats.closed;
+          bValue = b.stats.closed;
+          break;
+        case 'conversionRate':
+          aValue = a.stats.conversionRate;
+          bValue = b.stats.conversionRate;
+          break;
+        default:
+          aValue = a.stats.closed;
+          bValue = b.stats.closed;
+      }
+
+      return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
+    });
+
+    // Calculate totals
+    const totals = {
+      campaigns: campaigns.length,
+      leads: campaigns.reduce((sum, c) => sum + c.stats.leads, 0),
+      claimed: campaigns.reduce((sum, c) => sum + c.stats.claimed, 0),
+      closed: campaigns.reduce((sum, c) => sum + c.stats.closed, 0),
+      conversionRate: 0,
+      estimatedRevenue: campaigns.reduce((sum, c) => sum + c.stats.estimatedRevenue, 0),
+    };
+
+    if (totals.leads > 0) {
+      totals.conversionRate = Number(((totals.closed / totals.leads) * 100).toFixed(2));
+    }
+
+    // TODO: Calculate comparison with previous period
+    const comparison = {
+      previousPeriod: {
+        leads: 0,
+        closed: 0,
+        conversionRate: 0,
+      },
+      changes: {
+        leads: 0,
+        closed: 0,
+        conversionRate: 0,
+      },
+    };
+
+    // Top performers
+    const topPerformers = campaigns
+      .sort((a, b) => b.stats.conversionRate - a.stats.conversionRate)
+      .slice(0, 3)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        conversionRate: c.stats.conversionRate,
+      }));
+
+    const response: AdminApiResponse<any> = {
+      success: true,
+      data: {
+        campaigns,
+        totals,
+        comparison,
+        topPerformers,
+        period,
+      },
+    };
+
+    logger.info('getCampaigns completed', {
+      totalCampaigns: campaigns.length,
+      totalLeads: totals.leads,
+    });
+
+    res.status(200).json(response);
+  } catch (error) {
+    logger.error('getCampaigns failed', { error });
+    next(error);
+  }
+}
+
+/**
+ * GET /api/admin/campaigns/:campaignId
+ * ดึงข้อมูล campaign detail
+ */
+export async function getCampaignDetail(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const validation = safeValidateQuery(campaignIdSchema, req.params);
+    if (!validation.success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Campaign ID ไม่ถูกต้อง',
+          details: validation.errors,
+        },
+      });
+      return;
+    }
+
+    const campaignId = validation.data.campaignId;
+
+    logger.info('getCampaignDetail called', {
+      campaignId,
+      user: req.user?.email,
+    });
+
+    const allLeads = await getAllLeads();
+    const campaignLeads = allLeads.filter((lead) => lead.campaignId === campaignId);
+
+    if (campaignLeads.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'ไม่พบ Campaign ที่ต้องการ',
+          details: { campaignId },
+        },
+      });
+      return;
+    }
+
+    // Campaign info
+    const campaign = {
+      id: campaignId,
+      name: campaignLeads[0].campaignName,
+      subject: campaignLeads[0].emailSubject,
+      startDate: campaignLeads.reduce((earliest, lead) => {
+        const leadDate = new Date(lead.date);
+        return leadDate < earliest ? leadDate : earliest;
+      }, new Date(campaignLeads[0].date)).toISOString(),
+    };
+
+    // Stats
+    const totalLeads = campaignLeads.length;
+    const claimed = campaignLeads.filter((l) => l.salesOwnerId).length;
+    const contacted = campaignLeads.filter((l) => l.status === 'contacted').length;
+    const closed = campaignLeads.filter((l) => l.status === 'closed').length;
+    const lost = campaignLeads.filter((l) => l.status === 'lost').length;
+    const unreachable = campaignLeads.filter((l) => l.status === 'unreachable').length;
+    const conversionRate = totalLeads > 0 ? (closed / totalLeads) * 100 : 0;
+    const claimRate = totalLeads > 0 ? (claimed / totalLeads) * 100 : 0;
+
+    const estimatedRevenue = closed * EXPORT.AVERAGE_DEAL_SIZE;
+
+    const stats = {
+      leads: totalLeads,
+      claimed,
+      contacted,
+      closed,
+      lost,
+      unreachable,
+      conversionRate: Number(conversionRate.toFixed(2)),
+      claimRate: Number(claimRate.toFixed(2)),
+      estimatedRevenue,
+    };
+
+    // Leads by status
+    const leadsByStatus = countByStatus(campaignLeads);
+
+    // Leads by sales
+    const salesMap = new Map<string, { leads: LeadRow[]; name: string }>();
+    campaignLeads
+      .filter((lead) => lead.salesOwnerId)
+      .forEach((lead) => {
+        if (!salesMap.has(lead.salesOwnerId!)) {
+          salesMap.set(lead.salesOwnerId!, {
+            leads: [],
+            name: lead.salesOwnerName || 'Unknown',
+          });
+        }
+        salesMap.get(lead.salesOwnerId!)!.leads.push(lead);
+      });
+
+    const leadsBySales = Array.from(salesMap.entries()).map(([id, data]) => ({
+      id,
+      name: data.name,
+      count: data.leads.length,
+      closed: data.leads.filter((l) => l.status === 'closed').length,
+    }));
+
+    // Daily trend
+    const dailyMap = new Map<string, { claimed: number; closed: number }>();
+    campaignLeads.forEach((lead) => {
+      const dateKey = lead.date.split('T')[0];
+      if (!dailyMap.has(dateKey)) {
+        dailyMap.set(dateKey, { claimed: 0, closed: 0 });
+      }
+      const daily = dailyMap.get(dateKey)!;
+      if (lead.salesOwnerId) {daily.claimed++;}
+      if (lead.status === 'closed') {daily.closed++;}
+    });
+
+    const dailyTrend = Array.from(dailyMap.entries())
+      .map(([date, data]) => ({
+        date,
+        claimed: data.claimed,
+        closed: data.closed,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Recent leads (last 10)
+    const recentLeads = campaignLeads
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10)
+      .map((lead) => ({
+        row: lead.rowNumber,
+        company: lead.company,
+        status: lead.status,
+        date: lead.date,
+      }));
+
+    const response: AdminApiResponse<any> = {
+      success: true,
+      data: {
+        campaign,
+        stats,
+        leadsByStatus,
+        leadsBySales,
+        dailyTrend,
+        recentLeads,
+      },
+    };
+
+    logger.info('getCampaignDetail completed', { campaignId, totalLeads });
+
+    res.status(200).json(response);
+  } catch (error) {
+    logger.error('getCampaignDetail failed', { error });
+    next(error);
+  }
+}
+
+// ===========================================
+// Export Endpoint
+// ===========================================
+
+/**
+ * GET /api/admin/export
+ * Export data to file
+ */
+export async function exportData(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const validation = safeValidateQuery(exportQuerySchema, req.query);
+    if (!validation.success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'พารามิเตอร์ไม่ถูกต้อง',
+          details: validation.errors,
+        },
+      });
+      return;
+    }
+
+    const { type, format, startDate, endDate, status, owner, campaign } = validation.data;
+
+    logger.info('exportData called', {
+      type,
+      format,
+      user: req.user?.email,
+    });
+
+    // ดึงข้อมูลตาม type
+    const allLeads = await getAllLeads();
+    let dataToExport: any[] = [];
+
+    // Apply filters
+    let filteredLeads = allLeads;
+
+    if (startDate) {
+      const startTime = new Date(startDate).getTime();
+      filteredLeads = filteredLeads.filter((lead) => new Date(lead.date).getTime() >= startTime);
+    }
+
+    if (endDate) {
+      const endTime = new Date(endDate).getTime();
+      filteredLeads = filteredLeads.filter((lead) => new Date(lead.date).getTime() <= endTime);
+    }
+
+    if (status) {
+      filteredLeads = filteredLeads.filter((lead) => lead.status === status);
+    }
+
+    if (owner) {
+      filteredLeads = filteredLeads.filter((lead) => lead.salesOwnerId === owner);
+    }
+
+    if (campaign) {
+      filteredLeads = filteredLeads.filter((lead) => lead.campaignId === campaign);
+    }
+
+    // Limit to MAX_ROWS
+    if (filteredLeads.length > EXPORT.MAX_ROWS) {
+      filteredLeads = filteredLeads.slice(0, EXPORT.MAX_ROWS);
+    }
+
+    // Prepare data based on type
+    if (type === 'leads' || type === 'all') {
+      dataToExport = filteredLeads.map((lead) => ({
+        'Row': lead.rowNumber,
+        'Date': lead.date,
+        'Customer Name': lead.customerName,
+        'Email': lead.email,
+        'Phone': lead.phone,
+        'Company': lead.company,
+        'Industry': lead.industryAI,
+        'Website': lead.website || '',
+        'Capital': lead.capital || '',
+        'Status': lead.status,
+        'Sales Owner': lead.salesOwnerName || '',
+        'Campaign': lead.campaignName,
+        'Source': lead.source,
+        'Talking Point': lead.talkingPoint || '',
+        'Clicked At': lead.clickedAt,
+        'Closed At': lead.closedAt || '',
+      }));
+    }
+
+    // Generate file
+    if (format === 'xlsx') {
+      const XLSX = await import('xlsx');
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
+
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      const filename = `${type}_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+
+      logger.info('exportData completed', { type, format, rows: dataToExport.length });
+    } else if (format === 'csv') {
+      const { parse } = await import('json2csv');
+      const csv = parse(dataToExport);
+
+      const filename = `${type}_export_${new Date().toISOString().split('T')[0]}.csv`;
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csv);
+
+      logger.info('exportData completed', { type, format, rows: dataToExport.length });
+    } else if (format === 'pdf') {
+      const PDFDocument = (await import('pdfkit')).default;
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+
+      const filename = `${type}_export_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      doc.pipe(res);
+
+      // Title
+      doc.fontSize(20).text(`${type.toUpperCase()} Export`, { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(12).text(`Generated: ${new Date().toLocaleString()}`, { align: 'center' });
+      doc.moveDown();
+
+      // Add simple table (first N rows for PDF)
+      const pdfData = dataToExport.slice(0, EXPORT.PDF_MAX_PREVIEW_ROWS);
+      doc.fontSize(10);
+
+      pdfData.forEach((row, index) => {
+        if (index > 0 && index % 15 === 0) {
+          doc.addPage();
+        }
+
+        doc.text(`Row ${row.Row}: ${row['Customer Name']} (${row.Company}) - Status: ${row.Status}`);
+        doc.moveDown(0.5);
+      });
+
+      if (dataToExport.length > EXPORT.PDF_MAX_PREVIEW_ROWS) {
+        doc.moveDown();
+        doc.text(`... and ${dataToExport.length - EXPORT.PDF_MAX_PREVIEW_ROWS} more rows`, { align: 'center' });
+      }
+
+      doc.end();
+
+      logger.info('exportData completed', { type, format, rows: dataToExport.length });
+    }
+  } catch (error) {
+    logger.error('exportData failed', { error });
+    next(error);
+  }
 }

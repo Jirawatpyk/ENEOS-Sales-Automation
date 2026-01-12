@@ -69,9 +69,31 @@ export type PeriodType = typeof VALID_PERIODS[number];
 export const SORT_OPTIONS = {
   LEADS: ['date', 'company', 'status'] as const,
   SALES: ['claimed', 'closed', 'conversionRate'] as const,
+  CAMPAIGNS: ['leads', 'closed', 'conversionRate'] as const,
 } as const;
 
 export const SORT_ORDERS = ['asc', 'desc'] as const;
+
+// ===========================================
+// Export Settings
+// ===========================================
+
+export const EXPORT = {
+  /** จำนวน row สูงสุดที่ export ได้ */
+  MAX_ROWS: 10000,
+  /** ขนาดไฟล์สูงสุด (bytes) - 50MB */
+  MAX_FILE_SIZE: 50 * 1024 * 1024,
+  /** ค่าเฉลี่ยการขายต่อ deal (บาท) สำหรับคำนวณ estimatedRevenue */
+  AVERAGE_DEAL_SIZE: 75000,
+  /** จำนวน row สูงสุดที่แสดงใน PDF preview */
+  PDF_MAX_PREVIEW_ROWS: 50,
+} as const;
+
+export const EXPORT_TYPES = ['leads', 'sales', 'campaigns', 'all'] as const;
+export type ExportType = typeof EXPORT_TYPES[number];
+
+export const EXPORT_FORMATS = ['xlsx', 'csv', 'pdf'] as const;
+export type ExportFormat = typeof EXPORT_FORMATS[number];
 
 // ===========================================
 // Admin Constants Export (All-in-one)
@@ -85,4 +107,7 @@ export const ADMIN_CONSTANTS = {
   VALID_PERIODS,
   SORT_OPTIONS,
   SORT_ORDERS,
+  EXPORT,
+  EXPORT_TYPES,
+  EXPORT_FORMATS,
 } as const;

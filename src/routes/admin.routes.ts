@@ -7,11 +7,15 @@
  */
 
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   getDashboard,
   getLeads,
   getLeadById,
   getSalesPerformance,
+  getCampaigns,
+  getCampaignDetail,
+  exportData,
 } from '../controllers/admin.controller.js';
 import {
   adminAuthMiddleware,
@@ -21,6 +25,33 @@ import {
 import { asyncHandler } from '../middleware/error-handler.js';
 
 const router = Router();
+
+// ===========================================
+// Rate Limiters
+// ===========================================
+
+/**
+ * Export-specific rate limiter
+ * ป้องกันการ export บ่อยเกินไป (resource intensive)
+ * Limit: 10 requests per hour per user
+ */
+const exportRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 requests per hour
+  message: {
+    success: false,
+    error: {
+      code: 'RATE_LIMIT',
+      message: 'Export rate limit exceeded. Maximum 10 exports per hour.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Key by user email from req.user (set by adminAuthMiddleware)
+  keyGenerator: (req) => {
+    return req.user?.email || req.ip || 'unknown';
+  },
+});
 
 // ===========================================
 // Apply Auth Middleware to all admin routes
@@ -98,6 +129,59 @@ router.get('/leads/:id', requireViewer, asyncHandler(getLeadById));
  * Access: manager, admin
  */
 router.get('/sales-performance', requireManager, asyncHandler(getSalesPerformance));
+
+// ===========================================
+// Campaign Endpoints
+// ===========================================
+
+/**
+ * GET /api/admin/campaigns
+ * ดึงข้อมูล campaign analytics
+ *
+ * Query params:
+ * - period: today | yesterday | week | month | quarter | year | custom (default: quarter)
+ * - startDate: ISO date (required for custom period)
+ * - endDate: ISO date (required for custom period)
+ * - sortBy: leads | closed | conversionRate (default: closed)
+ * - sortOrder: asc | desc (default: desc)
+ *
+ * Access: viewer, manager, admin
+ */
+router.get('/campaigns', requireViewer, asyncHandler(getCampaigns));
+
+/**
+ * GET /api/admin/campaigns/:campaignId
+ * ดึงข้อมูล campaign detail
+ *
+ * Params:
+ * - campaignId: Campaign ID
+ *
+ * Access: viewer, manager, admin
+ */
+router.get('/campaigns/:campaignId', requireViewer, asyncHandler(getCampaignDetail));
+
+// ===========================================
+// Export Endpoint
+// ===========================================
+
+/**
+ * GET /api/admin/export
+ * Export data to file
+ *
+ * Query params:
+ * - type: leads | sales | campaigns | all (required)
+ * - format: xlsx | csv | pdf (required)
+ * - startDate: ISO date (optional)
+ * - endDate: ISO date (optional)
+ * - status: Lead status (optional)
+ * - owner: Sales owner ID (optional)
+ * - campaign: Campaign ID (optional)
+ * - fields: Comma-separated field names (optional)
+ *
+ * Access: viewer, manager, admin
+ * Rate Limit: 10 requests per hour
+ */
+router.get('/export', exportRateLimiter, requireViewer, asyncHandler(exportData));
 
 // ===========================================
 // Export

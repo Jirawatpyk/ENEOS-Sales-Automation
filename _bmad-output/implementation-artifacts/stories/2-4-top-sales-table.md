@@ -1,6 +1,6 @@
 # Story 2.4: Top Sales Table
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -54,43 +54,43 @@ so that **I can recognize top performers and identify success patterns**.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Table Component** (AC: #1, #2)
-  - [ ] 1.1 Create `src/components/dashboard/top-sales-table.tsx`
-  - [ ] 1.2 Use shadcn/ui Table component
-  - [ ] 1.3 Define columns: Rank, Name, Claimed, Contacted, Closed, Conv.Rate
-  - [ ] 1.4 Style table with proper spacing
+- [x] **Task 1: Table Component** (AC: #1, #2)
+  - [x] 1.1 Create `src/components/dashboard/top-sales-table.tsx`
+  - [x] 1.2 Use shadcn/ui Table component
+  - [x] 1.3 Define columns: Rank, Name, Claimed, Contacted, Closed, Conv.Rate
+  - [x] 1.4 Style table with proper spacing
 
-- [ ] **Task 2: Data Integration** (AC: #4)
-  - [ ] 2.1 Extract `topSales` from dashboard API response
-  - [ ] 2.2 Ensure data is sorted by conversion rate
-  - [ ] 2.3 Limit to top 5 entries
+- [x] **Task 2: Data Integration** (AC: #4)
+  - [x] 2.1 Extract `topSales` from dashboard API response
+  - [x] 2.2 Ensure data is sorted by conversion rate
+  - [x] 2.3 Limit to top 5 entries
 
-- [ ] **Task 3: Ranking Display** (AC: #3)
-  - [ ] 3.1 Create rank display component
-  - [ ] 3.2 Show medals for positions 1-3
-  - [ ] 3.3 Show numbers for positions 4-5
+- [x] **Task 3: Ranking Display** (AC: #3)
+  - [x] 3.1 Create rank display component
+  - [x] 3.2 Show medals for positions 1-3
+  - [x] 3.3 Show numbers for positions 4-5
 
-- [ ] **Task 4: Formatting** (AC: #5)
-  - [ ] 4.1 Format conversion rate as percentage
-  - [ ] 4.2 Add green highlight for rates > 30%
-  - [ ] 4.3 Format numbers with locale separators
+- [x] **Task 4: Formatting** (AC: #5)
+  - [x] 4.1 Format conversion rate as percentage
+  - [x] 4.2 Add green highlight for rates > 30%
+  - [x] 4.3 Format numbers with locale separators
 
-- [ ] **Task 5: Interactivity** (AC: #6)
-  - [ ] 5.1 Add click handler to name column
-  - [ ] 5.2 Navigate to sales detail page
-  - [ ] 5.3 Add hover state to rows
-  - [ ] 5.4 Add cursor pointer style
+- [x] **Task 5: Interactivity** (AC: #6)
+  - [x] 5.1 Add click handler to name column
+  - [x] 5.2 Navigate to sales detail page
+  - [x] 5.3 Add hover state to rows
+  - [x] 5.4 Add cursor pointer style
 
-- [ ] **Task 6: States** (AC: #7)
-  - [ ] 6.1 Create skeleton table rows
-  - [ ] 6.2 Create empty state component
-  - [ ] 6.3 Handle loading prop
+- [x] **Task 6: States** (AC: #7)
+  - [x] 6.1 Create skeleton table rows
+  - [x] 6.2 Create empty state component
+  - [x] 6.3 Handle loading prop
 
-- [ ] **Task 7: Testing** (AC: #1-7)
-  - [ ] 7.1 Test table renders with data
-  - [ ] 7.2 Test sorting is correct
-  - [ ] 7.3 Test navigation works
-  - [ ] 7.4 Test loading/empty states
+- [x] **Task 7: Testing** (AC: #1-7)
+  - [x] 7.1 Test table renders with data
+  - [x] 7.2 Test sorting is correct
+  - [x] 7.3 Test navigation works
+  - [x] 7.4 Test loading/empty states
 
 ## Dev Notes
 
@@ -280,11 +280,53 @@ src/components/dashboard/
 ## Dev Agent Record
 
 ### Agent Model Used
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
+- Installed shadcn/ui Table component
+- Type check passed with 0 errors
+- All 329 tests passed (34 new tests for Story 2.4)
+- Code review: Fixed 4 medium issues, 3 low issues
 
 ### Completion Notes List
+- Created TopSalesTable component with full AC coverage
+- Implemented medal display (🥇🥈🥉) for ranks 1-3
+- Added green highlight for conversion rates >= 30%
+- Implemented keyboard navigation (Enter/Space) for accessibility
+- Created container component for data fetching with error handling
+- Added comprehensive test coverage for all acceptance criteria
+- **[Code Review Fix]** Added defensive frontend sorting (AC#4 tie-breaking)
+- **[Code Review Fix]** Added Math.round for conversion rate display (AC#5)
+- **[Code Review Fix]** Added aria-busy for accessibility
+- **[Code Review Fix]** Added tests for sorting and decimal rounding
 
 ### File List
+**New Files:**
+- `eneos-admin-dashboard/src/components/dashboard/top-sales-table.tsx`
+- `eneos-admin-dashboard/src/components/dashboard/top-sales-table-skeleton.tsx`
+- `eneos-admin-dashboard/src/components/dashboard/top-sales-table-empty.tsx`
+- `eneos-admin-dashboard/src/components/dashboard/top-sales-table-container.tsx`
+- `eneos-admin-dashboard/src/__tests__/top-sales-table.test.tsx`
+- `eneos-admin-dashboard/src/__tests__/top-sales-table-skeleton.test.tsx`
+- `eneos-admin-dashboard/src/__tests__/top-sales-table-empty.test.tsx`
+- `eneos-admin-dashboard/src/__tests__/top-sales-table-container.test.tsx`
+- `eneos-admin-dashboard/src/components/ui/table.tsx` (shadcn/ui component)
+
+**Modified Files:**
+- `eneos-admin-dashboard/src/types/dashboard.ts` - Added TopSalesPerson interface
+- `eneos-admin-dashboard/src/components/dashboard/index.ts` - Added exports
+- `eneos-admin-dashboard/src/app/(dashboard)/dashboard/page.tsx` - Added TopSalesTableContainer
+
+**Note:** Other modified files in git (`package.json`, `src/lib/auth.ts`, etc.) are from previous stories or unrelated changes.
+
+### Cleanup Notes
+**Debug files to clean up or add to .gitignore:**
+- `dashboard-screenshot.png` - Development screenshot
+- `screenshot-dashboard.ts` - Screenshot utility
+- `src/app/api/debug/` - Debug API routes (dev only)
+
+### Change Log
+- 2026-01-13: Implemented Story 2.4 Top Sales Table with all ACs satisfied
+- 2026-01-13: Code Review - Fixed MEDIUM-1 (defensive sorting), MEDIUM-2 (tie-breaking tests), MEDIUM-3 (decimal rounding), LOW-1 (aria-busy)
+- 2026-01-13: Added cleanup notes for debug files (LOW-3)
 

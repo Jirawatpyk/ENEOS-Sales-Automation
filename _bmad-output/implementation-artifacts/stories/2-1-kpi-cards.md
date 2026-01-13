@@ -1,6 +1,6 @@
 # Story 2.1: KPI Cards
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -60,49 +60,49 @@ so that **I can quickly understand the current state of our sales pipeline**.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Dashboard Page Setup** (AC: #1)
-  - [ ] 1.1 Create `src/app/(dashboard)/page.tsx` as main dashboard
-  - [ ] 1.2 Create `src/app/(dashboard)/layout.tsx` with sidebar navigation
-  - [ ] 1.3 Set up basic page structure with header
+- [x] **Task 1: Dashboard Page Setup** (AC: #1)
+  - [x] 1.1 Create `src/app/(dashboard)/page.tsx` as main dashboard
+  - [x] 1.2 Create `src/app/(dashboard)/layout.tsx` with sidebar navigation (existed from Epic 1)
+  - [x] 1.3 Set up basic page structure with header
 
-- [ ] **Task 2: API Integration** (AC: #2, #5, #6)
-  - [ ] 2.1 Create `src/lib/api/dashboard.ts` with fetch functions
-  - [ ] 2.2 Define TypeScript types for dashboard response
-  - [ ] 2.3 Set up TanStack Query hook `useDashboardData()`
-  - [ ] 2.4 Configure staleTime and cacheTime
-  - [ ] 2.5 Implement error handling
+- [x] **Task 2: API Integration** (AC: #2, #5, #6)
+  - [x] 2.1 Create `src/lib/api/dashboard.ts` with fetch functions
+  - [x] 2.2 Define TypeScript types for dashboard response
+  - [x] 2.3 Set up TanStack Query hook `useDashboardData()`
+  - [x] 2.4 Configure staleTime and cacheTime
+  - [x] 2.5 Implement error handling
 
-- [ ] **Task 3: KPI Card Component** (AC: #1, #3, #4)
-  - [ ] 3.1 Create `src/components/dashboard/kpi-card.tsx`
-  - [ ] 3.2 Accept props: title, value, change, changeLabel, icon
-  - [ ] 3.3 Display numeric value with formatting (1,234)
-  - [ ] 3.4 Display percentage/rate below value
-  - [ ] 3.5 Show up/down arrow with color based on change
-  - [ ] 3.6 Add appropriate icon for each metric
+- [x] **Task 3: KPI Card Component** (AC: #1, #3, #4)
+  - [x] 3.1 Create `src/components/dashboard/kpi-card.tsx`
+  - [x] 3.2 Accept props: title, value, change, changeLabel, icon
+  - [x] 3.3 Display numeric value with formatting (1,234)
+  - [x] 3.4 Display percentage/rate below value
+  - [x] 3.5 Show up/down arrow with color based on change
+  - [x] 3.6 Add appropriate icon for each metric
 
-- [ ] **Task 4: KPI Cards Grid** (AC: #1, #7)
-  - [ ] 4.1 Create `src/components/dashboard/kpi-cards-grid.tsx`
-  - [ ] 4.2 Render 4 KPICard components
-  - [ ] 4.3 Implement responsive grid layout
-  - [ ] 4.4 Pass data from API to each card
+- [x] **Task 4: KPI Cards Grid** (AC: #1, #7)
+  - [x] 4.1 Create `src/components/dashboard/kpi-cards-grid.tsx`
+  - [x] 4.2 Render 4 KPICard components
+  - [x] 4.3 Implement responsive grid layout
+  - [x] 4.4 Pass data from API to each card
 
-- [ ] **Task 5: Loading State** (AC: #5)
-  - [ ] 5.1 Create `src/components/dashboard/kpi-card-skeleton.tsx`
-  - [ ] 5.2 Use shadcn/ui Skeleton component
-  - [ ] 5.3 Match dimensions of actual KPI card
-  - [ ] 5.4 Show skeleton grid while loading
+- [x] **Task 5: Loading State** (AC: #5)
+  - [x] 5.1 Create `src/components/dashboard/kpi-card-skeleton.tsx`
+  - [x] 5.2 Use shadcn/ui Skeleton component
+  - [x] 5.3 Match dimensions of actual KPI card
+  - [x] 5.4 Show skeleton grid while loading
 
-- [ ] **Task 6: Error State** (AC: #6)
-  - [ ] 6.1 Create error UI with message and retry button
-  - [ ] 6.2 Implement retry functionality using TanStack Query refetch
-  - [ ] 6.3 Log errors to console (or Sentry in production)
+- [x] **Task 6: Error State** (AC: #6)
+  - [x] 6.1 Create error UI with message and retry button
+  - [x] 6.2 Implement retry functionality using TanStack Query refetch
+  - [x] 6.3 Log errors to console (or Sentry in production)
 
-- [ ] **Task 7: Testing** (AC: #1, #2, #3, #4, #5, #6, #7)
-  - [ ] 7.1 Test KPI cards render with correct data
-  - [ ] 7.2 Test loading skeleton appears
-  - [ ] 7.3 Test error state and retry
-  - [ ] 7.4 Test responsive layout
-  - [ ] 7.5 Test percentage calculations
+- [x] **Task 7: Testing** (AC: #1, #2, #3, #4, #5, #6, #7)
+  - [x] 7.1 Test KPI cards render with correct data
+  - [x] 7.2 Test loading skeleton appears
+  - [x] 7.3 Test error state and retry
+  - [x] 7.4 Test responsive layout
+  - [x] 7.5 Test percentage calculations
 
 ## Dev Notes
 
@@ -417,11 +417,87 @@ npx shadcn-ui@latest add skeleton
 ## Dev Agent Record
 
 ### Agent Model Used
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
+- Tests: 243 passed (63 new for Story 2.1, including 6 fixes)
+- Lint: Passed (no warnings or errors)
+- Pre-existing TypeScript errors in Epic 1 test files (not related to this story)
 
 ### Completion Notes List
+1. Installed @tanstack/react-query@^5 and updated providers.tsx
+2. Added shadcn/ui Card and Skeleton components
+3. Created complete KPI dashboard with loading/error states
+4. All acceptance criteria implemented and tested
+5. Fixed pre-existing timeout issue in role-gate.test.tsx (Epic 1)
 
 ### File List
+**New Files Created:**
+- src/types/dashboard.ts
+- src/lib/api/dashboard.ts
+- src/hooks/use-dashboard-data.ts
+- src/components/dashboard/kpi-card.tsx
+- src/components/dashboard/kpi-card-skeleton.tsx
+- src/components/dashboard/dashboard-error.tsx
+- src/components/dashboard/kpi-cards-grid.tsx
+- src/components/dashboard/index.ts
+- src/components/ui/card.tsx (shadcn)
+- src/components/ui/skeleton.tsx (shadcn)
+- src/__tests__/kpi-card.test.tsx
+- src/__tests__/kpi-card-skeleton.test.tsx
+- src/__tests__/dashboard-error.test.tsx
+- src/__tests__/kpi-cards-grid.test.tsx
+- src/__tests__/use-dashboard-data.test.tsx
+- src/__tests__/dashboard-api.test.ts
+
+**Modified Files:**
+- src/app/providers.tsx (added QueryClientProvider)
+- src/app/(dashboard)/dashboard/page.tsx (added KPICardsGrid)
+- package.json (added @tanstack/react-query)
+- src/__tests__/role-gate.test.tsx (fixed timeout issue)
+
+## Code Review Record
+
+### Reviewer
+Claude Opus 4.5 (Adversarial Review) - 2026-01-13
+
+### AC Verification
+| AC | Description | Status |
+|----|-------------|--------|
+| AC#1 | Four KPI Cards Display | ✅ PASS |
+| AC#2 | Accurate Data | ✅ PASS |
+| AC#3 | Percentage/Rate Display | ✅ PASS |
+| AC#4 | Visual Indicators | ✅ PASS |
+| AC#5 | Loading State | ✅ PASS |
+| AC#6 | Error State | ✅ PASS |
+| AC#7 | Responsive Layout | ✅ PASS |
+
+### Issues Found (6 total) - ALL FIXED
+
+| # | Severity | Issue | File | Status |
+|---|----------|-------|------|--------|
+| 1 | MEDIUM | Missing `gcTime` in TanStack Query v5 | use-dashboard-data.ts | ✅ FIXED |
+| 2 | LOW | Type assertion instead of type guard | use-dashboard-data.ts | ✅ FIXED |
+| 3 | MEDIUM | Division by zero edge case | kpi-cards-grid.tsx | ✅ FIXED |
+| 4 | MEDIUM | Rate values always positive (UX confusing) | kpi-cards-grid.tsx, kpi-card.tsx | ✅ FIXED |
+| 5 | LOW | Console.error in production | dashboard-error.tsx | ✅ FIXED |
+| 6 | LOW | Missing skeleton accessibility test | kpi-card-skeleton.tsx/test | ✅ FIXED |
+
+### Fixes Applied (2026-01-13)
+1. Added `gcTime: 5 * 60 * 1000` to TanStack Query options
+2. Added `isDashboardApiError()` type guard function
+3. Fixed division by zero: handles `total=0 && previousPeriodLeads=0` correctly
+4. Added `isRate` prop to KPICard: rate metrics now show neutral color (not green/red)
+5. Made console.error conditional: only logs in development mode
+6. Added `aria-busy` and `aria-label` to skeleton, with accessibility test
+
+### Verdict
+**PASS** - All 6 issues fixed. All AC verified. 243 tests passing (+6 new tests).
+
+### Positive Findings
+- Clean separation: types, api, hooks, components
+- 63 comprehensive tests for Story 2.1
+- TanStack Query v5 object syntax correct with gcTime
+- Good error handling with custom error class and type guard
+- Proper accessibility attributes (aria-label, aria-hidden, aria-busy)
 

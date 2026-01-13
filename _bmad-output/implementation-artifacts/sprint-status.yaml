@@ -75,7 +75,7 @@ development_status:
   2-1-kpi-cards: done                     # Must Have - Code review passed 2026-01-13
   2-2-lead-trend-chart: done              # Must Have - Code review passed 2026-01-13
   2-3-status-distribution: done            # Must Have - Done 2026-01-13
-  2-4-top-sales-table: ready-for-dev     # Must Have
+  2-4-top-sales-table: done               # Must Have - Code review passed 2026-01-13
   2-5-recent-activity: ready-for-dev     # Should Have
   2-6-alerts-panel: ready-for-dev        # Should Have
   2-7-date-filter: ready-for-dev         # Should Have

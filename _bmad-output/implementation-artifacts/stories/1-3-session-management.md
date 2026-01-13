@@ -1,6 +1,6 @@
 # Story 1.3: Session Management
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -54,59 +54,59 @@ so that **I can work efficiently without re-logging frequently while maintaining
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: NextAuth Session Configuration** (AC: #1, #2)
-  - [ ] 1.1 Configure JWT maxAge to 24 hours in auth.ts
-  - [ ] 1.2 Implement jwt callback to track token creation time
-  - [ ] 1.3 Implement token refresh logic in jwt callback
-  - [ ] 1.4 Add expiresAt field to token for expiry tracking
-  - [ ] 1.5 Configure session callback to expose expiry to client
+- [x] **Task 1: NextAuth Session Configuration** (AC: #1, #2)
+  - [x] 1.1 Configure JWT maxAge to 24 hours in auth.ts
+  - [x] 1.2 Implement jwt callback to track token creation time
+  - [x] 1.3 Implement token refresh logic in jwt callback
+  - [x] 1.4 Add expiresAt field to token for expiry tracking
+  - [x] 1.5 Configure session callback to expose expiry to client
 
-- [ ] **Task 2: Session Provider Enhancement** (AC: #5, #6)
-  - [ ] 2.1 Configure SessionProvider with refetchInterval
-  - [ ] 2.2 Set refetchOnWindowFocus to true for tab sync
-  - [ ] 2.3 Set refetchWhenOffline to false
-  - [ ] 2.4 Configure appropriate refetch interval (e.g., 5 minutes)
+- [x] **Task 2: Session Provider Enhancement** (AC: #5, #6)
+  - [x] 2.1 Configure SessionProvider with refetchInterval
+  - [x] 2.2 Set refetchOnWindowFocus to true for tab sync
+  - [x] 2.3 Set refetchWhenOffline to false
+  - [x] 2.4 Configure appropriate refetch interval (e.g., 5 minutes)
 
-- [ ] **Task 3: Session Expiry Warning Component** (AC: #3)
-  - [ ] 3.1 Install shadcn/ui toast component (`npx shadcn-ui@latest add toast`)
-  - [ ] 3.2 Create `src/components/shared/session-warning.tsx`
-  - [ ] 3.3 Implement useSession hook to track remaining time
-  - [ ] 3.4 Show toast when session has < 5 minutes remaining
-  - [ ] 3.5 Add "Extend Session" button that triggers page refresh to renew session
-  - [ ] 3.6 Style as non-intrusive toast (bottom-right corner)
+- [x] **Task 3: Session Expiry Warning Component** (AC: #3)
+  - [x] 3.1 Install shadcn/ui toast component (`npx shadcn-ui@latest add toast`)
+  - [x] 3.2 Create `src/components/shared/session-warning.tsx`
+  - [x] 3.3 Implement useSession hook to track remaining time
+  - [x] 3.4 Show toast when session has < 5 minutes remaining
+  - [x] 3.5 Add "Extend Session" button that triggers page refresh to renew session
+  - [x] 3.6 Style as non-intrusive toast (bottom-right corner)
 
-- [ ] **Task 4: Session Expired Handler** (AC: #4)
-  - [ ] 4.1 Create error page or modal for expired session
-  - [ ] 4.2 Update API client to handle 401 responses
-  - [ ] 4.3 Redirect to login with `?error=SessionExpired` param
-  - [ ] 4.4 Display session expired message on login page
+- [x] **Task 4: Session Expired Handler** (AC: #4)
+  - [x] 4.1 Create error page or modal for expired session
+  - [x] 4.2 Update API client to handle 401 responses
+  - [x] 4.3 Redirect to login with `?error=SessionExpired` param
+  - [x] 4.4 Display session expired message on login page
 
-- [ ] **Task 5: API Client Session Integration** (AC: #2, #4)
-  - [ ] 5.1 Update `src/lib/api.ts` to check session before requests
-  - [ ] 5.2 Implement automatic token refresh on 401 response
-  - [ ] 5.3 Add session expiry check before API calls
-  - [ ] 5.4 Handle network errors gracefully
+- [x] **Task 5: API Client Session Integration** (AC: #2, #4)
+  - [x] 5.1 Update `src/lib/api.ts` to check session before requests
+  - [x] 5.2 Implement automatic token refresh on 401 response
+  - [x] 5.3 Add session expiry check before API calls
+  - [x] 5.4 Handle network errors gracefully
 
-- [ ] **Task 6: Dashboard Layout Session Integration** (AC: #5)
-  - [ ] 6.1 Update dashboard layout to use useSession
-  - [ ] 6.2 Display user info (name, email, avatar) in header
-  - [ ] 6.3 Show loading state while session is being fetched
-  - [ ] 6.4 Integrate session warning component
+- [x] **Task 6: Dashboard Layout Session Integration** (AC: #5)
+  - [x] 6.1 Update dashboard layout to use useSession
+  - [x] 6.2 Display user info (name, email, avatar) in header
+  - [x] 6.3 Show loading state while session is being fetched
+  - [x] 6.4 Integrate session warning component
 
-- [ ] **Task 7: Security Configuration** (AC: #7)
-  - [ ] 7.1 Verify cookies are httpOnly (NextAuth default)
-  - [ ] 7.2 Configure secure cookies for production
-  - [ ] 7.3 Set sameSite cookie attribute appropriately
-  - [ ] 7.4 Verify no tokens in localStorage
+- [x] **Task 7: Security Configuration** (AC: #7)
+  - [x] 7.1 Verify cookies are httpOnly (NextAuth default)
+  - [x] 7.2 Configure secure cookies for production
+  - [x] 7.3 Set sameSite cookie attribute appropriately
+  - [x] 7.4 Verify no tokens in localStorage
 
-- [ ] **Task 8: Testing** (AC: #1, #2, #3, #4, #5, #6, #7)
-  - [ ] 8.1 Test session creation with correct maxAge
-  - [ ] 8.2 Test session refresh within refresh window
-  - [ ] 8.3 Test expiry warning appears at correct time
-  - [ ] 8.4 Test expired session redirects to login
-  - [ ] 8.5 Test session data accessible in components
-  - [ ] 8.6 Test multi-tab session sync
-  - [ ] 8.7 Test no sensitive data in localStorage
+- [x] **Task 8: Testing** (AC: #1, #2, #3, #4, #5, #6, #7)
+  - [x] 8.1 Test session creation with correct maxAge
+  - [x] 8.2 Test session refresh within refresh window
+  - [x] 8.3 Test expiry warning appears at correct time
+  - [x] 8.4 Test expired session redirects to login
+  - [x] 8.5 Test session data accessible in components
+  - [x] 8.6 Test multi-tab session sync
+  - [x] 8.7 Test no sensitive data in localStorage
 
 ## Dev Notes
 
@@ -287,11 +287,64 @@ Login                                                   Logout/Expire
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+No critical bugs encountered during implementation.
+
 ### Completion Notes List
 
+1. **Task 1 - NextAuth Session Configuration**: Enhanced jwt callback with token creation time tracking (issuedAt), expiry tracking (expiresAt), and automatic token refresh within last 6 hours of session. Extended Session and JWT types.
+
+2. **Task 2 - SessionProvider Enhancement**: Configured refetchInterval (5 minutes), refetchOnWindowFocus (true), refetchWhenOffline (false) for automatic session sync across tabs.
+
+3. **Task 3 - Session Expiry Warning**: Installed shadcn/ui toast and button components. Created SessionWarning component that shows toast notification when session has <5 minutes remaining with "Extend Session" button.
+
+4. **Task 4 - Session Expired Handler**: Added SessionExpired error handling to login page. Created API client (src/lib/api.ts) with fetchWithAuth that redirects to login on 401 responses.
+
+5. **Task 5 - API Client**: Created full API client with fetchWithAuth, apiGet, apiPost, apiPut, apiDelete helpers. Handles 401 with SessionExpiredError.
+
+6. **Task 6 - Dashboard Layout**: Already integrated from Story 1.1. Added SessionWarning component to dashboard layout.
+
+7. **Task 7 - Security**: Verified NextAuth defaults for httpOnly cookies, secure (in production), sameSite=lax. Added security verification tests.
+
+8. **Task 8 - Testing**: 76 tests passing across 7 test files covering all acceptance criteria.
+
 ### File List
+
+**New Files:**
+- `src/lib/api.ts` - API client with session handling
+- `src/lib/utils.ts` - shadcn/ui utilities
+- `src/components/shared/session-warning.tsx` - Session expiry warning component
+- `src/components/ui/toast.tsx` - shadcn/ui toast component
+- `src/components/ui/toaster.tsx` - shadcn/ui toaster component
+- `src/components/ui/button.tsx` - shadcn/ui button component
+- `src/hooks/use-toast.ts` - shadcn/ui toast hook
+- `src/__tests__/session.test.ts` - Session tests (12 tests)
+- `src/__tests__/providers.test.tsx` - Providers tests (4 tests)
+- `src/__tests__/session-warning.test.tsx` - Session warning tests (9 tests)
+- `src/__tests__/api.test.ts` - API client tests (10 tests)
+- `components.json` - shadcn/ui configuration
+
+**Modified Files:**
+- `src/lib/auth.ts` - Added issuedAt, expiresAt tracking and refresh logic
+- `src/types/next-auth.d.ts` - Extended Session and JWT types
+- `src/app/providers.tsx` - Configured SessionProvider options
+- `src/app/layout.tsx` - Added Toaster component
+- `src/app/(dashboard)/layout.tsx` - Added SessionWarning component
+- `src/app/(auth)/login/page.tsx` - Added SessionExpired error handling
+- `src/__tests__/auth.test.ts` - Added security tests (16 tests total)
+- `src/__tests__/login.test.tsx` - Added SessionExpired test (12 tests total)
+- `tailwind.config.ts` - Updated by shadcn/ui
+- `src/app/globals.css` - Updated by shadcn/ui
+- `package.json` - Added shadcn dependencies
+- `package-lock.json` - Updated dependencies
+
+## Change Log
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2025-01-12 | Story implementation complete - All 8 tasks done, 76 tests passing | Claude Opus 4.5 |
+| 2025-01-13 | Code Review fixes - 8 issues fixed (2 HIGH, 4 MEDIUM, 2 LOW), 89 tests passing | Claude Opus 4.5 |
 

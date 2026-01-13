@@ -156,16 +156,25 @@ export async function adminAuthMiddleware(
       );
     }
 
-    // Check email domain is @eneos.co.th
-    if (!email.endsWith('@eneos.co.th')) {
+    // Check email domain is allowed
+    // Parse allowed domains from env (default: eneos.co.th)
+    const allowedDomains = (process.env.ALLOWED_DOMAINS || 'eneos.co.th')
+      .split(',')
+      .map(d => d.trim().toLowerCase());
+
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+
+    if (!emailDomain || !allowedDomains.includes(emailDomain)) {
       logger.warn('Unauthorized domain access attempt', {
         email,
+        emailDomain,
+        allowedDomains,
         requestId: req.requestId,
         path: req.path,
       });
 
       throw new AppError(
-        'Access denied. Only @eneos.co.th domain is allowed',
+        `Access denied. Only ${allowedDomains.join(', ')} domains are allowed`,
         403,
         'FORBIDDEN_DOMAIN'
       );

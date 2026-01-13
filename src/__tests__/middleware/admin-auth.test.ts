@@ -9,6 +9,13 @@ import type { AdminUser } from '../../middleware/admin-auth.js';
 // Setup environment
 process.env.GOOGLE_OAUTH_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
 
+// Mock sheetsService ก่อน import middleware เพื่อป้องกัน Google Sheets connection
+vi.mock('../../services/sheets.service.js', () => ({
+  sheetsService: {
+    getUserByEmail: vi.fn().mockResolvedValue({ role: 'viewer' }),
+  },
+}));
+
 // Mock helpers
 const createMockRequest = (overrides: Partial<Request> = {}): Request => ({
   headers: {},

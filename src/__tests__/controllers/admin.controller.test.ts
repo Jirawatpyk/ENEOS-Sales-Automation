@@ -130,7 +130,7 @@ describe('Admin Controller', () => {
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.success).toBe(true);
       expect(response.data).toHaveProperty('summary');
-      expect(response.data).toHaveProperty('trend');
+      expect(response.data).toHaveProperty('trends');
       expect(response.data).toHaveProperty('statusDistribution');
       expect(response.data).toHaveProperty('topSales');
       expect(response.data).toHaveProperty('recentActivity');

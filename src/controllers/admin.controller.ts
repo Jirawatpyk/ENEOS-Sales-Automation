@@ -20,7 +20,6 @@ import {
   LeadItem,
   StatusDistribution,
   DashboardSummary,
-  TrendData,
   TopSalesPerson,
   ActivityItem,
   Alert,
@@ -245,26 +244,23 @@ export async function getDashboard(
     };
 
     // สร้าง Trend Data (group by date)
-    const trendMap = new Map<string, TrendData>();
+    // Frontend expects: { date, newLeads, closed }
+    const trendMap = new Map<string, { date: string; newLeads: number; closed: number }>();
     leads.forEach((lead) => {
       const dateKey = lead.date.split('T')[0]; // YYYY-MM-DD
       if (!trendMap.has(dateKey)) {
         trendMap.set(dateKey, {
           date: dateKey,
-          leads: 0,
-          claimed: 0,
-          contacted: 0,
+          newLeads: 0,
           closed: 0,
         });
       }
       const trend = trendMap.get(dateKey)!;
-      trend.leads++;
-      if (lead.status === 'claimed') {trend.claimed++;}
-      if (lead.status === 'contacted') {trend.contacted++;}
+      trend.newLeads++; // Count all leads as "new" for that day
       if (lead.status === 'closed') {trend.closed++;}
     });
 
-    const trend = Array.from(trendMap.values()).sort((a, b) =>
+    const dailyTrends = Array.from(trendMap.values()).sort((a, b) =>
       a.date.localeCompare(b.date)
     );
 
@@ -375,7 +371,9 @@ export async function getDashboard(
       success: true,
       data: {
         summary,
-        trend,
+        trends: {
+          daily: dailyTrends,
+        },
         statusDistribution: statusCount,
         topSales,
         recentActivity,

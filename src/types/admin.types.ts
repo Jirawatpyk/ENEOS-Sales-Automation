@@ -64,12 +64,24 @@ export interface PeriodInfo {
 // ============================================================================
 
 /**
+ * Daily Trend Data (for Frontend compatibility)
+ * Used by Lead Trend Chart component
+ */
+export interface DailyTrend {
+  date: string; // YYYY-MM-DD
+  newLeads: number;
+  closed: number;
+}
+
+/**
  * Dashboard Summary Response
  * GET /api/admin/dashboard
  */
 export interface DashboardResponse {
   summary: DashboardSummary;
-  trend: TrendData[];
+  trends: {
+    daily: DailyTrend[];
+  };
   statusDistribution: StatusDistribution;
   topSales: TopSalesPerson[];
   recentActivity: ActivityItem[];

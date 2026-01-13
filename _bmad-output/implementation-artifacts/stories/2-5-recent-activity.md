@@ -1,6 +1,6 @@
 # Story 2.5: Recent Activity Feed
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -52,36 +52,36 @@ so that **I can monitor team actions in real-time and stay informed**.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Activity Feed Component** (AC: #1, #2)
-  - [ ] 1.1 Create `src/components/dashboard/recent-activity.tsx`
-  - [ ] 1.2 Create scrollable list with max 10 items
-  - [ ] 1.3 Style as card with header
+- [x] **Task 1: Activity Feed Component** (AC: #1, #2)
+  - [x] 1.1 Create `src/components/dashboard/recent-activity.tsx`
+  - [x] 1.2 Create scrollable list with max 10 items
+  - [x] 1.3 Style as card with header
 
-- [ ] **Task 2: Activity Item Component** (AC: #2, #3, #6)
-  - [ ] 2.1 Create `src/components/dashboard/activity-item.tsx`
-  - [ ] 2.2 Display icon based on activity type
-  - [ ] 2.3 Show description and timestamp
-  - [ ] 2.4 Apply color coding
+- [x] **Task 2: Activity Item Component** (AC: #2, #3, #6)
+  - [x] 2.1 Create `src/components/dashboard/activity-item.tsx`
+  - [x] 2.2 Display icon based on activity type
+  - [x] 2.3 Show description and timestamp
+  - [x] 2.4 Apply color coding
 
-- [ ] **Task 3: Timestamp Formatting** (AC: #4)
-  - [ ] 3.1 Use date-fns `formatDistanceToNow` for relative time
-  - [ ] 3.2 Use `format` for older timestamps
-  - [ ] 3.3 Determine threshold (24h for relative)
+- [x] **Task 3: Timestamp Formatting** (AC: #4)
+  - [x] 3.1 Use date-fns `formatDistanceToNow` for relative time
+  - [x] 3.2 Use `format` for older timestamps
+  - [x] 3.3 Determine threshold (24h for relative)
 
-- [ ] **Task 4: View All Link** (AC: #5)
-  - [ ] 4.1 Add footer link "View All Activity"
-  - [ ] 4.2 Navigate to `/activity` or `/leads?view=activity`
+- [x] **Task 4: View All Link** (AC: #5)
+  - [x] 4.1 Add footer link "View All Activity"
+  - [x] 4.2 Navigate to `/activity` or `/leads?view=activity`
 
-- [ ] **Task 5: States** (AC: #7)
-  - [ ] 5.1 Create skeleton loader
-  - [ ] 5.2 Create empty state
-  - [ ] 5.3 Handle loading prop
+- [x] **Task 5: States** (AC: #7)
+  - [x] 5.1 Create skeleton loader
+  - [x] 5.2 Create empty state
+  - [x] 5.3 Handle loading prop
 
-- [ ] **Task 6: Testing** (AC: #1-7)
-  - [ ] 6.1 Test feed renders with data
-  - [ ] 6.2 Test timestamp formatting
-  - [ ] 6.3 Test navigation works
-  - [ ] 6.4 Test loading/empty states
+- [x] **Task 6: Testing** (AC: #1-7)
+  - [x] 6.1 Test feed renders with data
+  - [x] 6.2 Test timestamp formatting
+  - [x] 6.3 Test navigation works
+  - [x] 6.4 Test loading/empty states
 
 ## Dev Notes
 
@@ -266,11 +266,45 @@ src/components/dashboard/
 ## Dev Agent Record
 
 ### Agent Model Used
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
+- No debug issues encountered during implementation
 
 ### Completion Notes List
+- ✅ Implemented RecentActivity component with ScrollArea for up to 10 activities (AC#1)
+- ✅ Created ActivityItem component with Lucide icons (CheckCircle2, UserCheck, Phone, Inbox) (AC#2, AC#6)
+- ✅ Activity items display icon, description, and formatted timestamp (AC#3)
+- ✅ Created formatActivityTime utility using date-fns for relative/absolute timestamps (AC#4)
+- ✅ Added "View All Activity" link navigating to /activity with aria-label (AC#5)
+- ✅ Color coding: green=closed, blue=claimed, amber=contacted, gray=new_lead (AC#6)
+- ✅ Created RecentActivitySkeleton for loading state (AC#7)
+- ✅ Empty state shows message when no activities (AC#7)
+- ✅ All 27 unit tests pass covering all acceptance criteria
+- ✅ Full test suite (356 tests) passes with no regressions
+- ✅ TypeScript type-check passes with no errors
+- ✅ Installed scroll-area shadcn/ui component
+- ✅ Updated barrel export in index.ts
+
+### Code Review Fixes Applied
+- **[H-01]** Added invalid timestamp validation in formatActivityTime() - returns "Unknown time" for invalid dates
+- **[H-02]** Added fallback for unknown activity types with HelpCircle icon and muted color
+- **[M-02]** Added edge case tests (invalid timestamps, unknown types, long descriptions)
+- **[M-03]** Fixed test flakiness by using fixed timestamps with vi.useFakeTimers()
+- **[L-01]** Added tooltip on activity descriptions for truncated text
+- **[L-03]** Added aria-label="View all sales activity history" to link for accessibility
 
 ### File List
+- `src/components/dashboard/recent-activity.tsx` (created)
+- `src/components/dashboard/activity-item.tsx` (created + tooltip support)
+- `src/components/dashboard/recent-activity-skeleton.tsx` (created)
+- `src/components/dashboard/index.ts` (modified - added exports)
+- `src/components/ui/scroll-area.tsx` (created by shadcn)
+- `src/lib/format-activity-time.ts` (created + validation)
+- `src/__tests__/unit/components/dashboard/recent-activity.test.tsx` (created + edge cases)
+- `package.json` (modified - radix-ui/react-scroll-area added)
+- `package-lock.json` (modified)
 
+## Change Log
+- 2026-01-13: Story implementation complete - All 6 tasks done, 19 tests passing
+- 2026-01-13: Code review complete - 8 issues fixed, 27 tests passing (8 new edge case tests)

@@ -64,7 +64,7 @@ development_status:
   1-4-logout: done
   1-5-role-based-access: done
   1-6-audit-log: deferred              # Could Have - deferred to post-MVP
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
   # EPIC-01 SUMMARY: 5 stories ready (28 ACs, 128 subtasks)
 
   # ============================================================

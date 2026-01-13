@@ -72,9 +72,9 @@ development_status:
   # ALL STORIES READY FOR IMPLEMENTATION
   # ============================================================
   epic-2: in-progress
-  2-1-kpi-cards: ready-for-dev           # Must Have
-  2-2-lead-trend-chart: ready-for-dev    # Must Have
-  2-3-status-distribution: ready-for-dev # Must Have
+  2-1-kpi-cards: done                     # Must Have - Code review passed 2026-01-13
+  2-2-lead-trend-chart: done              # Must Have - Code review passed 2026-01-13
+  2-3-status-distribution: done            # Must Have - Done 2026-01-13
   2-4-top-sales-table: ready-for-dev     # Must Have
   2-5-recent-activity: ready-for-dev     # Should Have
   2-6-alerts-panel: ready-for-dev        # Should Have

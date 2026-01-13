@@ -54,7 +54,7 @@ so that **I can understand the breakdown of my sales pipeline at a glance**.
 
 - [ ] **Task 1: Donut Chart Component** (AC: #1, #2)
   - [ ] 1.1 Create `src/components/dashboard/status-distribution-chart.tsx`
-  - [ ] 1.2 Use Tremor DonutChart component
+  - [ ] 1.2 Use Recharts PieChart component
   - [ ] 1.3 Configure 6 data segments for each status
   - [ ] 1.4 Position next to trend chart in grid
 
@@ -91,26 +91,27 @@ so that **I can understand the breakdown of my sales pipeline at a glance**.
 
 ## Dev Notes
 
-### Tremor Implementation (Recommended)
+### Recharts Implementation
 
 ```typescript
 // src/components/dashboard/status-distribution-chart.tsx
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DonutChart, Legend } from '@tremor/react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { PieChart as PieIcon } from 'lucide-react';
 import { StatusChartSkeleton } from './status-distribution-skeleton';
 import { StatusChartEmpty } from './status-distribution-empty';
+import { CHART_COLORS } from '@/lib/chart-config';
 
-// Tremor color mapping
+// Status color mapping (HEX)
 const STATUS_COLORS: Record<string, string> = {
-  New: 'gray',
-  Claimed: 'blue',
-  Contacted: 'yellow',
-  Closed: 'emerald',
-  Lost: 'red',
-  Unreachable: 'orange',
+  New: '#6B7280',      // Gray-500
+  Claimed: '#3B82F6',  // Blue-500
+  Contacted: '#EAB308', // Yellow-500
+  Closed: '#10B981',   // Emerald-500
+  Lost: '#EF4444',     // Red-500
+  Unreachable: '#F97316', // Orange-500
 };
 
 interface StatusDistributionChartProps {
@@ -125,28 +126,25 @@ interface StatusDistributionChartProps {
   isLoading?: boolean;
 }
 
-// Transform API data to Tremor format
-function transformToTremorData(data: StatusDistributionChartProps['data']) {
+// Transform API data to Recharts format
+function transformData(data: StatusDistributionChartProps['data']) {
   return [
-    { name: 'New', value: data.new },
-    { name: 'Claimed', value: data.claimed },
-    { name: 'Contacted', value: data.contacted },
-    { name: 'Closed', value: data.closed },
-    { name: 'Lost', value: data.lost },
-    { name: 'Unreachable', value: data.unreachable },
+    { name: 'New', value: data.new, color: STATUS_COLORS.New },
+    { name: 'Claimed', value: data.claimed, color: STATUS_COLORS.Claimed },
+    { name: 'Contacted', value: data.contacted, color: STATUS_COLORS.Contacted },
+    { name: 'Closed', value: data.closed, color: STATUS_COLORS.Closed },
+    { name: 'Lost', value: data.lost, color: STATUS_COLORS.Lost },
+    { name: 'Unreachable', value: data.unreachable, color: STATUS_COLORS.Unreachable },
   ].filter(item => item.value > 0);
 }
 
 export function StatusDistributionChart({ data, isLoading }: StatusDistributionChartProps) {
   if (isLoading) return <StatusChartSkeleton />;
 
-  const chartData = transformToTremorData(data);
+  const chartData = transformData(data);
   const total = chartData.reduce((sum, item) => sum + item.value, 0);
 
   if (total === 0) return <StatusChartEmpty />;
-
-  // Get colors array in same order as data
-  const colors = chartData.map(item => STATUS_COLORS[item.name]);
 
   return (
     <Card>
@@ -157,35 +155,42 @@ export function StatusDistributionChart({ data, isLoading }: StatusDistributionC
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <DonutChart
-          className="h-72"
-          data={chartData}
-          category="value"
-          index="name"
-          colors={colors}
-          valueFormatter={(value) => `${value} leads`}
-          showAnimation={true}
-          showTooltip={true}
-          label={`${total} Total`}
-        />
-        <Legend
-          className="mt-4 justify-center"
-          categories={chartData.map(item => item.name)}
-          colors={colors}
-        />
+        <ResponsiveContainer width="100%" height={300}>
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={100}
+              paddingAngle={2}
+              dataKey="value"
+              label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip content={<CustomTooltip total={total} />} />
+            <Legend content={<CustomLegend />} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="text-center mt-2 text-lg font-semibold">
+          {total} Total Leads
+        </div>
       </CardContent>
     </Card>
   );
 }
 ```
 
-### Why Tremor?
+### Why Recharts?
 
-- ✅ Beautiful donut chart with center label built-in
-- ✅ Smooth hover animations
-- ✅ Dark mode support
-- ✅ Less code than Recharts
-- ✅ Consistent styling with other charts
+- ✅ Compatible with React 19
+- ✅ Direct control over styling (CustomLegend, CustomTooltip)
+- ✅ No peer dependency conflicts
+- ✅ Consistent with Lead Trend Chart (Story 2.2)
+- ✅ Uses shared chart-config.ts
 
 ### Skeleton Component
 
@@ -269,8 +274,9 @@ src/
 
 ### Dependencies
 
-- `@tremor/react` - Charting library (shared with 2-2)
+- `recharts` - Charting library (shared with Story 2.2)
 - `lucide-react` - Icons (PieChart)
+- `src/lib/chart-config.ts` - Shared chart configuration
 - Story 2-1 and 2-2 should be complete for shared patterns
 
 ### References

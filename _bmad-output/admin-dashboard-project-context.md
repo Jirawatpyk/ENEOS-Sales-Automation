@@ -27,7 +27,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **UI & Styling:**
 - Tailwind CSS ^3.4.0
 - shadcn/ui (Radix UI-based, copy components)
-- @tremor/react ^3.13.0 (Dashboard charts - v3 API)
+- recharts ^3.6.0 (Dashboard charts - React 19 compatible)
 - lucide-react ^0.312.0 (Icons)
 - clsx + tailwind-merge (cn() utility)
 
@@ -154,10 +154,12 @@ export function cn(...inputs: ClassValue[]) {
 }
 ```
 
-### Tremor Charts
+### Recharts (Charts)
 ```typescript
-// Use Tailwind color NAMES (not hex)
-<AreaChart colors={['red', 'green']} />
+// Use HEX colors from chart-config.ts
+import { CHART_COLORS, LEAD_TREND_COLORS } from '@/lib/chart-config';
+
+<Area stroke={LEAD_TREND_COLORS.newLeads} fill="url(#gradient-newLeads)" />
 ```
 
 ### NextAuth.js Session
@@ -476,8 +478,8 @@ useEffect(() => setTime(new Date().toLocaleString()), [])
 
 ### Dynamic Imports for Heavy Components
 ```typescript
-const AreaChart = dynamic(
-  () => import('@tremor/react').then(mod => mod.AreaChart),
+const LeadTrendChart = dynamic(
+  () => import('@/components/dashboard/lead-trend-chart').then(mod => mod.LeadTrendChart),
   { ssr: false, loading: () => <ChartSkeleton /> }
 )
 ```

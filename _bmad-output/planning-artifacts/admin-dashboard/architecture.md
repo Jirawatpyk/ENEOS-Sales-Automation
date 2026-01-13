@@ -80,7 +80,7 @@ Admin Dashboard เป็นระบบ Web Application สำหรับผ�
 |----------|--------|------------------------|-----------|
 | Frontend Framework | Next.js 14 | React SPA, Vue, Angular | SSR, App Router, Performance |
 | Styling | Tailwind CSS | CSS Modules, Styled Components | Utility-first, Consistency |
-| UI Components | shadcn/ui + Tremor | MUI, Ant Design | Customizable, Dashboard-ready |
+| UI Components | shadcn/ui + Recharts | MUI, Ant Design | Customizable, React 19 compatible |
 | State Management | TanStack Query | Redux, Zustand | Server state focus |
 | Authentication | NextAuth.js | Auth0, Firebase Auth | Open source, Google OAuth |
 | Deployment | Vercel | AWS, Railway | Next.js optimized |
@@ -305,11 +305,10 @@ App
     │   ├── Select
     │   ├── DatePicker
     │   └── Dialog
-    ├── Charts (Tremor)
-    │   ├── AreaChart
-    │   ├── BarChart
-    │   ├── DonutChart
-    │   └── LineChart
+    ├── Charts (Recharts)
+    │   ├── LeadTrendChart (AreaChart)
+    │   ├── StatusDistributionChart (PieChart)
+    │   └── chart-config.ts (shared styling)
     └── Common
         ├── LoadingSpinner
         ├── ErrorBoundary

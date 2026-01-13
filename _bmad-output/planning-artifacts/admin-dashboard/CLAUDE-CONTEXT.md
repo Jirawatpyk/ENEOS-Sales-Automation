@@ -44,7 +44,7 @@
 | **Project Name** | ENEOS Admin Dashboard |
 | **Framework** | Next.js 14 (App Router) |
 | **Language** | TypeScript (Strict Mode) |
-| **UI Library** | shadcn/ui + Tremor |
+| **UI Library** | shadcn/ui + Recharts |
 | **Styling** | Tailwind CSS |
 | **Auth** | NextAuth.js + Google OAuth |
 | **Data Fetching** | TanStack Query v5 |
@@ -278,14 +278,13 @@ const statusColors = {
   unreachable: 'gray',
 };
 
-// Chart Colors (Tremor)
-const chartColors = [
-  'red',      // Primary
-  'blue',     // Secondary
-  'green',    // Tertiary
-  'amber',    // Quaternary
-  'gray',     // Quinary
-];
+// Chart Colors (Recharts) - from src/lib/chart-config.ts
+const CHART_COLORS = {
+  primary: '#6366F1',    // Indigo-500 - New Leads
+  secondary: '#10B981',  // Emerald-500 - Closed
+  grid: '#E5E7EB',       // Gray-200
+  text: '#6B7280',       // Gray-500
+};
 ```
 
 ---
@@ -581,7 +580,7 @@ NEXT_PUBLIC_ENABLE_EXPORT=true
 npx create-next-app@latest admin-dashboard --typescript --tailwind --eslint --app --src-dir
 
 # Install dependencies
-npm install @tanstack/react-query @tanstack/react-table next-auth tremor @tremor/react lucide-react xlsx jspdf date-fns zod
+npm install @tanstack/react-query @tanstack/react-table next-auth recharts lucide-react xlsx jspdf date-fns zod
 
 # Install shadcn/ui
 npx shadcn@latest init
@@ -665,9 +664,10 @@ const breakpoints = {
    - Wrap app ด้วย `QueryClientProvider`
    - ใช้ `useQuery` สำหรับ GET, `useMutation` สำหรับ POST/PUT/DELETE
 
-5. **Tremor Charts**
-   - Import จาก `@tremor/react`
-   - Colors ใช้ชื่อ Tailwind เช่น 'red', 'blue'
+5. **Recharts**
+   - Import จาก `recharts`
+   - Colors ใช้ HEX จาก `src/lib/chart-config.ts`
+   - Custom components: CustomLegend, CustomTooltip
 
 6. **Port**
    - Backend ใช้ port 3000
@@ -706,7 +706,7 @@ const breakpoints = {
     npx create-next-app@latest admin-dashboard --typescript --tailwind --eslint --app --src-dir
 
 [ ] Install dependencies
-    npm install @tanstack/react-query @tanstack/react-table next-auth @tremor/react lucide-react xlsx jspdf date-fns zod
+    npm install @tanstack/react-query @tanstack/react-table next-auth recharts lucide-react xlsx jspdf date-fns zod
 
 [ ] Setup shadcn/ui
     npx shadcn@latest init

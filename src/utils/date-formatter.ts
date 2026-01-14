@@ -54,8 +54,9 @@ export function parseDateFromSheets(dateStr: string): Date {
     }
   }
 
-  // Parse Thai format (DD/MM/YYYY HH:MM:SS)
-  const match = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  // Parse Thai format (D/M/YYYY, HH:MM:SS or DD/MM/YYYY HH:MM:SS)
+  // Supports: 11/1/2026, 16:56:06 or 11/01/2026 16:56:06
+  const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2}):(\d{2})$/);
   if (match) {
     const [, day, month, year, hours, minutes, seconds] = match;
     // Create date in Thai timezone, then convert to UTC

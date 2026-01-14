@@ -52,6 +52,12 @@ export const brevoWebhookSchema = z.object({
   link: z.string().optional(),
   // Contact can be nested object or flat attributes
   contact: contactSchema,
+  // Brevo Automation webhook uses "attributes" object
+  attributes: contactSchema,
+  // Automation workflow fields
+  appName: z.string().optional(),
+  workflow_id: z.number().optional(),
+  step_id: z.number().optional(),
   // Contact attributes at root level (legacy/alternative format)
   FIRSTNAME: z.string().optional(),
   LASTNAME: z.string().optional(),
@@ -81,29 +87,30 @@ export type BrevoWebhookInput = z.infer<typeof brevoWebhookSchema>;
 
 /**
  * Normalize Brevo webhook payload to consistent format
- * Handles both nested contact object and flat attributes
+ * Handles: nested contact object, attributes object (Automation), and flat attributes
  */
 export function normalizeBrevoPayload(input: BrevoWebhookInput): NormalizedBrevoPayload {
-  // Get contact data from nested object or root level
+  // Get contact data from nested object, attributes (Automation), or root level
   const contact = input.contact || {};
+  const attrs = input.attributes || {};
 
   return {
     email: input.email.toLowerCase().trim(),
-    firstname: contact.FIRSTNAME || contact.firstname || input.FIRSTNAME || input.firstname || '',
-    lastname: contact.LASTNAME || contact.lastname || input.LASTNAME || input.lastname || '',
-    phone: contact.PHONE || contact.phone || contact.SMS || contact.sms || input.PHONE || input.phone || input.SMS || input.sms || '',
-    company: contact.COMPANY || contact.company || input.COMPANY || input.company || '',
-    campaignId: String(input.campaign_id || ''),
-    campaignName: input.campaign_name || '',
+    firstname: attrs.FIRSTNAME || attrs.firstname || contact.FIRSTNAME || contact.firstname || input.FIRSTNAME || input.firstname || '',
+    lastname: attrs.LASTNAME || attrs.lastname || contact.LASTNAME || contact.lastname || input.LASTNAME || input.lastname || '',
+    phone: attrs.PHONE || attrs.phone || attrs.SMS || attrs.sms || contact.PHONE || contact.phone || contact.SMS || contact.sms || input.PHONE || input.phone || input.SMS || input.sms || '',
+    company: attrs.COMPANY || attrs.company || contact.COMPANY || contact.company || input.COMPANY || input.company || '',
+    campaignId: String(input.campaign_id || input.workflow_id || ''),
+    campaignName: input.campaign_name || (input.workflow_id ? `Workflow ${input.workflow_id}` : ''),
     subject: input.subject || '',
     contactId: String(input.contact_id || ''),
     eventId: input['message-id'] || String(input.id || ''),
     clickedAt: formatDateForSheets(input.date || new Date()),
     // New fields from Brevo Contact Attributes
-    jobTitle: contact.JOB_TITLE || contact.job_title || input.JOB_TITLE || input.job_title || '',
-    leadSource: contact.LEAD_SOURCE || contact.lead_source || input.LEAD_SOURCE || input.lead_source || '',
-    city: contact.CITY || contact.city || input.CITY || input.city || '',
-    website: contact.WEBSITE || contact.website || input.WEBSITE || input.website || '',
+    jobTitle: attrs.JOB_TITLE || attrs.job_title || contact.JOB_TITLE || contact.job_title || input.JOB_TITLE || input.job_title || '',
+    leadSource: attrs.LEAD_SOURCE || attrs.lead_source || contact.LEAD_SOURCE || contact.lead_source || input.LEAD_SOURCE || input.lead_source || '',
+    city: attrs.CITY || attrs.city || contact.CITY || contact.city || input.CITY || input.city || '',
+    website: attrs.WEBSITE || attrs.website || contact.WEBSITE || contact.website || input.WEBSITE || input.website || '',
   };
 }
 

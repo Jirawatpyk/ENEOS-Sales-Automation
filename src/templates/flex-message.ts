@@ -103,7 +103,7 @@ export function createLeadFlexMessage(
         },
         {
           type: 'text',
-          text: `ผู้ติดต่อ: ${lead.customerName || 'ไม่ระบุ'}`,
+          text: `ผู้ติดต่อ: ${lead.customerName || 'ไม่ระบุ'}${lead.jobTitle ? ` (${lead.jobTitle})` : ''}`,
           size: 'sm',
           color: COLORS.medium,
           wrap: true,

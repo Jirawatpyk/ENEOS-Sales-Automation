@@ -94,9 +94,9 @@ export function guessCompanyFromEmail(email: string): string {
  * Create deduplication key from email and campaign
  *
  * @param email - Email address
- * @param campaignId - Campaign ID
+ * @param leadSource - Lead source (e.g., Website, LinkedIn, Trade Show)
  * @returns Composite key for deduplication
  */
-export function createDedupKey(email: string, campaignId: string): string {
-  return `${normalizeEmail(email)}_${campaignId}`;
+export function createDedupKey(email: string, leadSource: string): string {
+  return `${normalizeEmail(email)}_${leadSource || 'unknown'}`;
 }

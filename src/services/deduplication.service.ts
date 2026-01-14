@@ -50,14 +50,14 @@ export class DeduplicationService {
    * 2. In-memory cache - fallback
    * 3. Google Sheets - persistent storage
    */
-  async checkAndMark(email: string, campaignId: string): Promise<boolean> {
+  async checkAndMark(email: string, leadSource: string): Promise<boolean> {
     if (!this.enabled) {
       logger.debug('Deduplication disabled, allowing all leads');
       return false;
     }
 
     const normalizedEmail = normalizeEmail(email);
-    const key = createDedupKey(normalizedEmail, campaignId);
+    const key = createDedupKey(normalizedEmail, leadSource);
     const redisKey = REDIS_KEYS.dedupKey(key);
 
     logger.debug('Checking deduplication', { key, redisAvailable: redisService.isAvailable() });
@@ -92,7 +92,7 @@ export class DeduplicationService {
     }
 
     // Not a duplicate - mark as processed
-    await this.markAsProcessed(key, normalizedEmail, campaignId);
+    await this.markAsProcessed(key, normalizedEmail, leadSource);
 
     logger.info('New lead processed', { key });
     return false;
@@ -101,24 +101,24 @@ export class DeduplicationService {
   /**
    * Check if duplicate and throw error if true
    */
-  async checkOrThrow(email: string, campaignId: string): Promise<void> {
-    const isDuplicate = await this.checkAndMark(email, campaignId);
+  async checkOrThrow(email: string, leadSource: string): Promise<void> {
+    const isDuplicate = await this.checkAndMark(email, leadSource);
 
     if (isDuplicate) {
-      throw new DuplicateLeadError(email, campaignId);
+      throw new DuplicateLeadError(email, leadSource);
     }
   }
 
   /**
    * Check only (without marking)
    */
-  async isDuplicate(email: string, campaignId: string): Promise<boolean> {
+  async isDuplicate(email: string, leadSource: string): Promise<boolean> {
     if (!this.enabled) {
       return false;
     }
 
     const normalizedEmail = normalizeEmail(email);
-    const key = createDedupKey(normalizedEmail, campaignId);
+    const key = createDedupKey(normalizedEmail, leadSource);
     const redisKey = REDIS_KEYS.dedupKey(key);
 
     // Check Redis first
@@ -186,13 +186,13 @@ export class DeduplicationService {
   private async markAsProcessed(
     key: string,
     email: string,
-    campaignId: string
+    leadSource: string
   ): Promise<void> {
     // Add to caches immediately
     await this.addToCaches(key);
 
     // Persist to Google Sheets (async, don't wait)
-    sheetsService.markAsProcessed(key, email, campaignId).catch((error) => {
+    sheetsService.markAsProcessed(key, email, leadSource).catch((error) => {
       logger.error('Failed to persist dedup record to sheets', {
         key,
         error: error instanceof Error ? error.message : 'Unknown error',

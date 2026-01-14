@@ -72,15 +72,15 @@ export async function handleBrevoWebhook(
       return;
     }
 
-    // Step 3: Check for duplicates
+    // Step 3: Check for duplicates (using email + leadSource)
     try {
-      await deduplicationService.checkOrThrow(payload.email, payload.campaignId);
+      await deduplicationService.checkOrThrow(payload.email, payload.leadSource);
     } catch (error) {
       if (error instanceof DuplicateLeadError) {
         duplicateLeadsTotal.inc();
         logger.info('Duplicate lead detected', {
           email: payload.email,
-          campaignId: payload.campaignId,
+          leadSource: payload.leadSource,
         });
         res.status(200).json({
           success: true,
@@ -105,7 +105,7 @@ export async function handleBrevoWebhook(
     if (config.features.aiEnrichment) {
       const aiStartTime = Date.now();
       try {
-        aiAnalysis = await geminiService.analyzeCompany(domain, payload.company, payload.jobTitle);
+        aiAnalysis = await geminiService.analyzeCompany(domain, payload.company);
         aiAnalysisDuration.observe((Date.now() - aiStartTime) / 1000);
         aiAnalysisTotal.inc({ status: 'success' });
         logger.info('AI analysis completed', {

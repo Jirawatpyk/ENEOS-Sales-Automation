@@ -250,8 +250,8 @@ export class ValidationError extends AppError {
 }
 
 export class DuplicateLeadError extends AppError {
-  constructor(email: string, campaignId: string) {
-    super(`Lead already processed: ${email} for campaign ${campaignId}`, 409, 'DUPLICATE_LEAD');
+  constructor(email: string, leadSource: string) {
+    super(`Lead already processed: ${email} from source ${leadSource}`, 409, 'DUPLICATE_LEAD');
     this.name = 'DuplicateLeadError';
   }
 }

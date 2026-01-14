@@ -407,7 +407,7 @@ export class SheetsService {
   /**
    * Mark a lead as processed (add to dedup log)
    */
-  async markAsProcessed(key: string, email: string, campaignId: string): Promise<void> {
+  async markAsProcessed(key: string, email: string, leadSource: string): Promise<void> {
     logger.info('Marking lead as processed', { key });
 
     return circuitBreaker.execute(async () => {
@@ -417,7 +417,7 @@ export class SheetsService {
           range: getSheetRange(this.dedupSheet, 'A:D'),
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [[key, email, campaignId, formatDateForSheets()]],
+            values: [[key, email, leadSource, formatDateForSheets()]],
           },
         });
       });

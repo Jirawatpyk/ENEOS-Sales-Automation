@@ -43,6 +43,7 @@ export async function handleBrevoWebhook(
     logger.info('Received Brevo webhook', {
       event: req.body?.event,
       email: req.body?.email,
+      rawPayload: JSON.stringify(req.body),
     });
 
     // Step 1: Validate incoming payload

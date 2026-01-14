@@ -127,7 +127,8 @@ export async function handleBrevoWebhook(
       phone: formatPhone(payload.phone),
       company: payload.company || 'ไม่ระบุ',
       industryAI: aiAnalysis.industry,
-      website: aiAnalysis.website,
+      // Use Brevo website if provided, otherwise use AI-guessed website
+      website: payload.website || aiAnalysis.website,
       capital: aiAnalysis.registeredCapital,
       status: 'new',
       campaignId: payload.campaignId,
@@ -138,6 +139,10 @@ export async function handleBrevoWebhook(
       eventId: payload.eventId,
       clickedAt: payload.clickedAt,
       talkingPoint: aiAnalysis.talkingPoint,
+      // New fields from Brevo Contact Attributes
+      leadSource: payload.leadSource || null,
+      jobTitle: payload.jobTitle || null,
+      city: payload.city || null,
     };
 
     const rowNumber = await sheetsService.addLead(lead);

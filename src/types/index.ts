@@ -30,6 +30,9 @@ export interface Lead {
   closedAt: string | null;
   lostAt: string | null;
   unreachableAt: string | null;
+  leadSource: string | null;
+  jobTitle: string | null;
+  city: string | null;
 }
 
 export type LeadStatus =
@@ -98,6 +101,11 @@ export interface NormalizedBrevoPayload {
   contactId: string;
   eventId: string;
   clickedAt: string;
+  // New fields from Brevo Contact Attributes
+  jobTitle: string;
+  leadSource: string;
+  city: string;
+  website: string;
 }
 
 // ===========================================

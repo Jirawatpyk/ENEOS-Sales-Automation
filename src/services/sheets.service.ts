@@ -44,6 +44,7 @@ const circuitBreaker = new CircuitBreaker(5, 60000);
  * J: salesOwnerId, K: salesOwnerName, L: campaignId, M: campaignName
  * N: emailSubject, O: source, P: leadId, Q: eventId, R: clickedAt
  * S: talkingPoint, T: closedAt, U: lostAt, V: unreachableAt, W: version
+ * X: leadSource, Y: jobTitle, Z: city
  */
 
 
@@ -94,6 +95,10 @@ function rowToLead(row: string[], rowNumber: number): LeadRow {
     closedAt: row[19] || null,
     lostAt: row[20] || null,
     unreachableAt: row[21] || null,
+    // New fields from Brevo Contact Attributes (columns X, Y, Z)
+    leadSource: row[23] || null,
+    jobTitle: row[24] || null,
+    city: row[25] || null,
   };
 }
 
@@ -122,6 +127,10 @@ function leadToRow(lead: Partial<Lead>, version: number = 1): string[] {
     lead.lostAt || '',
     lead.unreachableAt || '',
     version.toString(),
+    // New fields from Brevo Contact Attributes (columns X, Y, Z)
+    lead.leadSource || '',
+    lead.jobTitle || '',
+    lead.city || '',
   ];
 }
 
@@ -159,7 +168,7 @@ export class SheetsService {
 
         const response = await sheets.spreadsheets.values.append({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A:W'),
+          range: getSheetRange(this.leadsSheet, 'A:Z'),
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           requestBody: {
@@ -186,7 +195,7 @@ export class SheetsService {
 
     return circuitBreaker.execute(async () => {
       return withRetry(async () => {
-        const range = getSheetRange(this.leadsSheet, `A${rowNumber}:W${rowNumber}`);
+        const range = getSheetRange(this.leadsSheet, `A${rowNumber}:Z${rowNumber}`);
 
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
@@ -245,7 +254,7 @@ export class SheetsService {
       await withRetry(async () => {
         await sheets.spreadsheets.values.update({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, `A${rowNumber}:W${rowNumber}`),
+          range: getSheetRange(this.leadsSheet, `A${rowNumber}:Z${rowNumber}`),
           valueInputOption: 'RAW',
           requestBody: {
             values: [row],

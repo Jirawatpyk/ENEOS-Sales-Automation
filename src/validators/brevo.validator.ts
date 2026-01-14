@@ -18,11 +18,19 @@ const contactSchema = z.object({
   PHONE: z.string().optional(),
   SMS: z.string().optional(),
   COMPANY: z.string().optional(),
+  JOB_TITLE: z.string().optional(),
+  LEAD_SOURCE: z.string().optional(),
+  CITY: z.string().optional(),
+  WEBSITE: z.string().optional(),
   firstname: z.string().optional(),
   lastname: z.string().optional(),
   phone: z.string().optional(),
   sms: z.string().optional(),
   company: z.string().optional(),
+  job_title: z.string().optional(),
+  lead_source: z.string().optional(),
+  city: z.string().optional(),
+  website: z.string().optional(),
 }).optional();
 
 export const brevoWebhookSchema = z.object({
@@ -49,11 +57,19 @@ export const brevoWebhookSchema = z.object({
   PHONE: z.string().optional(),
   SMS: z.string().optional(),
   COMPANY: z.string().optional(),
+  JOB_TITLE: z.string().optional(),
+  LEAD_SOURCE: z.string().optional(),
+  CITY: z.string().optional(),
+  WEBSITE: z.string().optional(),
   firstname: z.string().optional(),
   lastname: z.string().optional(),
   phone: z.string().optional(),
   sms: z.string().optional(),
   company: z.string().optional(),
+  job_title: z.string().optional(),
+  lead_source: z.string().optional(),
+  city: z.string().optional(),
+  website: z.string().optional(),
 });
 
 export type BrevoWebhookInput = z.infer<typeof brevoWebhookSchema>;
@@ -82,6 +98,11 @@ export function normalizeBrevoPayload(input: BrevoWebhookInput): NormalizedBrevo
     contactId: String(input.contact_id || ''),
     eventId: input['message-id'] || String(input.id || ''),
     clickedAt: formatDateForSheets(input.date || new Date()),
+    // New fields from Brevo Contact Attributes
+    jobTitle: contact.JOB_TITLE || contact.job_title || input.JOB_TITLE || input.job_title || '',
+    leadSource: contact.LEAD_SOURCE || contact.lead_source || input.LEAD_SOURCE || input.lead_source || '',
+    city: contact.CITY || contact.city || input.CITY || input.city || '',
+    website: contact.WEBSITE || contact.website || input.WEBSITE || input.website || '',
   };
 }
 

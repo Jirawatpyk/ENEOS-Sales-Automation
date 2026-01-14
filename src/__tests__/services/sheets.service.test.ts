@@ -99,7 +99,7 @@ describe('SheetsService', () => {
       expect(mockSheets.spreadsheets.values.append).toHaveBeenCalledWith(
         expect.objectContaining({
           spreadsheetId: 'test-sheet-id',
-          range: 'Leads!A:W',
+          range: 'Leads!A:Z',
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
         })

@@ -84,7 +84,7 @@ Research and return JSON with this schema:
 {
   "industry": "Choose from: Automotive, Manufacturing, Logistics, Construction, Agriculture, Energy, Food Processing, Other",
   "company_type": "e.g., ผู้ผลิต, ผู้จัดจำหน่าย, ผู้ให้บริการ, โรงงาน",
-  "one_talking_point": "Thai language - specific benefit of ENEOS lubricants for this company's industry",
+  "one_talking_point": "Format: [ข้อมูลบริษัทสั้นๆ] → [สินค้า ENEOS ที่แนะนำ] เช่น 'ผลิตชิ้นส่วนยานยนต์ → แนะนำ Cutting Oil ENEOS สำหรับเครื่อง CNC'",
   "website": "Company website URL if found, otherwise null",
   "registered_capital_thb": "Amount in Thai Baht (e.g. 5,000,000 บาท). If not found, return 'ไม่ระบุ'",
   "keywords": ["One relevant keyword"]

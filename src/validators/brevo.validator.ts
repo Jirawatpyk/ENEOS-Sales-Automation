@@ -34,7 +34,8 @@ const contactSchema = z.object({
 }).optional();
 
 export const brevoWebhookSchema = z.object({
-  event: z.string(),
+  // event is optional - defaults to 'click' for Automation outbound webhooks
+  event: z.string().optional().default('click'),
   email: z.string().email('Invalid email format'),
   id: z.number().optional(),
   date: z.string().optional(),

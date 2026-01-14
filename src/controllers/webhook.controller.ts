@@ -9,6 +9,7 @@ import { sheetsService } from '../services/sheets.service.js';
 import { geminiService } from '../services/gemini.service.js';
 import { lineService } from '../services/line.service.js';
 import { deduplicationService } from '../services/deduplication.service.js';
+import { brevoService } from '../services/brevo.service.js';
 import { addFailedBrevoWebhook } from '../services/dead-letter-queue.service.js';
 import { validateBrevoWebhook, isClickEvent } from '../validators/brevo.validator.js';
 import { extractDomain } from '../utils/email-parser.js';
@@ -58,7 +59,31 @@ export async function handleBrevoWebhook(
       return;
     }
 
-    const payload = validation.data;
+    let payload = validation.data;
+
+    // Step 1.5: If contact details missing, fetch from Brevo API
+    const hasContactDetails = payload.firstname || payload.company || payload.phone;
+    if (!hasContactDetails && brevoService.isConfigured()) {
+      logger.info('Contact details missing, fetching from Brevo API', { email: payload.email });
+      const contact = await brevoService.getContactByEmail(payload.email);
+      if (contact) {
+        payload = {
+          ...payload,
+          firstname: contact.firstname || payload.firstname,
+          lastname: contact.lastname || payload.lastname,
+          phone: contact.phone || payload.phone,
+          company: contact.company || payload.company,
+          jobTitle: contact.jobTitle || payload.jobTitle,
+          leadSource: contact.leadSource || payload.leadSource,
+          city: contact.city || payload.city,
+          website: contact.website || payload.website,
+        };
+        logger.info('Contact details enriched from Brevo API', {
+          email: payload.email,
+          company: payload.company,
+        });
+      }
+    }
 
     // Step 2: Check if this is a click event (hot lead)
     // Use validated event (defaults to 'click' if not provided by Brevo Automation)

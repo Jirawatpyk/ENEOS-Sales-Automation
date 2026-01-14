@@ -21,6 +21,7 @@ const envSchema = z.object({
 
   // Brevo
   BREVO_WEBHOOK_SECRET: z.string().min(1, 'BREVO_WEBHOOK_SECRET is required'),
+  BREVO_API_KEY: z.string().optional(),
 
   // Google
   GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email('Invalid service account email'),
@@ -121,6 +122,7 @@ export const config = {
   // Brevo
   brevo: {
     webhookSecret: env.BREVO_WEBHOOK_SECRET,
+    apiKey: env.BREVO_API_KEY,
   },
 
   // Google

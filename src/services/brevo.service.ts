@@ -89,6 +89,12 @@ export class BrevoService {
 
       const contact = (await response.json()) as BrevoContact;
 
+      // Log raw attributes for debugging
+      logger.info('Brevo API raw attributes', {
+        email,
+        attributes: JSON.stringify(contact.attributes),
+      });
+
       const details: ContactDetails = {
         firstname: contact.attributes.FIRSTNAME || '',
         lastname: contact.attributes.LASTNAME || '',
@@ -102,7 +108,10 @@ export class BrevoService {
 
       logger.info('Contact fetched from Brevo', {
         email,
+        firstname: details.firstname,
+        lastname: details.lastname,
         company: details.company,
+        jobTitle: details.jobTitle,
         hasPhone: !!details.phone,
       });
 

@@ -10,6 +10,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger.js';
 import { sheetsService } from '../services/sheets.service.js';
+import { parseDateFromSheets, extractDateKey } from '../utils/date-formatter.js';
 import {
   AdminApiResponse,
   DashboardResponse,
@@ -149,7 +150,7 @@ function filterByPeriod(leads: LeadRow[], period: PeriodInfo): LeadRow[] {
   const endTime = new Date(period.endDate).getTime();
 
   return leads.filter((lead) => {
-    const leadTime = new Date(lead.date).getTime();
+    const leadTime = parseDateFromSheets(lead.date).getTime();
     return leadTime >= startTime && leadTime <= endTime;
   });
 }
@@ -247,7 +248,7 @@ export async function getDashboard(
     // Frontend expects: { date, newLeads, closed }
     const trendMap = new Map<string, { date: string; newLeads: number; closed: number }>();
     leads.forEach((lead) => {
-      const dateKey = lead.date.split('T')[0]; // YYYY-MM-DD
+      const dateKey = extractDateKey(lead.date); // YYYY-MM-DD
       if (!trendMap.has(dateKey)) {
         trendMap.set(dateKey, {
           date: dateKey,
@@ -328,7 +329,7 @@ export async function getDashboard(
     // Unclaimed leads (เกิน threshold ชั่วโมง)
     const unclaimedLeads = leads.filter((lead) => {
       if (lead.status !== 'new') {return false;}
-      const hoursSinceCreated = (now.getTime() - new Date(lead.date).getTime()) / (1000 * 60 * 60);
+      const hoursSinceCreated = (now.getTime() - parseDateFromSheets(lead.date).getTime()) / (1000 * 60 * 60);
       return hoursSinceCreated > ALERTS.UNCLAIMED_HOURS;
     });
 
@@ -349,7 +350,7 @@ export async function getDashboard(
     // Stale leads (contacted แต่ไม่ update เกิน threshold วัน)
     const staleLeads = leads.filter((lead) => {
       if (lead.status !== 'contacted') {return false;}
-      const daysSinceContact = (now.getTime() - new Date(lead.clickedAt || lead.date).getTime()) / (1000 * 60 * 60 * 24);
+      const daysSinceContact = (now.getTime() - parseDateFromSheets(lead.clickedAt || lead.date).getTime()) / (1000 * 60 * 60 * 24);
       return daysSinceContact > ALERTS.STALE_DAYS;
     });
 
@@ -470,12 +471,12 @@ export async function getLeads(
 
     if (startDate) {
       const startTime = new Date(startDate).getTime();
-      allLeads = allLeads.filter((lead) => new Date(lead.date).getTime() >= startTime);
+      allLeads = allLeads.filter((lead) => parseDateFromSheets(lead.date).getTime() >= startTime);
     }
 
     if (endDate) {
       const endTime = new Date(endDate).getTime();
-      allLeads = allLeads.filter((lead) => new Date(lead.date).getTime() <= endTime);
+      allLeads = allLeads.filter((lead) => parseDateFromSheets(lead.date).getTime() <= endTime);
     }
 
     // Sort
@@ -1077,14 +1078,14 @@ export async function getCampaigns(
 
       // Get earliest lead date as startDate
       const startDateCampaign = campaignLeads.reduce((earliest, lead) => {
-        const leadDate = new Date(lead.date);
+        const leadDate = parseDateFromSheets(lead.date);
         return leadDate < earliest ? leadDate : earliest;
       }, new Date(campaignLeads[0].date));
 
       // Create weekly trend
       const trendMap = new Map<string, { leads: number; closed: number }>();
       campaignLeads.forEach((lead) => {
-        const weekNum = getWeekNumber(new Date(lead.date));
+        const weekNum = getWeekNumber(parseDateFromSheets(lead.date));
         const weekKey = `W${weekNum}`;
         if (!trendMap.has(weekKey)) {
           trendMap.set(weekKey, { leads: 0, closed: 0 });
@@ -1258,7 +1259,7 @@ export async function getCampaignDetail(
       name: campaignLeads[0].campaignName,
       subject: campaignLeads[0].emailSubject,
       startDate: campaignLeads.reduce((earliest, lead) => {
-        const leadDate = new Date(lead.date);
+        const leadDate = parseDateFromSheets(lead.date);
         return leadDate < earliest ? leadDate : earliest;
       }, new Date(campaignLeads[0].date)).toISOString(),
     };
@@ -1314,7 +1315,7 @@ export async function getCampaignDetail(
     // Daily trend
     const dailyMap = new Map<string, { claimed: number; closed: number }>();
     campaignLeads.forEach((lead) => {
-      const dateKey = lead.date.split('T')[0];
+      const dateKey = extractDateKey(lead.date);
       if (!dailyMap.has(dateKey)) {
         dailyMap.set(dateKey, { claimed: 0, closed: 0 });
       }
@@ -1407,12 +1408,12 @@ export async function exportData(
 
     if (startDate) {
       const startTime = new Date(startDate).getTime();
-      filteredLeads = filteredLeads.filter((lead) => new Date(lead.date).getTime() >= startTime);
+      filteredLeads = filteredLeads.filter((lead) => parseDateFromSheets(lead.date).getTime() >= startTime);
     }
 
     if (endDate) {
       const endTime = new Date(endDate).getTime();
-      filteredLeads = filteredLeads.filter((lead) => new Date(lead.date).getTime() <= endTime);
+      filteredLeads = filteredLeads.filter((lead) => parseDateFromSheets(lead.date).getTime() <= endTime);
     }
 
     if (status) {

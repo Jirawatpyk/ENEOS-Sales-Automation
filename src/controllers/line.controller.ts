@@ -37,8 +37,16 @@ export async function handleLineWebhook(
 ): Promise<void> {
 
   try {
+    // Log all events with source details for debugging
+    const rawEvents = req.body?.events || [];
     logger.info('Received LINE webhook', {
-      eventsCount: req.body?.events?.length || 0,
+      eventsCount: rawEvents.length,
+      sources: rawEvents.map((e: { type: string; source?: { type: string; groupId?: string; userId?: string } }) => ({
+        eventType: e.type,
+        sourceType: e.source?.type,
+        groupId: e.source?.groupId,
+        userId: e.source?.userId?.substring(0, 10) + '...',
+      })),
     });
 
     // Step 1: Validate incoming payload

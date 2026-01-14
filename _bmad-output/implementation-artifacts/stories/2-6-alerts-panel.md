@@ -1,6 +1,6 @@
 # Story 2.6: Alerts Panel
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -53,37 +53,37 @@ so that **I can take action on unclaimed or stale leads promptly**.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Alerts Panel Component** (AC: #1, #5)
-  - [ ] 1.1 Create `src/components/dashboard/alerts-panel.tsx`
-  - [ ] 1.2 Create card with header and alert count badge
-  - [ ] 1.3 Position in dashboard grid
+- [x] **Task 1: Alerts Panel Component** (AC: #1, #5)
+  - [x] 1.1 Create `src/components/dashboard/alerts-panel.tsx`
+  - [x] 1.2 Create card with header and alert count badge
+  - [x] 1.3 Position in dashboard grid
 
-- [ ] **Task 2: Alert Item Component** (AC: #2, #3, #7)
-  - [ ] 2.1 Create `src/components/dashboard/alert-item.tsx`
-  - [ ] 2.2 Display icon based on alert type (warning/info)
-  - [ ] 2.3 Show description text
-  - [ ] 2.4 Style differently for warning vs info
+- [x] **Task 2: Alert Item Component** (AC: #2, #3, #7)
+  - [x] 2.1 Create `src/components/dashboard/alert-item.tsx`
+  - [x] 2.2 Display icon based on alert type (warning/info)
+  - [x] 2.3 Show description text
+  - [x] 2.4 Style differently for warning vs info
 
-- [ ] **Task 3: Action Buttons** (AC: #4)
-  - [ ] 3.1 Add "View Leads" button to alert items
-  - [ ] 3.2 Construct filter URL based on alert type
-  - [ ] 3.3 Navigate to leads page with filters
+- [x] **Task 3: Action Buttons** (AC: #4)
+  - [x] 3.1 Add "View Leads" button to alert items
+  - [x] 3.2 Construct filter URL based on alert type
+  - [x] 3.3 Navigate to leads page with filters
 
-- [ ] **Task 4: No Alerts State** (AC: #6)
-  - [ ] 4.1 Create empty/success state component
-  - [ ] 4.2 Show green checkmark icon
-  - [ ] 4.3 Display "All clear!" message
+- [x] **Task 4: No Alerts State** (AC: #6)
+  - [x] 4.1 Create empty/success state component
+  - [x] 4.2 Show green checkmark icon
+  - [x] 4.3 Display "All clear!" message
 
-- [ ] **Task 5: Data Integration** (AC: #2)
-  - [ ] 5.1 Extract alerts from dashboard API
-  - [ ] 5.2 Calculate unclaimed >24h count
-  - [ ] 5.3 Calculate stale contacted >7d count
+- [x] **Task 5: Data Integration** (AC: #2)
+  - [x] 5.1 Extract alerts from dashboard API
+  - [x] 5.2 Calculate unclaimed >24h count
+  - [x] 5.3 Calculate stale contacted >7d count
 
-- [ ] **Task 6: Testing** (AC: #1-7)
-  - [ ] 6.1 Test alerts render correctly
-  - [ ] 6.2 Test action buttons navigate
-  - [ ] 6.3 Test no alerts state
-  - [ ] 6.4 Test badge count
+- [x] **Task 6: Testing** (AC: #1-7)
+  - [x] 6.1 Test alerts render correctly
+  - [x] 6.2 Test action buttons navigate
+  - [x] 6.3 Test no alerts state
+  - [x] 6.4 Test badge count
 
 ## Dev Notes
 
@@ -277,11 +277,37 @@ src/components/dashboard/
 ## Dev Agent Record
 
 ### Agent Model Used
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
+- N/A
 
 ### Completion Notes List
+- All 7 ACs implemented and tested
+- AlertsPanel, AlertItem, AlertsPanelSkeleton components created
+- AlertsPanelContainer for API integration
+- 34 tests passing (24 unit + 10 container)
+- Full test suite: 398 tests passing
+- Integrated into dashboard page at Row 4 (alongside RecentActivityContainer)
+- Badge shows warning count only (excludes info alerts)
+- Warning = amber, Info = blue color scheme
+- "All clear!" state with green checkmark
+
+### Code Review Fixes Applied
+- Added role="alert" and aria-live="polite" for warning messages (accessibility)
+- Fixed invalid nested interactive elements (Button asChild with Link)
+- Added aria-labelledby to Card for screen reader navigation
+- Added userEvent click/focus tests for AC#4
+- Added ARIA attribute tests (3 new tests)
+- Changed fragile CSS class assertions to semantic behavior tests
 
 ### File List
+- `src/components/dashboard/alerts-panel.tsx` - Main panel with badge
+- `src/components/dashboard/alert-item.tsx` - Individual alert item
+- `src/components/dashboard/alerts-panel-skeleton.tsx` - Loading state
+- `src/components/dashboard/alerts-panel-container.tsx` - API integration
+- `src/components/dashboard/index.ts` - Updated exports
+- `src/__tests__/unit/components/dashboard/alerts-panel.test.tsx` - Unit tests (20)
+- `src/__tests__/alerts-panel-container.test.tsx` - Container tests (10)
+- `src/app/(dashboard)/dashboard/page.tsx` - Dashboard integration
 

@@ -60,11 +60,13 @@ export async function handleBrevoWebhook(
     const payload = validation.data;
 
     // Step 2: Check if this is a click event (hot lead)
-    if (!isClickEvent(req.body.event)) {
-      logger.info('Ignoring non-click event', { event: req.body.event });
+    // Use validated event (defaults to 'click' if not provided by Brevo Automation)
+    const eventType = req.body.event || 'click';
+    if (!isClickEvent(eventType)) {
+      logger.info('Ignoring non-click event', { event: eventType });
       res.status(200).json({
         success: true,
-        message: `Event '${req.body.event}' acknowledged but not processed`,
+        message: `Event '${eventType}' acknowledged but not processed`,
       });
       return;
     }

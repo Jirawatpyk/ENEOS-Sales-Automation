@@ -105,7 +105,7 @@ export async function handleBrevoWebhook(
     if (config.features.aiEnrichment) {
       const aiStartTime = Date.now();
       try {
-        aiAnalysis = await geminiService.analyzeCompany(domain, payload.company);
+        aiAnalysis = await geminiService.analyzeCompany(domain, payload.company, payload.jobTitle);
         aiAnalysisDuration.observe((Date.now() - aiStartTime) / 1000);
         aiAnalysisTotal.inc({ status: 'success' });
         logger.info('AI analysis completed', {

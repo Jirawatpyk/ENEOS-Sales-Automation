@@ -40,12 +40,28 @@ const safetySettings = [
 // Prompts
 // ===========================================
 
-const SYSTEM_PROMPT = `You are a B2B sales assistant.
+const SYSTEM_PROMPT = `You are a B2B sales assistant for ENEOS Thailand - a leading industrial lubricant company from Japan.
+
+ENEOS Products:
+- Industrial lubricants (น้ำมันหล่อลื่นอุตสาหกรรม)
+- Hydraulic oils, gear oils, cutting oils
+- Automotive lubricants, engine oils
+- Specialty greases and metalworking fluids
+
+Target Industries:
+- Automotive (ยานยนต์)
+- Manufacturing (โรงงานผลิต)
+- Logistics (โลจิสติกส์/ขนส่ง)
+- Construction (ก่อสร้าง)
+- Agriculture (เกษตรกรรม)
+- Energy (พลังงาน)
+- Food Processing (อาหาร)
+- Other
 
 Required fields:
-- industry
-- company_type
-- one_talking_point
+- industry (choose from Target Industries above)
+- company_type (e.g., ผู้ผลิต, ผู้จัดจำหน่าย, ผู้ให้บริการ)
+- one_talking_point (MUST relate to ENEOS lubricant products for their industry)
 - registered_capital_thb
 - website
 - keywords
@@ -54,21 +70,24 @@ Rules:
 - Return valid JSON only.
 - No markdown. No explanation.
 - If uncertain, use "unknown".
-- keywords: max 1 items only`;
+- keywords: max 1 item only
+- one_talking_point: Write in Thai, must mention how ENEOS products can help their business`;
 
-const createAnalysisPrompt = (_domain: string, companyName: string): string => {
-  return `Analyze this company:
+const createAnalysisPrompt = (domain: string, companyName: string, jobTitle?: string): string => {
+  return `Analyze this B2B lead for ENEOS Thailand sales team:
 
 company_name: ${companyName || 'Unknown'}
+email_domain: ${domain || 'Unknown'}
+${jobTitle ? `contact_job_title: ${jobTitle}` : ''}
 
-Return JSON only with this schema:
+Research and return JSON with this schema:
 {
-  "industry": "",
-  "company_type": "",
-  "one_talking_point": "",
-  "website": "",
-  "registered_capital_thb": "Amount in Thai Baht (e.g. 5,000,000 บาท). If strictly not found, return 'ไม่ระบุ'",
-  "keywords": [""]
+  "industry": "Choose from: Automotive, Manufacturing, Logistics, Construction, Agriculture, Energy, Food Processing, Other",
+  "company_type": "e.g., ผู้ผลิต, ผู้จัดจำหน่าย, ผู้ให้บริการ, โรงงาน",
+  "one_talking_point": "Thai language - specific benefit of ENEOS lubricants for this company's industry",
+  "website": "Company website URL if found, otherwise null",
+  "registered_capital_thb": "Amount in Thai Baht (e.g. 5,000,000 บาท). If not found, return 'ไม่ระบุ'",
+  "keywords": ["One relevant keyword"]
 }`;
 };
 
@@ -108,19 +127,19 @@ export class GeminiService {
   /**
    * Analyze company information for sales intelligence
    */
-  async analyzeCompany(domain: string, companyName: string): Promise<CompanyAnalysis> {
+  async analyzeCompany(domain: string, companyName: string, jobTitle?: string): Promise<CompanyAnalysis> {
     if (!config.features.aiEnrichment) {
       logger.info('AI enrichment disabled, using default response');
       return DEFAULT_ANALYSIS;
     }
 
-    logger.info('Analyzing company', { domain, companyName });
+    logger.info('Analyzing company', { domain, companyName, jobTitle });
 
     try {
       return await circuitBreaker.execute(async () => {
         return withRetry(
           async () => {
-            const prompt = createAnalysisPrompt(domain, companyName);
+            const prompt = createAnalysisPrompt(domain, companyName, jobTitle);
 
             const chat = this.model.startChat({
               history: [

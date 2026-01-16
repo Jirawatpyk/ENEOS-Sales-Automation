@@ -47,3 +47,12 @@ test-*.json
 
 # Claude Code temp files
 tmpclaude-*
+
+# Claude local settings
+.claude/settings.local.json
+
+# Playwright MCP
+.playwright-mcp/
+
+# Windows artifacts
+nul

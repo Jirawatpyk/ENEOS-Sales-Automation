@@ -1,6 +1,6 @@
 # Story 3.5: Individual Performance Trend
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -79,78 +79,78 @@ so that **I can identify improving or declining performers and have data-driven 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Trend Data API Hook** (AC: #1, #3)
-  - [ ] 1.1 Create `src/hooks/use-sales-trend.ts`
-  - [ ] 1.2 Accept parameters: userId, period (7/30/90 days)
-  - [ ] 1.3 Call `/api/admin/sales-performance/trend?userId={id}&days={days}`
-  - [ ] 1.4 Handle loading, error, and empty states
-  - [ ] 1.5 **Note:** Backend endpoint may need to be created
-  - [ ] 1.6 **Fallback:** Create mock data generator for development if backend unavailable
-  - [ ] 1.7 Mock data should generate realistic daily metrics for 7/30/90 days
+- [x] **Task 1: Trend Data API Hook** (AC: #1, #3)
+  - [x] 1.1 Create `src/hooks/use-sales-trend.ts`
+  - [x] 1.2 Accept parameters: userId, period (7/30/90 days)
+  - [x] 1.3 Call `/api/admin/sales-performance/trend?userId={id}&days={days}`
+  - [x] 1.4 Handle loading, error, and empty states
+  - [x] 1.5 **Note:** Backend endpoint may need to be created
+  - [x] 1.6 **Fallback:** Create mock data generator for development if backend unavailable
+  - [x] 1.7 Mock data should generate realistic daily metrics for 7/30/90 days
 
-- [ ] **Task 2: Trend Chart Component** (AC: #1, #2, #9)
-  - [ ] 2.1 Create `src/components/sales/individual-trend-chart.tsx`
-  - [ ] 2.2 Use Recharts LineChart with ResponsiveContainer
-  - [ ] 2.3 Configure lines for Claimed and Closed metrics
-  - [ ] 2.4 Add legend with toggle functionality
-  - [ ] 2.5 **Guard logic:** Prevent hiding last visible metric (count visible, skip if count === 1)
-  - [ ] 2.6 Style to match existing charts (chart-config.ts)
+- [x] **Task 2: Trend Chart Component** (AC: #1, #2, #9)
+  - [x] 2.1 Create `src/components/sales/individual-trend-chart.tsx`
+  - [x] 2.2 Use Recharts LineChart with ResponsiveContainer
+  - [x] 2.3 Configure lines for Claimed and Closed metrics
+  - [x] 2.4 Add legend with toggle functionality
+  - [x] 2.5 **Guard logic:** Prevent hiding last visible metric (count visible, skip if count === 1)
+  - [x] 2.6 Style to match existing charts (chart-config.ts)
 
-- [ ] **Task 3: Period Selector** (AC: #3)
-  - [ ] 3.0 Install ToggleGroup if not exists: `npx shadcn-ui@latest add toggle-group`
-  - [ ] 3.1 Add period toggle buttons using ToggleGroup above chart
-  - [ ] 3.2 Options: "7 Days", "30 Days", "90 Days"
-  - [ ] 3.3 Default to "30 Days"
-  - [ ] 3.4 Trigger data refetch on change (TanStack Query auto-refetches when queryKey changes)
+- [x] **Task 3: Period Selector** (AC: #3)
+  - [x] 3.0 Used Button group instead of ToggleGroup (simpler implementation)
+  - [x] 3.1 Add period toggle buttons using Button above chart
+  - [x] 3.2 Options: "7 Days", "30 Days", "90 Days"
+  - [x] 3.3 Default to "30 Days"
+  - [x] 3.4 Trigger data refetch on change (TanStack Query auto-refetches when queryKey changes)
 
-- [ ] **Task 4: Team Average Line** (AC: #4)
-  - [ ] 4.1 Calculate team average for each day from existing data
-  - [ ] 4.2 Add dashed reference line to chart
-  - [ ] 4.3 Toggle via legend
-  - [ ] 4.4 Style as dashed gray line
+- [x] **Task 4: Team Average Line** (AC: #4)
+  - [x] 4.1 Calculate team average for each day from existing data
+  - [x] 4.2 Add dashed reference line to chart
+  - [x] 4.3 Toggle via legend
+  - [x] 4.4 Style as dashed gray line
 
-- [ ] **Task 5: Custom Tooltip** (AC: #5)
-  - [ ] 5.1 Create `trend-chart-tooltip.tsx`
-  - [ ] 5.2 Show date, metric values
-  - [ ] 5.3 Show comparison to team average
-  - [ ] 5.4 Format values appropriately
+- [x] **Task 5: Custom Tooltip** (AC: #5)
+  - [x] 5.1 Create `trend-chart-tooltip.tsx`
+  - [x] 5.2 Show date, metric values
+  - [x] 5.3 Show comparison to team average
+  - [x] 5.4 Format values appropriately
 
-- [ ] **Task 6: Trend Indicator** (AC: #6)
-  - [ ] 6.1 Calculate trend: compare avg of first half vs second half
-  - [ ] 6.2 **Guard:** If first half avg is 0, return "stable" (avoid division by zero)
-  - [ ] 6.3 Display arrow icon (↑/↓/→) with color
-  - [ ] 6.4 Add to chart header area
-  - [ ] 6.5 Threshold: >10% change = improving/declining, else stable
+- [x] **Task 6: Trend Indicator** (AC: #6)
+  - [x] 6.1 Calculate trend: compare avg of first half vs second half
+  - [x] 6.2 **Guard:** If first half avg is 0, return "stable" (avoid division by zero)
+  - [x] 6.3 Display arrow icon (↑/↓/→) with color
+  - [x] 6.4 Add to chart header area
+  - [x] 6.5 Threshold: >10% change = improving/declining, else stable
 
-- [ ] **Task 7: Empty State** (AC: #7)
-  - [ ] 7.1 Create `trend-chart-empty.tsx`
-  - [ ] 7.2 Show message for insufficient data
-  - [ ] 7.3 Define minimum: 7 data points required
+- [x] **Task 7: Empty State** (AC: #7)
+  - [x] 7.1 Create `trend-chart-empty.tsx`
+  - [x] 7.2 Show message for insufficient data
+  - [x] 7.3 Define minimum: 7 data points required
 
-- [ ] **Task 8: Loading State** (AC: #8)
-  - [ ] 8.1 Create `trend-chart-skeleton.tsx`
-  - [ ] 8.2 Match chart dimensions
-  - [ ] 8.3 Show while data loads
+- [x] **Task 8: Loading State** (AC: #8)
+  - [x] 8.1 Create `trend-chart-skeleton.tsx`
+  - [x] 8.2 Match chart dimensions
+  - [x] 8.3 Show while data loads
 
-- [ ] **Task 9: Integration with Detail Sheet** (AC: #1)
-  - [ ] 9.1 Update `sales-detail-sheet.tsx` (from Story 3-1)
-  - [ ] 9.2 Add trend chart section below metrics
-  - [ ] 9.3 Pass userId to trend hook
-  - [ ] 9.4 Handle loading state within sheet
+- [x] **Task 9: Integration with Detail Sheet** (AC: #1)
+  - [x] 9.1 Update `sales-detail-sheet.tsx` (from Story 3-1)
+  - [x] 9.2 Add trend chart section below metrics
+  - [x] 9.3 Pass userId to trend hook
+  - [x] 9.4 Handle loading state within sheet
 
-- [ ] **Task 10: Testing** (AC: #1-9)
-  - [ ] 10.1 Test chart renders with trend data
-  - [ ] 10.2 Test period selection changes data (verify TanStack Query refetch)
-  - [ ] 10.3 Test legend toggle shows/hides lines
-  - [ ] 10.4 Test guard logic: cannot hide last visible metric
-  - [ ] 10.5 Test tooltip shows correct values with comparison format (+X above avg / -X below avg)
-  - [ ] 10.6 Test trend indicator calculation (up >10%, down <-10%, else stable)
-  - [ ] 10.7 Test trend indicator with first half avg = 0 → returns "stable"
-  - [ ] 10.8 Test empty state with < 7 data points
-  - [ ] 10.9 Test loading state (skeleton)
-  - [ ] 10.10 Test responsive behavior
-  - [ ] 10.11 Test mock data fallback when API unavailable
-  - [ ] 10.12 Test all zeros data → trend is "stable"
+- [x] **Task 10: Testing** (AC: #1-9)
+  - [x] 10.1 Test chart renders with trend data
+  - [x] 10.2 Test period selection changes data (verify TanStack Query refetch)
+  - [x] 10.3 Test legend toggle shows/hides lines
+  - [x] 10.4 Test guard logic: cannot hide last visible metric
+  - [x] 10.5 Test tooltip shows correct values with comparison format (+X above avg / -X below avg)
+  - [x] 10.6 Test trend indicator calculation (up >10%, down <-10%, else stable)
+  - [x] 10.7 Test trend indicator with first half avg = 0 → returns "stable"
+  - [x] 10.8 Test empty state with < 7 data points
+  - [x] 10.9 Test loading state (skeleton)
+  - [x] 10.10 Test responsive behavior
+  - [x] 10.11 Test mock data fallback when API unavailable
+  - [x] 10.12 Test all zeros data → trend is "stable"
 
 ## Dev Notes
 
@@ -529,10 +529,55 @@ From Story 3-1:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+N/A
+
 ### Completion Notes List
 
+- Used Button group instead of ToggleGroup (simpler implementation without extra dependency)
+- Mock data generator provides realistic daily metrics with deterministic variance based on userId
+- Backend trend API endpoint not yet created - uses mock data fallback for MVP
+- Sheet width increased to sm:max-w-xl to accommodate trend chart
+- Trend calculation uses Closed metric as primary KPI (per AC#4)
+- All 9 ACs implemented with corresponding tests
+
+### Code Review Notes
+
+**Issues Found & Fixed:**
+1. **CRITICAL:** Test file `use-sales-trend.test.ts` used JSX but had `.ts` extension → Renamed to `.tsx`
+2. **HIGH:** Mock data used `Math.random()` causing non-deterministic tests → Implemented seeded PRNG (`seededRandom()`)
+3. **MEDIUM:** `console.warn()` in production code → Removed
+
+**Non-blocking Recommendations:**
+- Tooltip comparison only shows for 'closed' metric (by design per AC#4)
+- Consider adding ErrorBoundary for Recharts rendering errors
+
 ### File List
+
+**New Files Created:**
+- `src/hooks/use-sales-trend.ts` - TanStack Query hook with mock data fallback
+- `src/components/sales/individual-trend-chart.tsx` - Main trend chart component
+- `src/components/sales/trend-chart-skeleton.tsx` - Loading state skeleton
+- `src/components/sales/trend-chart-empty.tsx` - Empty/error state component
+- `src/components/sales/trend-chart-tooltip.tsx` - Custom tooltip with comparison
+- `src/components/sales/trend-indicator.tsx` - Trend direction indicator (up/down/stable)
+- `src/__tests__/individual-trend-chart.test.tsx` - Chart component tests (12 tests)
+- `src/__tests__/trend-indicator.test.ts` - Trend calculation tests (9 tests)
+- `src/__tests__/use-sales-trend.test.tsx` - Hook tests (10 tests)
+
+**Modified Files:**
+- `src/types/sales.ts` - Added DailyMetric, SalesTrendData, TrendPeriod, TrendDirection types
+- `src/hooks/index.ts` - Added useSalesTrend export
+- `src/components/sales/index.ts` - Added Story 3.5 exports
+- `src/components/sales/sales-detail-sheet.tsx` - Integrated IndividualTrendChart, increased width
+- `src/__tests__/sales-detail-sheet.test.tsx` - Added mock for IndividualTrendChart
+
+## Change Log
+
+| Date | Change | Author |
+|------|--------|--------|
+| 2026-01-16 | Story implementation complete, status → review | Claude Opus 4.5 |
+| 2026-01-16 | Code review: Fixed 3 issues (test extension, deterministic mock, console.warn), status → done | Claude Opus 4.5 |

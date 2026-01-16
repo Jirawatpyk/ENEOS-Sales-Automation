@@ -720,6 +720,39 @@ export interface DailyTrendItem {
   closed: number;
 }
 
+/**
+ * Daily Metric (Extended for Trend Chart)
+ * Used by Individual Trend Chart component
+ */
+export interface DailyMetric {
+  date: string;                  // YYYY-MM-DD
+  claimed: number;
+  contacted: number;
+  closed: number;
+  conversionRate: number;        // เปอร์เซ็นต์
+}
+
+/**
+ * Sales Performance Trend Response
+ * GET /api/admin/sales-performance/trend
+ */
+export interface SalesPerformanceTrendResponse {
+  userId: string;
+  name: string;
+  period: number;                // days (7, 30, 90)
+  dailyData: DailyMetric[];
+  teamAverage: DailyMetric[];
+}
+
+/**
+ * Sales Performance Trend Query Parameters
+ * GET /api/admin/sales-performance/trend
+ */
+export interface SalesPerformanceTrendQueryParams {
+  userId: string;
+  days?: number;                 // 7, 30, or 90 (default: 30)
+}
+
 // ============================================================================
 // Campaign Detail Types
 // ============================================================================

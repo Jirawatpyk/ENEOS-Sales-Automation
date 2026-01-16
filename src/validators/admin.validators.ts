@@ -118,6 +118,23 @@ export const salesPerformanceQuerySchema = z.object({
 export type SalesPerformanceQueryInput = z.infer<typeof salesPerformanceQuerySchema>;
 
 // ===========================================
+// Sales Performance Trend Query Schema
+// ===========================================
+
+export const salesPerformanceTrendQuerySchema = z.object({
+  userId: z.string().trim().min(1, 'userId ต้องระบุ'),
+  days: z.coerce
+    .number()
+    .int()
+    .refine((val) => [7, 30, 90].includes(val), {
+      message: 'days ต้องเป็น 7, 30 หรือ 90',
+    })
+    .optional(),
+});
+
+export type SalesPerformanceTrendQueryInput = z.infer<typeof salesPerformanceTrendQuerySchema>;
+
+// ===========================================
 // Campaigns Query Schema
 // ===========================================
 

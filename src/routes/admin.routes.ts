@@ -13,6 +13,7 @@ import {
   getLeads,
   getLeadById,
   getSalesPerformance,
+  getSalesPerformanceTrend,
   getCampaigns,
   getCampaignDetail,
   exportData,
@@ -156,6 +157,18 @@ router.get('/leads/:id', requireViewer, asyncHandler(getLeadById));
  * Access: manager, admin
  */
 router.get('/sales-performance', requireManager, asyncHandler(getSalesPerformance));
+
+/**
+ * GET /api/admin/sales-performance/trend
+ * ดึงข้อมูล daily trend สำหรับ individual salesperson
+ *
+ * Query params:
+ * - userId: LINE User ID ของ salesperson (required)
+ * - days: 7 | 30 | 90 (default: 30)
+ *
+ * Access: manager, admin
+ */
+router.get('/sales-performance/trend', requireManager, asyncHandler(getSalesPerformanceTrend));
 
 // ===========================================
 // Campaign Endpoints

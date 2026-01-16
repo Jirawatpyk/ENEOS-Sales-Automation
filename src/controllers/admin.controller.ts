@@ -17,6 +17,8 @@ import {
   LeadsListResponse,
   LeadDetailResponse,
   SalesPerformanceResponse,
+  SalesPerformanceTrendResponse,
+  DailyMetric,
   PeriodInfo,
   LeadItem,
   StatusDistribution,
@@ -43,6 +45,7 @@ import {
   leadsQuerySchema,
   leadIdSchema,
   salesPerformanceQuerySchema,
+  salesPerformanceTrendQuerySchema,
   campaignsQuerySchema,
   campaignIdSchema,
   exportQuerySchema,
@@ -1012,6 +1015,185 @@ function getWeekNumber(date: Date): number {
   const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
   const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
   return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+}
+
+// ===========================================
+// GET /api/admin/sales-performance/trend
+// ดึงข้อมูล daily trend สำหรับ individual salesperson
+// ===========================================
+
+/**
+ * GET /api/admin/sales-performance/trend
+ * ดึงข้อมูล daily trend สำหรับแต่ละ salesperson
+ */
+export async function getSalesPerformanceTrend(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    // Validate query parameters
+    const validation = safeValidateQuery(salesPerformanceTrendQuerySchema, req.query);
+    if (!validation.success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'พารามิเตอร์ไม่ถูกต้อง',
+          details: validation.errors,
+        },
+      });
+      return;
+    }
+
+    const { userId, days: daysParam } = validation.data;
+    const days = daysParam ?? 30; // Default to 30 days
+
+    logger.info('getSalesPerformanceTrend called', {
+      userId,
+      days,
+      user: req.user?.email,
+    });
+
+    // คำนวณ period
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    // ดึง leads ทั้งหมด
+    const allLeads = await getAllLeads();
+
+    // Filter leads ในช่วงเวลาที่กำหนด
+    const leadsInPeriod = allLeads.filter((lead) => {
+      const leadDate = parseDateFromSheets(lead.date);
+      return leadDate && leadDate >= startDate && leadDate <= now;
+    });
+
+    // สร้าง daily map สำหรับ user นี้
+    const userDailyMap = new Map<string, { claimed: number; contacted: number; closed: number }>();
+
+    // สร้าง daily map สำหรับ team average
+    const teamDailyMap = new Map<string, { claimed: number; contacted: number; closed: number; userCount: Set<string> }>();
+
+    // Initialize all days in the period
+    for (let i = 0; i < days; i++) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      userDailyMap.set(dateKey, { claimed: 0, contacted: 0, closed: 0 });
+      teamDailyMap.set(dateKey, { claimed: 0, contacted: 0, closed: 0, userCount: new Set() });
+    }
+
+    // Process leads
+    leadsInPeriod.forEach((lead) => {
+      const leadDate = parseDateFromSheets(lead.date);
+      if (!leadDate) {
+        return;
+      }
+
+      const dateKey = leadDate.toISOString().split('T')[0];
+
+      // Skip if date is not in our range
+      if (!userDailyMap.has(dateKey)) {
+        return;
+      }
+
+      // Update user data (filter by userId)
+      if (lead.salesOwnerId === userId) {
+        const userDay = userDailyMap.get(dateKey)!;
+        userDay.claimed++;
+        if (lead.status === 'contacted') {
+          userDay.contacted++;
+        }
+        if (lead.status === 'closed') {
+          userDay.closed++;
+        }
+      }
+
+      // Update team data (all users with salesOwnerId)
+      if (lead.salesOwnerId) {
+        const teamDay = teamDailyMap.get(dateKey)!;
+        teamDay.claimed++;
+        teamDay.userCount.add(lead.salesOwnerId);
+        if (lead.status === 'contacted') {
+          teamDay.contacted++;
+        }
+        if (lead.status === 'closed') {
+          teamDay.closed++;
+        }
+      }
+    });
+
+    // Convert to arrays sorted by date (ascending)
+    const sortedDates = Array.from(userDailyMap.keys()).sort();
+
+    const dailyData: DailyMetric[] = sortedDates.map((date) => {
+      const day = userDailyMap.get(date)!;
+      return {
+        date,
+        claimed: day.claimed,
+        contacted: day.contacted,
+        closed: day.closed,
+        conversionRate: day.claimed > 0 ? Number(((day.closed / day.claimed) * 100).toFixed(2)) : 0,
+      };
+    });
+
+    // Calculate team average per day
+    const teamAverage: DailyMetric[] = sortedDates.map((date) => {
+      const teamDay = teamDailyMap.get(date)!;
+      const userCount = teamDay.userCount.size || 1; // Avoid division by zero
+      return {
+        date,
+        claimed: Math.round(teamDay.claimed / userCount),
+        contacted: Math.round(teamDay.contacted / userCount),
+        closed: Math.round(teamDay.closed / userCount),
+        conversionRate: teamDay.claimed > 0 ? Number(((teamDay.closed / teamDay.claimed) * 100).toFixed(2)) : 0,
+      };
+    });
+
+    // ดึงข้อมูล sales member
+    const salesMember = await sheetsService.getSalesTeamMember(userId);
+
+    // Check if user has any leads in the period
+    const totalUserClaimed = dailyData.reduce((sum, d) => sum + d.claimed, 0);
+    if (totalUserClaimed === 0) {
+      logger.warn('getSalesPerformanceTrend: userId has no leads in period', {
+        userId,
+        days,
+        totalLeadsInPeriod: leadsInPeriod.length,
+      });
+    }
+
+    // Check if sales member exists
+    if (!salesMember) {
+      logger.warn('getSalesPerformanceTrend: salesMember not found', {
+        userId,
+      });
+    }
+
+    const response: AdminApiResponse<SalesPerformanceTrendResponse> = {
+      success: true,
+      data: {
+        userId,
+        name: salesMember?.name || 'Unknown',
+        period: days,
+        dailyData,
+        teamAverage,
+      },
+    };
+
+    logger.info('getSalesPerformanceTrend completed', {
+      userId,
+      days,
+      dataPoints: dailyData.length,
+    });
+
+    res.status(200).json(response);
+  } catch (error) {
+    logger.error('getSalesPerformanceTrend failed', { error });
+    next(error);
+  }
 }
 
 // ===========================================

@@ -152,6 +152,14 @@ so that **I can identify improving or declining performers and have data-driven 
   - [x] 10.11 Test mock data fallback when API unavailable
   - [x] 10.12 Test all zeros data → trend is "stable"
 
+- [x] **Task 11: Backend API Implementation** (Post-Review Fix)
+  - [x] 11.1 Create `getSalesPerformanceTrend()` controller function
+  - [x] 11.2 Add Zod validation schema `salesPerformanceTrendQuerySchema`
+  - [x] 11.3 Add route `GET /api/admin/sales-performance/trend`
+  - [x] 11.4 Add types `DailyMetric`, `SalesPerformanceTrendResponse`
+  - [x] 11.5 Create Frontend proxy route `/api/admin/sales-performance/trend`
+  - [x] 11.6 Update `use-sales-trend.ts` to use real API (mock only in dev fallback)
+
 ## Dev Notes
 
 ### API Requirements
@@ -546,12 +554,20 @@ N/A
 
 ### Code Review Notes
 
-**Issues Found & Fixed:**
+**Round 1 - Issues Found & Fixed:**
 1. **CRITICAL:** Test file `use-sales-trend.test.ts` used JSX but had `.ts` extension → Renamed to `.tsx`
 2. **HIGH:** Mock data used `Math.random()` causing non-deterministic tests → Implemented seeded PRNG (`seededRandom()`)
 3. **MEDIUM:** `console.warn()` in production code → Removed
 
-**Non-blocking Recommendations:**
+**Round 2 - Post-Backend Implementation Review:**
+1. **HIGH:** No unit tests for `getSalesPerformanceTrend` → Created `admin.controller.trend.test.ts` (15 tests)
+2. **MEDIUM:** `console.warn` in `use-sales-trend.ts` → Removed (comments retained for dev reference)
+3. **MEDIUM:** Duplicated DailyMetric type in proxy route → Added JSDoc comment referencing source types
+4. **MEDIUM:** Missing logging for invalid userId → Added `logger.warn()` for edge cases
+5. **LOW:** No integration tests → Created `admin.routes.trend.test.ts` (12 tests via supertest)
+
+**Non-blocking Recommendations (noted for future):**
+- Performance: Consider caching getAllLeads() in future optimization
 - Tooltip comparison only shows for 'closed' metric (by design per AC#4)
 - Consider adding ErrorBoundary for Recharts rendering errors
 
@@ -575,9 +591,24 @@ N/A
 - `src/components/sales/sales-detail-sheet.tsx` - Integrated IndividualTrendChart, increased width
 - `src/__tests__/sales-detail-sheet.test.tsx` - Added mock for IndividualTrendChart
 
+**Backend API Files (Task 11):**
+- `eneos-sales-automation/src/types/admin.types.ts` - Added DailyMetric, SalesPerformanceTrendResponse types
+- `eneos-sales-automation/src/validators/admin.validators.ts` - Added salesPerformanceTrendQuerySchema
+- `eneos-sales-automation/src/controllers/admin.controller.ts` - Added getSalesPerformanceTrend() with logging
+- `eneos-sales-automation/src/routes/admin.routes.ts` - Added GET /sales-performance/trend route
+- `eneos-sales-automation/src/__tests__/controllers/admin.controller.trend.test.ts` - Unit tests (15 tests)
+- `eneos-sales-automation/src/__tests__/routes/admin.routes.trend.test.ts` - Integration tests (12 tests)
+
+**Frontend Proxy (Task 11):**
+- `eneos-admin-dashboard/src/app/api/admin/sales-performance/trend/route.ts` - NEW proxy route
+- `eneos-admin-dashboard/src/hooks/use-sales-trend.ts` - Updated to use real API
+
 ## Change Log
 
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-16 | Story implementation complete, status → review | Claude Opus 4.5 |
 | 2026-01-16 | Code review: Fixed 3 issues (test extension, deterministic mock, console.warn), status → done | Claude Opus 4.5 |
+| 2026-01-16 | Backend API: Created /api/admin/sales-performance/trend endpoint, frontend proxy, updated hook to use real API | Claude Opus 4.5 |
+| 2026-01-16 | Code review round 2: Added backend unit tests (15 tests), type documentation, logging for edge cases | Claude Opus 4.5 |
+| 2026-01-16 | Added integration tests for /api/admin/sales-performance/trend endpoint (12 tests) | Claude Opus 4.5 |

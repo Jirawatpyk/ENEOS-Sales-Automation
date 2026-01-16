@@ -60,6 +60,33 @@ const exportRateLimiter = rateLimit({
 router.use(adminAuthMiddleware);
 
 // ===========================================
+// User Info Endpoint (for frontend role sync)
+// ===========================================
+
+/**
+ * GET /api/admin/me
+ * ดึงข้อมูล current user พร้อม role
+ * ใช้สำหรับ frontend เพื่อ sync role จาก backend
+ *
+ * Response:
+ * - email: User email
+ * - name: User name
+ * - role: admin | manager | viewer
+ *
+ * Access: Any authenticated user
+ */
+router.get('/me', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      email: req.user?.email || '',
+      name: req.user?.name || '',
+      role: req.user?.role || 'viewer',
+    },
+  });
+});
+
+// ===========================================
 // Dashboard Endpoints
 // ===========================================
 

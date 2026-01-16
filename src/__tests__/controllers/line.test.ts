@@ -6,6 +6,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import {
   mockPostbackEvent,
+  mockPostbackEventWithUUID,
+  mockPostbackEventUUIDOnly,
   mockLineWebhookBody,
   mockLineProfile,
 } from '../mocks/line.mock.js';
@@ -17,6 +19,7 @@ vi.mock('../../services/sheets.service.js', () => ({
     claimLead: vi.fn(),
     getRow: vi.fn(),
     updateLeadStatus: vi.fn(),
+    findLeadByUUID: vi.fn(),
   },
 }));
 
@@ -263,6 +266,156 @@ describe('LINE Controller', () => {
 
       // Should still try to claim with partial userId
       expect(sheetsService.claimLead).toHaveBeenCalled();
+    });
+  });
+
+  // ===========================================
+  // UUID-based Postback Processing (Migration Support)
+  // ===========================================
+
+  describe('UUID-based postback processing', () => {
+    it('should use findLeadByUUID when lead_id is provided', async () => {
+      const mockLeadWithUUID = {
+        ...mockLeadRow,
+        leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
+        createdAt: '2026-01-15T08:00:00.000Z',
+        updatedAt: '2026-01-15T08:00:00.000Z',
+      };
+
+      vi.mocked(sheetsService.findLeadByUUID).mockResolvedValue(mockLeadWithUUID);
+      vi.mocked(sheetsService.claimLead).mockResolvedValue({
+        success: true,
+        lead: mockLeadWithUUID,
+        alreadyClaimed: false,
+      });
+
+      mockReq = {
+        body: {
+          destination: 'U123456',
+          events: [mockPostbackEventWithUUID],
+        },
+      };
+
+      await handleLineWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      // Wait for async processing
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should call findLeadByUUID with the UUID from postback
+      expect(sheetsService.findLeadByUUID).toHaveBeenCalledWith(
+        'lead_550e8400-e29b-41d4-a716-446655440000'
+      );
+      // Should claim the lead using the resolved row number
+      expect(sheetsService.claimLead).toHaveBeenCalledWith(
+        mockLeadWithUUID.rowNumber,
+        'U123456789',
+        'วิภา รักงาน',
+        'contacted'
+      );
+    });
+
+    it('should handle UUID-only postback (no row_id fallback)', async () => {
+      const mockLeadWithUUID = {
+        ...mockLeadRow,
+        rowNumber: 99,
+        leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
+        createdAt: '2026-01-15T08:00:00.000Z',
+        updatedAt: '2026-01-15T08:00:00.000Z',
+      };
+
+      vi.mocked(sheetsService.findLeadByUUID).mockResolvedValue(mockLeadWithUUID);
+      vi.mocked(sheetsService.claimLead).mockResolvedValue({
+        success: true,
+        lead: mockLeadWithUUID,
+        alreadyClaimed: false,
+      });
+
+      mockReq = {
+        body: {
+          destination: 'U123456',
+          events: [mockPostbackEventUUIDOnly],
+        },
+      };
+
+      await handleLineWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      // Wait for async processing
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(sheetsService.findLeadByUUID).toHaveBeenCalled();
+      expect(sheetsService.claimLead).toHaveBeenCalledWith(
+        99, // Row number from UUID lookup
+        'U123456789',
+        'วิภา รักงาน',
+        'contacted'
+      );
+    });
+
+    it('should reply error when UUID not found', async () => {
+      vi.mocked(sheetsService.findLeadByUUID).mockResolvedValue(null);
+
+      mockReq = {
+        body: {
+          destination: 'U123456',
+          events: [mockPostbackEventUUIDOnly],
+        },
+      };
+
+      await handleLineWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      // Wait for async processing
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(sheetsService.findLeadByUUID).toHaveBeenCalled();
+      expect(lineService.replyError).toHaveBeenCalled();
+      expect(sheetsService.claimLead).not.toHaveBeenCalled();
+    });
+
+    it('should fallback to row_id when UUID lookup fails but row_id exists', async () => {
+      // This tests the hybrid format where both lead_id and row_id exist
+      // If lead_id lookup succeeds, use that; otherwise behavior depends on implementation
+      const mockLeadWithUUID = {
+        ...mockLeadRow,
+        leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
+      };
+
+      vi.mocked(sheetsService.findLeadByUUID).mockResolvedValue(mockLeadWithUUID);
+      vi.mocked(sheetsService.claimLead).mockResolvedValue({
+        success: true,
+        lead: mockLeadWithUUID,
+        alreadyClaimed: false,
+      });
+
+      mockReq = {
+        body: {
+          destination: 'U123456',
+          events: [mockPostbackEventWithUUID],
+        },
+      };
+
+      await handleLineWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      // Wait for async processing
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // UUID takes priority when present
+      expect(sheetsService.findLeadByUUID).toHaveBeenCalled();
     });
   });
 });

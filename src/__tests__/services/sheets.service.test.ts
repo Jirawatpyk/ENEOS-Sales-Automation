@@ -99,7 +99,7 @@ describe('SheetsService', () => {
       expect(mockSheets.spreadsheets.values.append).toHaveBeenCalledWith(
         expect.objectContaining({
           spreadsheetId: 'test-sheet-id',
-          range: 'Leads!A:Z',
+          range: 'Leads!A:AC', // Updated for UUID migration columns
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
         })
@@ -503,6 +503,88 @@ describe('SheetsService', () => {
         email: undefined,
         phone: undefined,
       });
+    });
+  });
+
+  // ===========================================
+  // UUID-based Lead Lookup (Migration Support)
+  // ===========================================
+
+  describe('findLeadByUUID', () => {
+    // Helper to create a mock row with specific UUID
+    const createMockRowWithUUID = (uuid: string) => {
+      const baseRow = [...mockSheetsGetResponse.data.values[0]];
+      baseRow[26] = uuid; // Set leadUUID at index 26
+      return baseRow;
+    };
+
+    it('should find lead by UUID and return correct row number', async () => {
+      const testUUID = 'lead_550e8400-e29b-41d4-a716-446655440000';
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            createMockRowWithUUID('lead_other-uuid'),
+            createMockRowWithUUID(testUUID),
+            createMockRowWithUUID('lead_another-uuid'),
+          ],
+        },
+      });
+
+      const lead = await service.findLeadByUUID(testUUID);
+
+      expect(lead).not.toBeNull();
+      expect(lead?.rowNumber).toBe(3); // Row 3 (index 1 + 2 for header)
+      expect(lead?.leadUUID).toBe(testUUID);
+    });
+
+    it('should return null when UUID not found', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            createMockRowWithUUID('lead_other-uuid'),
+          ],
+        },
+      });
+
+      const lead = await service.findLeadByUUID('lead_nonexistent-uuid');
+
+      expect(lead).toBeNull();
+    });
+
+    it('should return null when sheet is empty', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [] },
+      });
+
+      const lead = await service.findLeadByUUID('lead_any-uuid');
+
+      expect(lead).toBeNull();
+    });
+
+    it('should handle undefined values gracefully', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {},
+      });
+
+      const lead = await service.findLeadByUUID('lead_any-uuid');
+
+      expect(lead).toBeNull();
+    });
+
+    it('should find lead in first row correctly', async () => {
+      const testUUID = 'lead_first-row-uuid';
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            createMockRowWithUUID(testUUID),
+          ],
+        },
+      });
+
+      const lead = await service.findLeadByUUID(testUUID);
+
+      expect(lead).not.toBeNull();
+      expect(lead?.rowNumber).toBe(2); // Row 2 (first data row after header)
     });
   });
 

@@ -119,7 +119,8 @@ src/
 ระบบต้องการ 3 Sheets หลัก:
 
 1. **Leads** (Main database)
-   - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version
+   - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version, Lead_Source, Job_Title, City, Lead_UUID, Created_At, Updated_At
+   - **UUID Migration Notes:** Lead_UUID (unique identifier for Supabase migration), Created_At/Updated_At (ISO 8601 timestamps)
 
 2. **Deduplication_Log** (Prevent duplicates)
    - Columns: Key, Email, Campaign_ID, Processed_At
@@ -299,6 +300,13 @@ if (config.features.aiEnrichment) {
 5. **Email Domain Extraction:**
    - ใช้ `utils/email-parser.ts` แยก domain จาก email
    - ส่งให้ Gemini วิเคราะห์ว่าบริษัทนี้ทำธุรกิจอะไร
+
+6. **UUID Migration (Future Supabase):**
+   - Lead_UUID: Unique identifier สำหรับ database migration
+   - Format: `lead_<uuid>` (e.g., `lead_550e8400-e29b-41d4-a716-446655440000`)
+   - LINE Postback รองรับทั้ง `row_id` (legacy) และ `lead_id` (UUID)
+   - Timestamps: `created_at`, `updated_at` เป็น ISO 8601 format
+   - UUID จะถูกสร้างอัตโนมัติเมื่อ addLead() หรือ update existing lead
 
 ## Documentation
 

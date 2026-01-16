@@ -305,7 +305,7 @@ export function createLeadFlexMessage(
           action: {
             type: 'postback',
             label: '✅ รับเคสนี้',
-            data: `action=contacted&row_id=${lead.rowNumber}`,
+            data: createPostbackData('contacted', lead),
             displayText: `รับเคส: ${lead.company}`,
           },
           color: COLORS.success,
@@ -318,7 +318,7 @@ export function createLeadFlexMessage(
           action: {
             type: 'postback',
             label: '❌ ติดต่อไม่ได้',
-            data: `action=unreachable&row_id=${lead.rowNumber}`,
+            data: createPostbackData('unreachable', lead),
             displayText: `ติดต่อไม่ได้: ${lead.company}`,
           },
         },
@@ -336,7 +336,7 @@ export function createLeadFlexMessage(
               action: {
                 type: 'postback',
                 label: '💰 ปิดการขาย',
-                data: `action=closed&row_id=${lead.rowNumber}`,
+                data: createPostbackData('closed', lead),
                 displayText: `ปิดการขายสำเร็จ: ${lead.company}`,
               },
             },
@@ -348,7 +348,7 @@ export function createLeadFlexMessage(
               action: {
                 type: 'postback',
                 label: '📉 ปิดไม่สำเร็จ',
-                data: `action=lost&row_id=${lead.rowNumber}`,
+                data: createPostbackData('lost', lead),
                 displayText: `ปิดไม่สำเร็จ: ${lead.company}`,
               },
             },
@@ -433,6 +433,26 @@ export function createErrorReplyMessage(errorMessage?: string): TextMessage {
 // ===========================================
 // Helper Functions
 // ===========================================
+
+/**
+ * Create postback data string with lead identification
+ * Includes both lead_id (UUID) and row_id for backward compatibility
+ * Format: "action=<action>&lead_id=<uuid>&row_id=<number>"
+ */
+function createPostbackData(action: string, lead: LeadRow): string {
+  const params = new URLSearchParams();
+  params.set('action', action);
+
+  // Prioritize UUID-based identification (future-proof)
+  if (lead.leadUUID) {
+    params.set('lead_id', lead.leadUUID);
+  }
+
+  // Always include row_id for backward compatibility
+  params.set('row_id', lead.rowNumber.toString());
+
+  return params.toString();
+}
 
 function getStatusText(status: string): string {
   const statusMap: Record<string, string> = {

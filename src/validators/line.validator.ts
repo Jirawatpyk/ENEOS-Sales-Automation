@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { LinePostbackData, LeadStatus } from '../types/index.js';
+import { isValidLeadUUID } from '../utils/uuid.js';
 
 // ===========================================
 // LINE Webhook Schema
@@ -43,33 +44,66 @@ export type LineWebhookBodyInput = z.infer<typeof lineWebhookBodySchema>;
 
 /**
  * Parse postback data string to structured object
- * Expected format: "action=contacted&row_id=123"
+ * Supports both legacy format (row_id) and new UUID format (lead_id)
+ * Legacy format: "action=contacted&row_id=123"
+ * New format: "action=contacted&lead_id=lead_uuid-here"
  */
 export function parsePostbackData(dataString: string): LinePostbackData | null {
   try {
     const params = new URLSearchParams(dataString);
     const action = params.get('action');
     const rowId = params.get('row_id');
+    const leadId = params.get('lead_id');
 
-    if (!action || !rowId) {
+    // Must have action and at least one identifier (rowId or leadId)
+    if (!action || (!rowId && !leadId)) {
       return null;
     }
 
-    // Validate action is a valid status
-    const validStatuses: LeadStatus[] = ['new', 'contacted', 'unreachable', 'closed', 'lost'];
+    // Validate action is a valid status (includes 'claimed' for completeness)
+    const validStatuses: LeadStatus[] = ['new', 'claimed', 'contacted', 'unreachable', 'closed', 'lost'];
     if (!validStatuses.includes(action as LeadStatus)) {
       return null;
     }
 
-    const parsedRowId = parseInt(rowId, 10);
-    if (isNaN(parsedRowId) || parsedRowId < 1) {
-      return null;
+    // Build result object
+    const result: LinePostbackData = {
+      action: action as LeadStatus,
+    };
+
+    // Parse rowId if present (legacy support)
+    if (rowId) {
+      const parsedRowId = parseInt(rowId, 10);
+      if (isNaN(parsedRowId) || parsedRowId < 1) {
+        // Invalid rowId but leadId might be present
+        if (!leadId) {
+          return null;
+        }
+      } else {
+        result.rowId = parsedRowId;
+      }
     }
 
-    return {
-      action: action as LeadStatus,
-      rowId: parsedRowId,
-    };
+    // Parse leadId if present (new UUID format)
+    if (leadId) {
+      // Validate UUID format using the dedicated validator
+      // Accepts both full lead_<uuid> format and legacy formats for backward compatibility
+      if (isValidLeadUUID(leadId)) {
+        // Valid lead_<uuid> format
+        result.leadId = leadId;
+      } else if (leadId.length >= 36) {
+        // Might be a raw UUID without prefix - accept for backward compatibility
+        result.leadId = leadId;
+      } else {
+        // Invalid leadId but rowId might be present for fallback
+        if (!result.rowId) {
+          return null;
+        }
+        // Don't set invalid leadId, let rowId handle it
+      }
+    }
+
+    return result;
   } catch {
     return null;
   }

@@ -33,6 +33,10 @@ export interface Lead {
   leadSource: string | null;
   jobTitle: string | null;
   city: string | null;
+  // UUID Migration fields (for future Supabase migration)
+  leadUUID: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 export type LeadStatus =
@@ -114,7 +118,10 @@ export interface NormalizedBrevoPayload {
 
 export interface LinePostbackData {
   action: LeadStatus;
-  rowId: number;
+  /** @deprecated Use leadId instead. Kept for backward compatibility with existing postbacks */
+  rowId?: number;
+  /** UUID-based lead identifier for future-proof lead lookup */
+  leadId?: string;
 }
 
 export interface LineWebhookEvent {

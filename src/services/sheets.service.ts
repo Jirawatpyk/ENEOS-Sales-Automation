@@ -7,7 +7,8 @@ import { google } from 'googleapis';
 import { config } from '../config/index.js';
 import { sheetsLogger as logger } from '../utils/logger.js';
 import { withRetry, CircuitBreaker } from '../utils/retry.js';
-import { formatDateForSheets } from '../utils/date-formatter.js';
+import { formatDateForSheets, formatISOTimestamp } from '../utils/date-formatter.js';
+import { generateLeadUUID } from '../utils/uuid.js';
 import {
   Lead,
   LeadRow,
@@ -45,6 +46,7 @@ const circuitBreaker = new CircuitBreaker(5, 60000);
  * N: emailSubject, O: source, P: leadId, Q: eventId, R: clickedAt
  * S: talkingPoint, T: closedAt, U: lostAt, V: unreachableAt, W: version
  * X: leadSource, Y: jobTitle, Z: city
+ * AA: leadUUID, AB: createdAt, AC: updatedAt (UUID Migration columns)
  */
 
 
@@ -99,6 +101,10 @@ function rowToLead(row: string[], rowNumber: number): LeadRow {
     leadSource: row[23] || null,
     jobTitle: row[24] || null,
     city: row[25] || null,
+    // UUID Migration fields (columns AA, AB, AC)
+    leadUUID: row[26] || null,
+    createdAt: row[27] || null,
+    updatedAt: row[28] || null,
   };
 }
 
@@ -131,6 +137,10 @@ function leadToRow(lead: Partial<Lead>, version: number = 1): string[] {
     lead.leadSource || '',
     lead.jobTitle || '',
     lead.city || '',
+    // UUID Migration fields (columns AA, AB, AC)
+    lead.leadUUID || '',
+    lead.createdAt || '',
+    lead.updatedAt || '',
   ];
 }
 
@@ -158,17 +168,27 @@ export class SheetsService {
   /**
    * Add a new lead to the sheet
    * Returns the row number of the new lead
+   * Automatically generates leadUUID, createdAt, and updatedAt
    */
   async addLead(lead: Partial<Lead>): Promise<number> {
     logger.info('Adding new lead', { email: lead.email, company: lead.company });
 
     return circuitBreaker.execute(async () => {
       return withRetry(async () => {
-        const row = leadToRow(lead);
+        // Generate UUID and timestamps for new leads
+        const now = formatISOTimestamp();
+        const enrichedLead: Partial<Lead> = {
+          ...lead,
+          leadUUID: lead.leadUUID || generateLeadUUID(),
+          createdAt: lead.createdAt || now,
+          updatedAt: now,
+        };
+
+        const row = leadToRow(enrichedLead);
 
         const response = await sheets.spreadsheets.values.append({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A:Z'),
+          range: getSheetRange(this.leadsSheet, 'A:AC'),
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           requestBody: {
@@ -176,12 +196,16 @@ export class SheetsService {
           },
         });
 
-        // Extract row number from updatedRange (e.g., "Leads!A42:W42")
+        // Extract row number from updatedRange (e.g., "Leads!A42:AC42")
         const updatedRange = response.data.updates?.updatedRange || '';
         const match = updatedRange.match(/!A(\d+):/);
         const rowNumber = match ? parseInt(match[1], 10) : 0;
 
-        logger.info('Lead added successfully', { rowNumber, email: lead.email });
+        logger.info('Lead added successfully', {
+          rowNumber,
+          email: lead.email,
+          leadUUID: enrichedLead.leadUUID,
+        });
         return rowNumber;
       });
     });
@@ -195,7 +219,7 @@ export class SheetsService {
 
     return circuitBreaker.execute(async () => {
       return withRetry(async () => {
-        const range = getSheetRange(this.leadsSheet, `A${rowNumber}:Z${rowNumber}`);
+        const range = getSheetRange(this.leadsSheet, `A${rowNumber}:AC${rowNumber}`);
 
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
@@ -241,11 +265,21 @@ export class SheetsService {
         }
       }
 
-      // Merge updates
+      // Merge updates and set updatedAt timestamp
       const updatedLead: Lead = {
         ...currentLead,
         ...updates,
+        updatedAt: formatISOTimestamp(), // Always update timestamp on modification
       };
+
+      // Generate UUID for existing leads without one (backward compatibility)
+      if (!updatedLead.leadUUID) {
+        updatedLead.leadUUID = generateLeadUUID();
+        logger.info('Generated UUID for existing lead', {
+          rowNumber,
+          leadUUID: updatedLead.leadUUID,
+        });
+      }
 
       // Increment version
       const newVersion = currentLead.version + 1;
@@ -254,7 +288,7 @@ export class SheetsService {
       await withRetry(async () => {
         await sheets.spreadsheets.values.update({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, `A${rowNumber}:Z${rowNumber}`),
+          range: getSheetRange(this.leadsSheet, `A${rowNumber}:AC${rowNumber}`),
           valueInputOption: 'RAW',
           requestBody: {
             values: [row],
@@ -382,6 +416,46 @@ export class SheetsService {
   }
 
   // ===========================================
+  // UUID-based Lead Lookup (Migration Support)
+  // ===========================================
+
+  /**
+   * Find a lead by its UUID (leadUUID column)
+   * Used for UUID-based postback lookup (new format)
+   * Falls back to generating UUID for existing leads without one
+   */
+  async findLeadByUUID(leadUUID: string): Promise<LeadRow | null> {
+    logger.info('Finding lead by UUID', { leadUUID });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        // Get all leads with their leadUUID column (column AA = index 26)
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.leadsSheet, 'A2:AC'),
+        });
+
+        const rows = response.data.values || [];
+
+        // Find the row with matching leadUUID
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowLeadUUID = row[26]; // Column AA (index 26)
+
+          if (rowLeadUUID === leadUUID) {
+            const rowNumber = i + 2; // +2 because row 1 is header, array is 0-indexed
+            logger.info('Found lead by UUID', { leadUUID, rowNumber });
+            return rowToLead(row, rowNumber);
+          }
+        }
+
+        logger.warn('Lead not found by UUID', { leadUUID });
+        return null;
+      });
+    });
+  }
+
+  // ===========================================
   // Deduplication Operations
   // ===========================================
 
@@ -471,7 +545,7 @@ export class SheetsService {
       return withRetry(async () => {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A2:W'), // Skip header row
+          range: getSheetRange(this.leadsSheet, 'A2:AC'), // Skip header row, includes UUID migration columns
         });
 
         const rows = response.data.values || [];

@@ -12,7 +12,7 @@ export const mockLineProfile = {
   statusMessage: 'Working hard!',
 };
 
-// Mock LINE webhook event (postback)
+// Mock LINE webhook event (postback) - Legacy format with row_id
 export const mockPostbackEvent = {
   type: 'postback',
   replyToken: 'mock-reply-token-123',
@@ -24,6 +24,36 @@ export const mockPostbackEvent = {
   timestamp: Date.now(),
   postback: {
     data: 'action=contacted&row_id=42',
+  },
+};
+
+// Mock LINE webhook event (postback) - New UUID format with lead_id
+export const mockPostbackEventWithUUID = {
+  type: 'postback',
+  replyToken: 'mock-reply-token-uuid-456',
+  source: {
+    type: 'group',
+    userId: 'U123456789',
+    groupId: 'G987654321',
+  },
+  timestamp: Date.now(),
+  postback: {
+    data: 'action=contacted&lead_id=lead_550e8400-e29b-41d4-a716-446655440000&row_id=42',
+  },
+};
+
+// Mock LINE webhook event (postback) - UUID only format (no row_id fallback)
+export const mockPostbackEventUUIDOnly = {
+  type: 'postback',
+  replyToken: 'mock-reply-token-uuid-only-789',
+  source: {
+    type: 'group',
+    userId: 'U123456789',
+    groupId: 'G987654321',
+  },
+  timestamp: Date.now(),
+  postback: {
+    data: 'action=contacted&lead_id=lead_550e8400-e29b-41d4-a716-446655440000',
   },
 };
 

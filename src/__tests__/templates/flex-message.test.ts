@@ -33,6 +33,7 @@ describe('Flex Message Templates', () => {
   describe('createLeadFlexMessage', () => {
     const mockLead: LeadRow = {
       rowNumber: 42,
+      version: 1,
       email: 'test@example.com',
       company: 'Test Company',
       customerName: 'John Doe',
@@ -55,6 +56,14 @@ describe('Flex Message Templates', () => {
       closedAt: null,
       lostAt: null,
       unreachableAt: null,
+      // New Brevo Contact Attributes fields
+      leadSource: null,
+      jobTitle: null,
+      city: null,
+      // UUID Migration fields
+      leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
+      createdAt: '2026-01-15T08:00:00.000Z',
+      updatedAt: '2026-01-15T08:00:00.000Z',
     };
 
     const mockAiAnalysis = {
@@ -161,6 +170,56 @@ describe('Flex Message Templates', () => {
       const result = createLeadFlexMessage(mockLead, analysisWithNullCapital);
 
       expect(result.type).toBe('flex');
+    });
+
+    it('should include lead_id in postback data when leadUUID is present', () => {
+      const result = createLeadFlexMessage(mockLead, mockAiAnalysis);
+
+      // Check footer buttons contain lead_id in postback data
+      const bubble = result.contents as {
+        footer?: {
+          contents: Array<{
+            type: string;
+            action?: { type: string; data?: string };
+            contents?: Array<{ action?: { type: string; data?: string } }>;
+          }>;
+        };
+      };
+
+      expect(bubble.footer).toBeDefined();
+
+      // Find a button with postback action and check data format
+      const firstButton = bubble.footer?.contents[0];
+      if (firstButton?.action?.type === 'postback' && firstButton.action.data) {
+        const params = new URLSearchParams(firstButton.action.data);
+        expect(params.get('lead_id')).toBe('lead_550e8400-e29b-41d4-a716-446655440000');
+        expect(params.get('row_id')).toBe('42');
+        expect(params.get('action')).toBe('contacted');
+      }
+    });
+
+    it('should include only row_id when leadUUID is not present', () => {
+      const leadWithoutUUID: LeadRow = {
+        ...mockLead,
+        leadUUID: null,
+      };
+      const result = createLeadFlexMessage(leadWithoutUUID, mockAiAnalysis);
+
+      const bubble = result.contents as {
+        footer?: {
+          contents: Array<{
+            type: string;
+            action?: { type: string; data?: string };
+          }>;
+        };
+      };
+
+      const firstButton = bubble.footer?.contents[0];
+      if (firstButton?.action?.type === 'postback' && firstButton.action.data) {
+        const params = new URLSearchParams(firstButton.action.data);
+        expect(params.get('lead_id')).toBeNull();
+        expect(params.get('row_id')).toBe('42');
+      }
     });
   });
 

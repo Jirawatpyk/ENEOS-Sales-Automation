@@ -119,7 +119,31 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
     return;
   }
 
-  const { action, rowId } = postbackData;
+  const { action, rowId, leadId } = postbackData;
+
+  // Determine the row number to use
+  // Priority: leadId (new UUID format) > rowId (legacy format)
+  let effectiveRowId: number;
+
+  if (leadId) {
+    // UUID-based lookup
+    const leadData = await sheetsService.findLeadByUUID(leadId);
+    if (!leadData) {
+      logger.warn('Lead not found by UUID', { leadId });
+      await lineService.replyError(replyToken, 'ไม่พบข้อมูลเคสนี้ในระบบ');
+      return;
+    }
+    effectiveRowId = leadData.rowNumber;
+    logger.info('Resolved leadId to rowNumber', { leadId, rowNumber: effectiveRowId });
+  } else if (rowId !== undefined) {
+    // Legacy row-based lookup (backward compatibility)
+    effectiveRowId = rowId;
+    logger.info('Using legacy rowId', { rowId });
+  } else {
+    logger.warn('No leadId or rowId in postback', { data: postback?.data });
+    await lineService.replyError(replyToken, 'ข้อมูลไม่ถูกต้อง');
+    return;
+  }
 
   try {
     // Get user profile for display name
@@ -141,7 +165,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
     }
 
     // Claim or update lead
-    const result = await sheetsService.claimLead(rowId, userId, userName, action);
+    const result = await sheetsService.claimLead(effectiveRowId, userId, userName, action);
 
     if (result.alreadyClaimed) {
       // Lead was claimed by someone else
@@ -154,7 +178,8 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       );
       lineNotificationTotal.inc({ status: 'success', type: 'reply' });
       logger.info('Lead already claimed', {
-        rowId,
+        rowId: effectiveRowId,
+        leadId,
         owner: result.owner,
         attemptedBy: userName,
       });
@@ -178,7 +203,8 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       lineNotificationTotal.inc({ status: 'success', type: 'reply' });
 
       logger.info('Lead status updated by owner', {
-        rowId,
+        rowId: effectiveRowId,
+        leadId,
         newStatus: action,
         owner: userName,
       });
@@ -197,14 +223,16 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
     lineNotificationTotal.inc({ status: 'success', type: 'reply' });
 
     logger.info('Lead claimed successfully', {
-      rowId,
+      rowId: effectiveRowId,
+      leadId,
       owner: userName,
       status: action,
     });
   } catch (error) {
     logger.error('Error processing postback', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      rowId,
+      rowId: effectiveRowId,
+      leadId,
       userId,
     });
 

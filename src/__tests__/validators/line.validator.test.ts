@@ -82,7 +82,7 @@ describe('LINE Validator', () => {
     });
 
     it('should parse all valid actions', () => {
-      const actions = ['new', 'contacted', 'unreachable', 'closed', 'lost'];
+      const actions = ['new', 'claimed', 'contacted', 'unreachable', 'closed', 'lost'];
 
       actions.forEach((action) => {
         const result = parsePostbackData(`action=${action}&row_id=1`);
@@ -139,6 +139,62 @@ describe('LINE Validator', () => {
       expect(result).toEqual({
         action: 'contacted',
         rowId: 42,
+      });
+    });
+
+    // UUID-based postback tests (Migration Support)
+    describe('UUID-based postback parsing', () => {
+      it('should parse valid lead_id with lead_ prefix', () => {
+        const result = parsePostbackData('action=contacted&lead_id=lead_550e8400-e29b-41d4-a716-446655440000');
+
+        expect(result).toEqual({
+          action: 'contacted',
+          leadId: 'lead_550e8400-e29b-41d4-a716-446655440000',
+        });
+      });
+
+      it('should parse both lead_id and row_id together', () => {
+        const result = parsePostbackData('action=contacted&lead_id=lead_550e8400-e29b-41d4-a716-446655440000&row_id=42');
+
+        expect(result).toEqual({
+          action: 'contacted',
+          leadId: 'lead_550e8400-e29b-41d4-a716-446655440000',
+          rowId: 42,
+        });
+      });
+
+      it('should accept raw UUID format for backward compatibility', () => {
+        const result = parsePostbackData('action=contacted&lead_id=550e8400-e29b-41d4-a716-446655440000');
+
+        expect(result).toEqual({
+          action: 'contacted',
+          leadId: '550e8400-e29b-41d4-a716-446655440000',
+        });
+      });
+
+      it('should reject invalid short lead_id without row_id fallback', () => {
+        const result = parsePostbackData('action=contacted&lead_id=short');
+
+        expect(result).toBeNull();
+      });
+
+      it('should fallback to row_id when lead_id is invalid', () => {
+        const result = parsePostbackData('action=contacted&lead_id=short&row_id=42');
+
+        expect(result).toEqual({
+          action: 'contacted',
+          rowId: 42,
+        });
+        expect(result?.leadId).toBeUndefined();
+      });
+
+      it('should parse claimed action (added for completeness)', () => {
+        const result = parsePostbackData('action=claimed&lead_id=lead_550e8400-e29b-41d4-a716-446655440000');
+
+        expect(result).toEqual({
+          action: 'claimed',
+          leadId: 'lead_550e8400-e29b-41d4-a716-446655440000',
+        });
       });
     });
   });

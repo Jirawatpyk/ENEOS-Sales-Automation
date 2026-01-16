@@ -94,3 +94,12 @@ export function extractDateKey(dateStr: string): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Format date as ISO 8601 timestamp
+ * Output: "2026-01-15T08:30:00.000Z"
+ * Used for created_at and updated_at columns (future Supabase compatibility)
+ */
+export function formatISOTimestamp(date: Date = new Date()): string {
+  return date.toISOString();
+}

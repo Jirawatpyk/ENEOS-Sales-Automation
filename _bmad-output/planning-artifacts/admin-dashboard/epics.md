@@ -451,6 +451,31 @@ Sales กด "รับงาน"
 Sales login Admin Dashboard ได้ ✅
 ```
 
+#### Sales_Team Sheet Structure
+| Column | Type | Required | Description |
+|--------|------|----------|-------------|
+| LINE_User_ID | string | Yes | LINE User ID (Primary Key) |
+| Name | string | Yes | Display name จาก LINE Profile |
+| Email | string | No | Google email สำหรับ login Dashboard |
+| Phone | string | No | เบอร์โทรศัพท์ |
+| Role | string | Yes | `admin` หรือ `sales` (default: `sales`) |
+| Created_At | string | Yes | ISO timestamp เมื่อ auto-register |
+| Status | string | No | `active` / `inactive` (default: `active`) |
+
+#### Role System (Simplified)
+
+**Sheet Role → Dashboard Role Mapping:**
+| Sales_Team.Role | Dashboard Role | Access Level |
+|-----------------|----------------|--------------|
+| `admin` | `admin` | Full access (รวม export, settings) |
+| `sales` | `viewer` | Read-only (ดูได้หมด แต่ export ไม่ได้) |
+
+**Notes:**
+- ระบบมีแค่ 2 roles เท่านั้น: `admin` และ `viewer`
+- `manager` role ถูกลบออกแล้ว (commit: 206d62c)
+- Sales ที่ auto-register จะได้ role = `sales` โดยอัตโนมัติ
+- Admin สามารถเปลี่ยน role ได้ใน Dashboard
+
 #### Backend Changes Required
 ```typescript
 // src/controllers/line.controller.ts - handlePostback()
@@ -469,24 +494,31 @@ if (!existsInTeam) {
     name: displayName,  // ใช้ชื่อเดียวกับที่ลง Leads
     email: null,        // Admin fills later via Dashboard
     phone: null,
+    role: 'sales',      // Default role (maps to 'viewer' in dashboard)
     createdAt: new Date().toISOString(),
   });
 }
 ```
 
 #### Admin Dashboard UI (F-07.4)
-- View Sales Team list (name, LINE ID, email, status)
-- Edit Sales member (add/update email, phone)
+- View Sales Team list (name, LINE ID, email, role, status)
+- Edit Sales member:
+  - Add/update email
+  - Add/update phone
+  - Change role (admin/sales) - **Admin only**
 - Deactivate Sales member (soft delete)
 - Filter: Active / Inactive / All
+- Filter: By Role (Admin / Sales / All)
 
 ### Acceptance Criteria
 - [ ] แสดงชื่อและ email ของผู้ใช้
 - [ ] Theme toggle ทำงานได้ (ถ้ามี)
 - [ ] Settings บันทึกใน localStorage
-- [ ] **Sales Team auto-register เมื่อกดรับงานครั้งแรก**
-- [ ] **Admin สามารถเพิ่ม email ให้ Sales ได้**
-- [ ] **Sales ที่มี email สามารถ login Dashboard ได้**
+- [ ] **Sales Team auto-register เมื่อกดรับงานครั้งแรก** (role = 'sales')
+- [ ] **Admin สามารถเพิ่ม/แก้ไข email ให้ Sales ได้**
+- [ ] **Admin สามารถเปลี่ยน Role ได้** (admin/sales)
+- [ ] **Sales ที่มี @eneos.co.th email สามารถ login Dashboard ได้** (viewer role)
+- [ ] **Role mapping ทำงานถูกต้อง:** admin→admin, sales→viewer
 
 ### Dependencies
 - NextAuth.js session

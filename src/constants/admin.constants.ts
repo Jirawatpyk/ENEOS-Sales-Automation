@@ -69,7 +69,8 @@ export type PeriodType = typeof VALID_PERIODS[number];
 export const SORT_OPTIONS = {
   // LEADS: 'createdAt' is alias for 'date' - frontend uses createdAt, backend stores as date
   // Both are accepted for API compatibility (added in bugfix 2026-01-17)
-  LEADS: ['date', 'createdAt', 'company', 'status'] as const,
+  // Story 4.7: Added 'salesOwnerName' for Sort by Sales Owner
+  LEADS: ['date', 'createdAt', 'company', 'status', 'salesOwnerName'] as const,
   SALES: ['claimed', 'closed', 'conversionRate'] as const,
   CAMPAIGNS: ['leads', 'closed', 'conversionRate'] as const,
 } as const;

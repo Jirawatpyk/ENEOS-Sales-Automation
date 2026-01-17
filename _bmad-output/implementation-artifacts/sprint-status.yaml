@@ -108,7 +108,7 @@ development_status:
   4-4-filter-by-status: done  # Code review passed 2026-01-17
   4-5-filter-by-owner: done  # Code review passed 2026-01-17
   4-6-filter-by-date: done  # Code review passed 2026-01-17
-  4-7-sort-columns: ready-for-dev  # Story created 2026-01-17
+  4-7-sort-columns: done  # Code review passed 2026-01-18
   4-8-lead-detail-modal: ready-for-dev  # Story created 2026-01-17
   4-9-bulk-select: ready-for-dev  # Story created 2026-01-17
   4-10-quick-export: ready-for-dev  # Story created 2026-01-17

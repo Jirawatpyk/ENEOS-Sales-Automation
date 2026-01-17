@@ -520,6 +520,11 @@ export async function getLeads(
           aValue = a.status;
           bValue = b.status;
           break;
+        // Story 4.7: Sort by Sales Owner Name
+        case 'salesOwnerName':
+          aValue = (a.salesOwnerName || '').toLowerCase();
+          bValue = (b.salesOwnerName || '').toLowerCase();
+          break;
         default:
           aValue = new Date(a.date).getTime();
           bValue = new Date(b.date).getTime();

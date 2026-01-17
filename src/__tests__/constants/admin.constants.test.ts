@@ -128,11 +128,13 @@ describe('Admin Constants', () => {
         expect(SORT_OPTIONS.LEADS).toContain('createdAt');
         expect(SORT_OPTIONS.LEADS).toContain('company');
         expect(SORT_OPTIONS.LEADS).toContain('status');
+        // Story 4.7: salesOwnerName added for Sort by Sales Owner
+        expect(SORT_OPTIONS.LEADS).toContain('salesOwnerName');
       });
 
-      // Bugfix 2026-01-17: Changed from 3 to 4 options after adding createdAt
-      it('should have exactly 4 lead sort options', () => {
-        expect(SORT_OPTIONS.LEADS).toHaveLength(4);
+      // Story 4.7: Changed from 4 to 5 options after adding salesOwnerName
+      it('should have exactly 5 lead sort options', () => {
+        expect(SORT_OPTIONS.LEADS).toHaveLength(5);
       });
     });
 

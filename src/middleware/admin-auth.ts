@@ -20,7 +20,7 @@ export interface AdminUser {
   googleId: string;
 }
 
-export type UserRole = 'admin' | 'manager' | 'viewer';
+export type UserRole = 'admin' | 'viewer';
 
 // Admin emails ที่ได้รับสิทธิ์ admin โดยอัตโนมัติ (fallback)
 const ADMIN_EMAILS = [
@@ -214,7 +214,9 @@ export async function adminAuthMiddleware(
 /**
  * Middleware ตรวจสอบว่า user มี role ที่อนุญาตหรือไม่
  *
- * Role hierarchy: admin > manager > viewer
+ * Role hierarchy: admin > viewer
+ * - admin: full access (export, settings)
+ * - viewer: read-only (mapped from 'sales' role in Sales_Team sheet)
  *
  * @param allowedRoles - Array of roles ที่อนุญาต
  * @returns Express middleware
@@ -223,7 +225,7 @@ export async function adminAuthMiddleware(
  * ```typescript
  * router.get('/admin/leads',
  *   adminAuthMiddleware,
- *   requireRole(['admin', 'manager']),
+ *   requireRole(['admin']),
  *   getLeads
  * );
  * ```
@@ -266,18 +268,15 @@ export function requireRole(allowedRoles: UserRole[]) {
 
 /**
  * Shortcut middleware: ต้องเป็น admin เท่านั้น
+ * ใช้สำหรับ: export, settings, user management
  */
 export const requireAdmin = requireRole(['admin']);
 
 /**
- * Shortcut middleware: admin หรือ manager
+ * Shortcut middleware: ทุก role (admin, viewer)
+ * ใช้สำหรับ: ดู dashboard, leads, reports (read-only)
  */
-export const requireManager = requireRole(['admin', 'manager']);
-
-/**
- * Shortcut middleware: ทุก role (admin, manager, viewer)
- */
-export const requireViewer = requireRole(['admin', 'manager', 'viewer']);
+export const requireViewer = requireRole(['admin', 'viewer']);
 
 // ===========================================
 // Helper Functions
@@ -287,7 +286,12 @@ export const requireViewer = requireRole(['admin', 'manager', 'viewer']);
  * ดึง role ของ user จาก Google Sheets (Sales_Team sheet)
  * ถ้าไม่พบใน Sheets จะใช้ ADMIN_EMAILS เป็น fallback
  *
- * @param email - Email ของ user (@eneos.co.th)
+ * Role mapping from Sales_Team sheet:
+ * - 'admin' → 'admin' (full access)
+ * - 'sales' → 'viewer' (read-only)
+ * - other/null → 'viewer' (default)
+ *
+ * @param email - Email ของ user
  * @returns User role (default: 'viewer')
  */
 async function getUserRole(email: string): Promise<UserRole> {
@@ -296,11 +300,17 @@ async function getUserRole(email: string): Promise<UserRole> {
     const user = await sheetsService.getUserByEmail(email);
 
     if (user && user.role) {
-      const role = user.role.toLowerCase();
-      if (role === 'admin' || role === 'manager' || role === 'viewer') {
-        logger.debug('User role found in Sheets', { email, role });
-        return role as UserRole;
+      const sheetRole = user.role.toLowerCase();
+
+      // Map sheet role to dashboard role
+      if (sheetRole === 'admin') {
+        logger.debug('User role: admin', { email, sheetRole });
+        return 'admin';
       }
+
+      // 'sales' or any other role → viewer
+      logger.debug('User role: viewer', { email, sheetRole });
+      return 'viewer';
     }
 
     // Fallback: ตรวจสอบ ADMIN_EMAILS

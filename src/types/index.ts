@@ -189,7 +189,7 @@ export interface SalesTeamMember {
   name: string;
   email?: string;
   phone?: string;
-  role?: string; // admin | manager | sales
+  role?: string; // admin | sales (sales maps to viewer in dashboard)
 }
 
 // ===========================================

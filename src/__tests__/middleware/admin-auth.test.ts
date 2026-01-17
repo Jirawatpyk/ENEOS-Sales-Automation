@@ -1,5 +1,9 @@
 /**
  * ENEOS Sales Automation - Admin Auth Middleware Tests (Simplified)
+ *
+ * Roles: admin | viewer (no manager)
+ * - admin: full access (export, settings)
+ * - viewer: read-only (mapped from 'sales' role in Sales_Team sheet)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -47,16 +51,15 @@ describe('admin-auth middleware - Basic Tests', () => {
   });
 
   it('should export shortcut middleware functions', async () => {
-    const { requireAdmin, requireManager, requireViewer } = await import('../../middleware/admin-auth.js');
+    const { requireAdmin, requireViewer } = await import('../../middleware/admin-auth.js');
     expect(requireAdmin).toBeDefined();
-    expect(requireManager).toBeDefined();
     expect(requireViewer).toBeDefined();
   });
 
-  it('should have correct UserRole type', async () => {
+  it('should have correct UserRole type (admin or viewer)', async () => {
     const { _testOnly } = await import('../../middleware/admin-auth.js');
     const role = await _testOnly.getUserRole('test@eneos.co.th');
-    expect(['admin', 'manager', 'viewer']).toContain(role);
+    expect(['admin', 'viewer']).toContain(role);
   });
 });
 
@@ -93,7 +96,7 @@ describe('requireRole middleware', () => {
       googleId: 'google-id-123',
     };
 
-    const middleware = requireRole(['admin', 'manager']);
+    const middleware = requireRole(['admin']);
     middleware(req, res, next);
 
     expect(next).toHaveBeenCalled();
@@ -122,13 +125,13 @@ describe('requireRole middleware', () => {
     const { requireRole } = await import('../../middleware/admin-auth.js');
 
     req.user = {
-      email: 'manager@eneos.co.th',
-      name: 'Manager',
-      role: 'manager',
+      email: 'viewer@eneos.co.th',
+      name: 'Viewer',
+      role: 'viewer',
       googleId: 'google-id-456',
     };
 
-    const middleware = requireRole(['admin', 'manager']);
+    const middleware = requireRole(['admin', 'viewer']);
     middleware(req, res, next);
 
     expect(next).toHaveBeenCalledWith(); // No error
@@ -153,16 +156,16 @@ describe('requireAdmin shortcut', () => {
     expect(next).toHaveBeenCalledWith(); // No error
   });
 
-  it('should reject manager role', async () => {
+  it('should reject viewer role', async () => {
     const { requireAdmin } = await import('../../middleware/admin-auth.js');
     const req = createMockRequest();
     const res = createMockResponse();
     const next = createMockNext();
 
     req.user = {
-      email: 'manager@eneos.co.th',
-      name: 'Manager',
-      role: 'manager',
+      email: 'viewer@eneos.co.th',
+      name: 'Viewer',
+      role: 'viewer',
       googleId: 'google-id-456',
     };
 
@@ -173,59 +176,12 @@ describe('requireAdmin shortcut', () => {
   });
 });
 
-describe('requireManager shortcut', () => {
-  it('should allow admin and manager roles', async () => {
-    const { requireManager } = await import('../../middleware/admin-auth.js');
-
-    const roles: Array<{ role: 'admin' | 'manager'; email: string }> = [
-      { role: 'admin', email: 'admin@eneos.co.th' },
-      { role: 'manager', email: 'manager@eneos.co.th' },
-    ];
-
-    for (const { role, email } of roles) {
-      const req = createMockRequest();
-      const res = createMockResponse();
-      const next = createMockNext();
-
-      req.user = {
-        email,
-        name: role.charAt(0).toUpperCase() + role.slice(1),
-        role,
-        googleId: `google-id-${role}`,
-      };
-
-      requireManager(req, res, next);
-      expect(next).toHaveBeenCalledWith(); // No error
-    }
-  });
-
-  it('should reject viewer role', async () => {
-    const { requireManager } = await import('../../middleware/admin-auth.js');
-    const req = createMockRequest();
-    const res = createMockResponse();
-    const next = createMockNext();
-
-    req.user = {
-      email: 'viewer@eneos.co.th',
-      name: 'Viewer',
-      role: 'viewer',
-      googleId: 'google-id-viewer',
-    };
-
-    requireManager(req, res, next);
-
-    const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(error.statusCode).toBe(403);
-  });
-});
-
 describe('requireViewer shortcut', () => {
-  it('should allow all roles', async () => {
+  it('should allow admin and viewer roles', async () => {
     const { requireViewer } = await import('../../middleware/admin-auth.js');
 
-    const roles: Array<{ role: 'admin' | 'manager' | 'viewer'; email: string }> = [
+    const roles: Array<{ role: 'admin' | 'viewer'; email: string }> = [
       { role: 'admin', email: 'admin@eneos.co.th' },
-      { role: 'manager', email: 'manager@eneos.co.th' },
       { role: 'viewer', email: 'viewer@eneos.co.th' },
     ];
 

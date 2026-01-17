@@ -22,7 +22,7 @@ import {
 import {
   adminAuthMiddleware,
   requireViewer,
-  requireManager,
+  requireAdmin,
 } from '../middleware/admin-auth.js';
 import { asyncHandler } from '../middleware/error-handler.js';
 
@@ -73,7 +73,7 @@ router.use(adminAuthMiddleware);
  * Response:
  * - email: User email
  * - name: User name
- * - role: admin | manager | viewer
+ * - role: admin | viewer
  *
  * Access: Any authenticated user
  */
@@ -171,9 +171,9 @@ router.get('/sales-team', requireViewer, asyncHandler(getSalesTeam));
  * - sortBy: claimed | closed | conversionRate (default: closed)
  * - sortOrder: asc | desc (default: desc)
  *
- * Access: manager, admin
+ * Access: admin, viewer (read-only)
  */
-router.get('/sales-performance', requireManager, asyncHandler(getSalesPerformance));
+router.get('/sales-performance', requireViewer, asyncHandler(getSalesPerformance));
 
 /**
  * GET /api/admin/sales-performance/trend
@@ -183,9 +183,9 @@ router.get('/sales-performance', requireManager, asyncHandler(getSalesPerformanc
  * - userId: LINE User ID ของ salesperson (required)
  * - days: 7 | 30 | 90 (default: 30)
  *
- * Access: manager, admin
+ * Access: admin, viewer (read-only)
  */
-router.get('/sales-performance/trend', requireManager, asyncHandler(getSalesPerformanceTrend));
+router.get('/sales-performance/trend', requireViewer, asyncHandler(getSalesPerformanceTrend));
 
 // ===========================================
 // Campaign Endpoints
@@ -235,10 +235,10 @@ router.get('/campaigns/:campaignId', requireViewer, asyncHandler(getCampaignDeta
  * - campaign: Campaign ID (optional)
  * - fields: Comma-separated field names (optional)
  *
- * Access: manager, admin (Story 1.5 AC#7: Viewers cannot export)
+ * Access: admin only (Story 1.5 AC#7: Viewers cannot export)
  * Rate Limit: 10 requests per hour
  */
-router.get('/export', exportRateLimiter, requireManager, asyncHandler(exportData));
+router.get('/export', exportRateLimiter, requireAdmin, asyncHandler(exportData));
 
 // ===========================================
 // Export

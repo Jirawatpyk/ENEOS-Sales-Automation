@@ -86,7 +86,7 @@ development_status:
   # ============================================================
   # EPIC-03: Sales Team Performance
   # ============================================================
-  epic-3: in-progress
+  epic-3: done  # All 8 stories completed 2026-01-17
   3-1-performance-table: done  # Code review passed 2026-01-16  # Implementation complete 2026-01-15
   3-2-conversion-rate: done    # Code review passed 2026-01-16
   3-3-performance-bar-chart: done  # Code review passed 2026-01-16
@@ -94,7 +94,7 @@ development_status:
   3-5-trend-by-person: done    # Code review passed 2026-01-16
   3-6-period-filter: done       # Code review passed 2026-01-16
   3-7-target-vs-actual: done     # Code review passed 2026-01-16
-  3-8-export-individual: ready-for-dev
+  3-8-export-individual: done      # Code review passed 2026-01-17
   epic-3-retrospective: optional
 
   # ============================================================
@@ -153,6 +153,13 @@ development_status:
   7-6-audit-logs: backlog
   epic-7-retrospective: optional
 
+  # ============================================================
+  # TECH DEBT
+  # Non-critical improvements to address when time permits
+  # ============================================================
+  tech-debt:
+    lib-barrel-export: backlog  # Add src/lib/index.ts barrel export for module consistency (identified in Story 3-8 code review)
+
 # ============================================================
 # SPRINT SUMMARY
 # ============================================================
@@ -173,7 +180,7 @@ development_status:
 # EPIC-02 Status: ✅ COMPLETED (8/8 stories done)
 #   - 2-1 to 2-8: All done (2026-01-13)
 #
-# EPIC-03 Status: 🔄 IN PROGRESS (7/8 stories done)
+# EPIC-03 Status: ✅ COMPLETED (8/8 stories done)
 #   - 3-1 Performance Table: ✅ done (2026-01-16)
 #   - 3-2 Conversion Rate: ✅ done (2026-01-16)
 #   - 3-3 Performance Bar Chart: ✅ done (2026-01-16)
@@ -181,18 +188,18 @@ development_status:
 #   - 3-5 Trend by Person: ✅ done (2026-01-16) - Code review passed
 #   - 3-6 Period Filter: ✅ done (2026-01-16) - Code review passed
 #   - 3-7 Target vs Actual: ✅ done (2026-01-16) - Code review passed
-#   - 3-8 Export Individual: ready-for-dev
+#   - 3-8 Export Individual: ✅ done (2026-01-17) - Code review passed
 #
-# Completed Epics: 3 (EPIC-00, EPIC-01, EPIC-02)
-# Completed Stories: 30 (10 + 5 + 8 + 7)
-# Remaining Stories: 34
+# Completed Epics: 4 (EPIC-00, EPIC-01, EPIC-02, EPIC-03)
+# Completed Stories: 31 (10 + 5 + 8 + 8)
+# Remaining Stories: 33
 #
-# NEXT UP: Story 3-8 Export Individual (ready-for-dev)
+# NEXT UP: Epic-3 Retrospective (optional), then Epic-4 Lead Management
 #
 # RECOMMENDED MVP (Phase 1):
 # - EPIC-01: Authentication (5 stories) - ✅ COMPLETED
 # - EPIC-02: Dashboard Overview (8 stories) - ✅ COMPLETED
-# - EPIC-03: Sales Performance (8 stories) - 🔄 75% Complete
+# - EPIC-03: Sales Performance (8 stories) - ✅ COMPLETED
 # - EPIC-04: Lead Management - Basic (6 stories) - backlog
 # Total MVP Stories: ~27 stories (29 done)
 #

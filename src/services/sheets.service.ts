@@ -113,7 +113,7 @@ function leadToRow(lead: Partial<Lead>, version: number = 1): string[] {
     lead.date || formatDateForSheets(),
     lead.customerName || '',
     lead.email || '',
-    lead.phone || '',
+    lead.phone ? `'${lead.phone}` : '',  // Prefix with ' to preserve leading zeros
     lead.company || '',
     lead.industryAI || '',
     lead.website || '',

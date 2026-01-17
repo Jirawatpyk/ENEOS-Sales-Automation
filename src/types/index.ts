@@ -212,6 +212,11 @@ export interface HealthCheckResponse {
     geminiAI: ServiceStatus;
     lineAPI: ServiceStatus;
   };
+  // Cache metadata (optional)
+  cached?: boolean;
+  cacheAge?: number;
+  refreshed?: boolean;
+  error?: string;
 }
 
 export interface ServiceStatus {

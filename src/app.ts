@@ -110,8 +110,31 @@ app.use(requestLogger);
 // Routes
 // ===========================================
 
-// Health check endpoint
-app.get('/health', async (_req, res) => {
+// ===========================================
+// Health Check Cache (Enterprise-grade)
+// ===========================================
+interface HealthCacheEntry {
+  data: HealthCheckResponse;
+  expiry: number;
+  lastCheck: number;
+}
+
+const HEALTH_CACHE_TTL_MS = 30000; // 30 seconds
+let healthCache: HealthCacheEntry | null = null;
+
+async function getHealthCheckWithCache(): Promise<HealthCheckResponse> {
+  const now = Date.now();
+
+  // Return cached data if still valid
+  if (healthCache && now < healthCache.expiry) {
+    return {
+      ...healthCache.data,
+      cached: true,
+      cacheAge: now - healthCache.lastCheck,
+    } as HealthCheckResponse;
+  }
+
+  // Fetch fresh health data
   const [sheetsHealth, geminiHealth, lineHealth] = await Promise.all([
     sheetsService.healthCheck(),
     geminiService.healthCheck(),
@@ -141,7 +164,71 @@ app.get('/health', async (_req, res) => {
     },
   };
 
-  res.status(allHealthy ? 200 : 503).json(response);
+  // Update cache
+  healthCache = {
+    data: response,
+    expiry: now + HEALTH_CACHE_TTL_MS,
+    lastCheck: now,
+  };
+
+  return response;
+}
+
+// Health check endpoint (with caching)
+app.get('/health', async (_req, res) => {
+  try {
+    const response = await getHealthCheckWithCache();
+    const isHealthy = response.status === 'healthy';
+    res.status(isHealthy ? 200 : 503).json(response);
+  } catch (error) {
+    // If health check fails completely, return error but don't crash
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: 'Health check failed',
+    });
+  }
+});
+
+// Force refresh health (bypass cache) - useful for monitoring
+app.get('/health/refresh', async (_req, res) => {
+  healthCache = null; // Clear cache
+  const [sheetsHealth, geminiHealth, lineHealth] = await Promise.all([
+    sheetsService.healthCheck(),
+    geminiService.healthCheck(),
+    lineService.healthCheck(),
+  ]);
+
+  const allHealthy = sheetsHealth.healthy && geminiHealth.healthy && lineHealth.healthy;
+
+  const response: HealthCheckResponse = {
+    status: allHealthy ? 'healthy' : 'degraded',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+    services: {
+      googleSheets: {
+        status: sheetsHealth.healthy ? 'up' : 'down',
+        latency: sheetsHealth.latency,
+      },
+      geminiAI: {
+        status: geminiHealth.healthy ? 'up' : 'down',
+        latency: geminiHealth.latency,
+      },
+      lineAPI: {
+        status: lineHealth.healthy ? 'up' : 'down',
+        latency: lineHealth.latency,
+      },
+    },
+  };
+
+  // Update cache with fresh data
+  healthCache = {
+    data: response,
+    expiry: Date.now() + HEALTH_CACHE_TTL_MS,
+    lastCheck: Date.now(),
+  };
+
+  res.status(allHealthy ? 200 : 503).json({ ...response, refreshed: true });
 });
 
 // Readiness check (simpler)

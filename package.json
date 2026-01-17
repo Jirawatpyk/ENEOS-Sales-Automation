@@ -15,7 +15,11 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "deploy:railway": "railway up",
-    "health": "curl -s http://localhost:3000/health | jq ."
+    "health": "curl -s http://localhost:3000/health | jq .",
+    "test:load": "k6 run tests/load/health.js && k6 run tests/load/api-admin.js",
+    "test:load:health": "k6 run tests/load/health.js",
+    "test:load:api": "k6 run tests/load/api-admin.js",
+    "test:load:webhook": "k6 run tests/load/webhook-brevo.js"
   },
   "keywords": [
     "sales-automation",
@@ -37,6 +41,7 @@
     "axios": "^1.7.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.1",
     "googleapis": "^144.0.0",
@@ -48,7 +53,6 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "winston": "^3.15.0",
-    "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

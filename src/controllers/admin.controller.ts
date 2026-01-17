@@ -1639,12 +1639,29 @@ export async function exportData(
 
     // Generate file
     if (format === 'xlsx') {
-      const XLSX = await import('xlsx');
-      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Leads');
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Leads');
 
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      // Add columns with headers
+      if (dataToExport.length > 0) {
+        const columns = Object.keys(dataToExport[0]).map(key => ({
+          header: key,
+          key: key,
+          width: 20,
+        }));
+        worksheet.columns = columns;
+
+        // Add data rows
+        dataToExport.forEach(row => {
+          worksheet.addRow(row);
+        });
+
+        // Style header row (bold)
+        worksheet.getRow(1).font = { bold: true };
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
 
       const filename = `${type}_export_${new Date().toISOString().split('T')[0]}.xlsx`;
 

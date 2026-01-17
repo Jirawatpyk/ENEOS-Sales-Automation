@@ -104,12 +104,12 @@ development_status:
   epic-4: in-progress
   4-1-lead-list-table: done  # Code review passed 2026-01-17
   4-2-pagination: done  # Code review passed 2026-01-17
-  4-3-search: ready-for-dev  # Story created 2026-01-17
+  4-3-search: done  # Code review passed 2026-01-17
   4-4-filter-by-status: ready-for-dev  # Story created 2026-01-17
   4-5-filter-by-owner: ready-for-dev  # Story created 2026-01-17
   4-6-filter-by-date: ready-for-dev  # Story created 2026-01-17
-  4-7-sort-columns: backlog
-  4-8-lead-detail-modal: backlog
+  4-7-sort-columns: ready-for-dev  # Story created 2026-01-17
+  4-8-lead-detail-modal: ready-for-dev  # Story created 2026-01-17
   4-9-bulk-select: backlog
   4-10-quick-export: backlog
   epic-4-retrospective: optional
@@ -193,13 +193,13 @@ development_status:
 #   - Retrospective: ✅ done (2026-01-17)
 #
 # Completed Epics: 4 (EPIC-00, EPIC-01, EPIC-02, EPIC-03)
-# Completed Stories: 34 (10 + 5 + 8 + 8 + 2 + 1)  # +2 from Epic-4 (4-1, 4-2)
-# Remaining Stories: 30
+# Completed Stories: 35 (10 + 5 + 8 + 8 + 3 + 1)  # +3 from Epic-4 (4-1, 4-2, 4-3)
+# Remaining Stories: 29
 #
 # CURRENT: Epic-4 Lead Management (10 stories)
 #   - 4-1 Lead List Table: ✅ done (code review passed 2026-01-17)
 #   - 4-2 Pagination: ✅ done (code review passed 2026-01-17)
-#   - 4-3 Search: ready-for-dev
+#   - 4-3 Search: ✅ done (code review passed 2026-01-17)
 #
 # RECOMMENDED MVP (Phase 1):
 # - EPIC-01: Authentication (5 stories) - ✅ COMPLETED

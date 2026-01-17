@@ -1,6 +1,6 @@
 # Story 4.1: Lead List Table
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -87,78 +87,78 @@ so that **I can review lead information, track status, and manage the sales pipe
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Page Setup** (AC: #1)
-  - [ ] 1.1 Create `/leads` page at `src/app/(dashboard)/leads/page.tsx`
-  - [ ] 1.2 Add page metadata and title "Lead Management"
-  - [ ] 1.3 Verify route protection with auth middleware
-  - [ ] 1.4 Add navigation link in sidebar if not exists
+- [x] **Task 1: Page Setup** (AC: #1)
+  - [x] 1.1 Create `/leads` page at `src/app/(dashboard)/leads/page.tsx`
+  - [x] 1.2 Add page metadata and title "Lead Management"
+  - [x] 1.3 Verify route protection with auth middleware
+  - [x] 1.4 Add navigation link in sidebar if not exists
 
-- [ ] **Task 2: API Route & Hook** (AC: #3, #5)
-  - [ ] 2.1 Create `src/app/api/admin/leads/route.ts` proxy to backend
-  - [ ] 2.2 Create `src/app/api/admin/leads/[id]/route.ts` for single lead detail
-  - [ ] 2.3 Create `src/lib/api/leads.ts` API client function (fetchLeads, fetchLeadById)
-  - [ ] 2.4 Create `src/hooks/use-leads.ts` TanStack Query hook
-  - [ ] 2.5 Create `src/hooks/use-lead.ts` for single lead query (detail sheet)
-  - [ ] 2.6 Configure staleTime (60 seconds per architecture)
-  - [ ] 2.7 Handle error and retry logic
+- [x] **Task 2: API Route & Hook** (AC: #3, #5)
+  - [x] 2.1 Create `src/app/api/admin/leads/route.ts` proxy to backend
+  - [x] 2.2 Create `src/app/api/admin/leads/[id]/route.ts` for single lead detail
+  - [x] 2.3 Create `src/lib/api/leads.ts` API client function (fetchLeads, fetchLeadById)
+  - [x] 2.4 Create `src/hooks/use-leads.ts` TanStack Query hook
+  - [x] 2.5 Create `src/hooks/use-lead.ts` for single lead query (detail sheet)
+  - [x] 2.6 Configure staleTime (60 seconds per architecture)
+  - [x] 2.7 Handle error and retry logic
 
-- [ ] **Task 3: TypeScript Types** (AC: #3)
-  - [ ] 3.1 Create `src/types/lead.ts` with Lead interface
-  - [ ] 3.2 Include all fields: row, company, customerName, email, phone, status, salesOwnerId, salesOwnerName, campaignId, campaignName, industryAI, website, talkingPoint, createdAt, etc.
-  - [ ] 3.3 Add LeadStatus type with 6 values
-  - [ ] 3.4 Add LeadsResponse interface matching backend format
+- [x] **Task 3: TypeScript Types** (AC: #3)
+  - [x] 3.1 Create `src/types/lead.ts` with Lead interface
+  - [x] 3.2 Include all fields: row, company, customerName, email, phone, status, salesOwnerId, salesOwnerName, campaignId, campaignName, industryAI, website, talkingPoint, createdAt, etc.
+  - [x] 3.3 Add LeadStatus type with 6 values
+  - [x] 3.4 Add LeadsResponse interface matching backend format
 
-- [ ] **Task 4: Lead Table Component** (AC: #2, #3, #4, #7, #8, #9)
-  - [ ] 4.1 Create `src/components/leads/index.ts` barrel exports
-  - [ ] 4.2 Create `src/components/leads/lead-table.tsx`
-  - [ ] 4.3 Use TanStack Table with column definitions
-  - [ ] 4.4 Define 8 columns with proper alignment (Company left, Date right)
-  - [ ] 4.5 Add tooltips to column headers using shadcn/ui Tooltip
-  - [ ] 4.6 Implement status badge with STATUS_COLORS
-  - [ ] 4.7 Format phone number with Thai format
-  - [ ] 4.8 Format date as "DD MMM YYYY"
-  - [ ] 4.9 Wrap table in `overflow-x-auto` for horizontal scroll
-  - [ ] 4.10 Implement sticky first column (Company)
-  - [ ] 4.11 Set default sort: createdAt DESC
+- [x] **Task 4: Lead Table Component** (AC: #2, #3, #4, #7, #8, #9)
+  - [x] 4.1 Create `src/components/leads/index.ts` barrel exports
+  - [x] 4.2 Create `src/components/leads/lead-table.tsx`
+  - [x] 4.3 Use TanStack Table with column definitions
+  - [x] 4.4 Define 8 columns with proper alignment (Company left, Date right)
+  - [x] 4.5 Add tooltips to column headers using shadcn/ui Tooltip
+  - [x] 4.6 Implement status badge with STATUS_COLORS
+  - [x] 4.7 Format phone number with Thai format
+  - [x] 4.8 Format date as "DD MMM YYYY"
+  - [x] 4.9 Wrap table in `overflow-x-auto` for horizontal scroll
+  - [x] 4.10 Implement sticky first column (Company)
+  - [x] 4.11 Set default sort: createdAt DESC
 
-- [ ] **Task 5: Status Badge Component** (AC: #4)
-  - [ ] 5.1 Create `src/components/leads/lead-status-badge.tsx`
-  - [ ] 5.2 Use STATUS_COLORS from chart-config or create leads-constants
-  - [ ] 5.3 Add proper styling for each of 6 statuses
-  - [ ] 5.4 Include aria-label for accessibility
+- [x] **Task 5: Status Badge Component** (AC: #4)
+  - [x] 5.1 Create `src/components/leads/lead-status-badge.tsx`
+  - [x] 5.2 Use STATUS_COLORS from chart-config or create leads-constants
+  - [x] 5.3 Add proper styling for each of 6 statuses
+  - [x] 5.4 Include aria-label for accessibility
 
-- [ ] **Task 6: Row Interactivity & Detail Panel** (AC: #5)
-  - [ ] 6.1 Add onClick handler to table rows
-  - [ ] 6.2 Implement hover state styling
-  - [ ] 6.3 Add keyboard navigation (onKeyDown Enter/Space)
-  - [ ] 6.4 Create `src/components/leads/lead-detail-sheet.tsx` using Sheet component
-  - [ ] 6.5 Display all lead fields in Sheet: company, contact, email, phone, industry, website, talking point, timeline, status history
-  - [ ] 6.6 Add close button (X) and Escape key handler
-  - [ ] 6.7 Add cursor-pointer style to rows
+- [x] **Task 6: Row Interactivity & Detail Panel** (AC: #5)
+  - [x] 6.1 Add onClick handler to table rows
+  - [x] 6.2 Implement hover state styling
+  - [x] 6.3 Add keyboard navigation (onKeyDown Enter/Space)
+  - [x] 6.4 Create `src/components/leads/lead-detail-sheet.tsx` using Sheet component
+  - [x] 6.5 Display all lead fields in Sheet: company, contact, email, phone, industry, website, talking point, timeline, status history
+  - [x] 6.6 Add close button (X) and Escape key handler
+  - [x] 6.7 Add cursor-pointer style to rows
 
-- [ ] **Task 7: Loading & Error States** (AC: #6)
-  - [ ] 7.1 Create `src/components/leads/lead-table-skeleton.tsx`
-  - [ ] 7.2 Create `src/components/leads/lead-table-empty.tsx`
-  - [ ] 7.3 Create `src/components/leads/lead-table-error.tsx` with retry button
-  - [ ] 7.4 Add aria-busy for accessibility
+- [x] **Task 7: Loading & Error States** (AC: #6)
+  - [x] 7.1 Create `src/components/leads/lead-table-skeleton.tsx`
+  - [x] 7.2 Create `src/components/leads/lead-table-empty.tsx`
+  - [x] 7.3 Create `src/components/leads/lead-table-error.tsx` with retry button
+  - [x] 7.4 Add aria-busy for accessibility
 
-- [ ] **Task 8: Container Component** (AC: #1-8)
-  - [ ] 8.1 Create `src/components/leads/lead-table-container.tsx`
-  - [ ] 8.2 Handle data fetching with useLeads hook
-  - [ ] 8.3 Pass data to presentation component
-  - [ ] 8.4 Handle loading/error/empty states
-  - [ ] 8.5 Wire up detail sheet open/close state
+- [x] **Task 8: Container Component** (AC: #1-8)
+  - [x] 8.1 Create `src/components/leads/lead-table-container.tsx`
+  - [x] 8.2 Handle data fetching with useLeads hook
+  - [x] 8.3 Pass data to presentation component
+  - [x] 8.4 Handle loading/error/empty states
+  - [x] 8.5 Wire up detail sheet open/close state
 
-- [ ] **Task 9: Testing** (AC: #1-9)
-  - [ ] 9.1 Test table renders with mock data
-  - [ ] 9.2 Test status badge color mapping
-  - [ ] 9.3 Test phone number formatting
-  - [ ] 9.4 Test date formatting
-  - [ ] 9.5 Test row click opens detail sheet
-  - [ ] 9.6 Test keyboard navigation
-  - [ ] 9.7 Test loading/empty/error states
-  - [ ] 9.8 Test responsive behavior
-  - [ ] 9.9 Test accessibility (aria-busy, roles)
+- [x] **Task 9: Testing** (AC: #1-9)
+  - [x] 9.1 Test table renders with mock data
+  - [x] 9.2 Test status badge color mapping
+  - [x] 9.3 Test phone number formatting
+  - [x] 9.4 Test date formatting
+  - [x] 9.5 Test row click opens detail sheet
+  - [x] 9.6 Test keyboard navigation
+  - [x] 9.7 Test loading/empty/error states
+  - [x] 9.8 Test responsive behavior
+  - [x] 9.9 Test accessibility (aria-busy, roles)
 
 ## Dev Notes
 
@@ -508,5 +508,92 @@ This story lays foundation for:
 
 ## Code Review
 
-_To be completed after implementation_
+### Implementation Summary (2026-01-17)
+
+**Files Created:**
+- `src/app/(dashboard)/leads/page.tsx` - Main leads page with Suspense
+- `src/app/api/admin/leads/route.ts` - API proxy for leads list
+- `src/app/api/admin/leads/[id]/route.ts` - API proxy for single lead
+- `src/lib/api/leads.ts` - API client with fetchLeads, fetchLeadById, LeadsApiError
+- `src/hooks/use-leads.ts` - TanStack Query hook for leads list
+- `src/hooks/use-lead.ts` - TanStack Query hook for single lead
+- `src/types/lead.ts` - Lead interface and LeadStatus type
+- `src/lib/leads-constants.ts` - Status colors and labels
+- `src/lib/format-lead.ts` - Phone/date formatting utilities
+- `src/components/leads/lead-table.tsx` - Main table with TanStack Table
+- `src/components/leads/lead-status-badge.tsx` - Status badge component
+- `src/components/leads/lead-detail-sheet.tsx` - Detail panel Sheet
+- `src/components/leads/lead-table-skeleton.tsx` - Loading skeleton
+- `src/components/leads/lead-table-empty.tsx` - Empty state
+- `src/components/leads/lead-table-error.tsx` - Error state with retry
+- `src/components/leads/lead-table-container.tsx` - Container component
+- `src/components/leads/index.ts` - Barrel exports
+
+**Files Modified:**
+- `src/config/nav-items.ts` - Enabled Leads navigation link
+- `package.json` - Added `test:run` script
+- `.gitignore` - Added test output file patterns
+
+**Test Files Created:**
+- `src/__tests__/lead-table.test.tsx` - Table component tests (AC#1-9)
+- `src/__tests__/lead-table-states.test.tsx` - Loading/Empty/Error tests (AC#6)
+- `src/__tests__/lead-status-badge.test.tsx` - Status badge tests (AC#4)
+- `src/__tests__/format-lead.test.ts` - Formatting utility tests (AC#3)
+- `src/__tests__/lead-table-container.test.tsx` - Container integration tests
+- `src/__tests__/config/nav-items.test.ts` - Updated for Leads enabled
+- `src/__tests__/api/admin/leads/route.test.ts` - API proxy route tests (6 tests)
+- `src/__tests__/api/admin/leads/[id]/route.test.ts` - Lead detail API tests (6 tests)
+
+**Test Results:**
+- All 1058 tests passing
+- TypeScript type check passing
+- ESLint lint passing
+
+**Architecture Compliance:**
+- ✅ TanStack Query v5 object syntax `{queryKey, queryFn}`
+- ✅ TanStack Table for table rendering
+- ✅ Container/Presentation component separation
+- ✅ API proxy pattern (never call backend directly)
+- ✅ Status colors matching project-context.md
+- ✅ staleTime 60 seconds, gcTime 5 minutes
+- ✅ Keyboard navigation (Enter/Space)
+- ✅ Accessibility (aria-busy, role="button", tabIndex)
+- ✅ Sticky first column for responsive scroll
+
+### Code Review Findings & Fixes (2026-01-17)
+
+**Issues Found:** 0 High, 4 Medium, 2 Low
+
+**Fixed Issues:**
+1. ✅ **M3**: Added test output files to `.gitignore` (test-output.json, test-result.json, vitest-result.json, run-test.js)
+2. ✅ **M4**: Created API route tests - `src/__tests__/api/admin/leads/route.test.ts` and `[id]/route.test.ts` (12 tests added)
+3. ✅ **M2**: Documented `package.json` changes in File List
+4. ✅ **M1**: Clarified `src/lib/index.ts` is from Epic 3 tech debt, not Story 4.1
+
+**Noted (Low Priority):**
+- L1: `docs/test-pattern-library.md` is unrelated to Story 4.1
+- L2: Touch scrolling (AC#7) requires E2E testing with Playwright
+
+**Code Review Status: PASSED**
+
+### Bugfix: API Parameter Mapping (2026-01-17)
+
+**Issue:** "Bad Request" error on Lead Management page after initial deployment.
+
+**Root Cause Analysis:**
+1. Frontend sends `salesOwnerId`, backend expects `owner`
+2. Frontend sends `sortDir`, backend expects `sortOrder`
+3. Frontend sends `sortBy=createdAt`, backend only accepted `date`, `company`, `status`
+4. Response format mismatch: backend returns `{data: {data: [], pagination}}`, frontend expects `{data: [], pagination}`
+
+**Backend Changes (eneos-sales-automation):**
+- `src/constants/admin.constants.ts` - Added `createdAt` to SORT_OPTIONS.LEADS as alias for `date`
+- `src/controllers/admin.controller.ts` - Added case `createdAt` in sorting switch
+- `src/__tests__/constants/admin.constants.test.ts` - Updated to expect 4 sort options
+
+**Frontend Changes (eneos-admin-dashboard):**
+- `src/app/api/admin/leads/route.ts` - Parameter mapping + response transformation
+- `src/__tests__/api/admin/leads/route.test.ts` - Updated test expectations
+
+**Resolution:** Fixed both backend (accept `createdAt`) and frontend (parameter mapping, response transformation).
 

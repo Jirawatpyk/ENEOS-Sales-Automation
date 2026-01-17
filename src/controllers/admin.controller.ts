@@ -489,6 +489,7 @@ export async function getLeads(
 
       switch (sortBy) {
         case 'date':
+        case 'createdAt': // createdAt is alias for date
           aValue = new Date(a.date).getTime();
           bValue = new Date(b.date).getTime();
           break;

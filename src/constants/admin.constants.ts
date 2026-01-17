@@ -67,7 +67,9 @@ export type PeriodType = typeof VALID_PERIODS[number];
 // ===========================================
 
 export const SORT_OPTIONS = {
-  LEADS: ['date', 'company', 'status'] as const,
+  // LEADS: 'createdAt' is alias for 'date' - frontend uses createdAt, backend stores as date
+  // Both are accepted for API compatibility (added in bugfix 2026-01-17)
+  LEADS: ['date', 'createdAt', 'company', 'status'] as const,
   SALES: ['claimed', 'closed', 'conversionRate'] as const,
   CAMPAIGNS: ['leads', 'closed', 'conversionRate'] as const,
 } as const;

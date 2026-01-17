@@ -124,12 +124,15 @@ describe('Admin Constants', () => {
     describe('LEADS', () => {
       it('should contain all expected lead sort options', () => {
         expect(SORT_OPTIONS.LEADS).toContain('date');
+        // Bugfix 2026-01-17: createdAt added as alias for 'date' (frontend compatibility)
+        expect(SORT_OPTIONS.LEADS).toContain('createdAt');
         expect(SORT_OPTIONS.LEADS).toContain('company');
         expect(SORT_OPTIONS.LEADS).toContain('status');
       });
 
-      it('should have exactly 3 lead sort options', () => {
-        expect(SORT_OPTIONS.LEADS).toHaveLength(3);
+      // Bugfix 2026-01-17: Changed from 3 to 4 options after adding createdAt
+      it('should have exactly 4 lead sort options', () => {
+        expect(SORT_OPTIONS.LEADS).toHaveLength(4);
       });
     });
 

@@ -4,8 +4,13 @@
  */
 
 /**
- * Format date for Google Sheets (Thai timezone +7)
- * Output: "DD/MM/YYYY HH:MM:SS"
+ * Format date for Google Sheets (ISO 8601 format)
+ * Output: "YYYY-MM-DDTHH:MM:SS.sssZ"
+ *
+ * Changed from Thai format (DD/MM/YYYY HH:MM:SS) to ISO for:
+ * - Easier date comparison and filtering
+ * - No timezone conversion issues
+ * - Standard format for APIs
  */
 export function formatDateForSheets(date: Date | string = new Date()): string {
   // Parse string date if needed
@@ -16,17 +21,8 @@ export function formatDateForSheets(date: Date | string = new Date()): string {
     return formatDateForSheets(new Date()); // Fallback to current time
   }
 
-  // Convert to Thai timezone (+7 hours)
-  const thaiDate = new Date(dateObj.getTime() + 7 * 60 * 60 * 1000);
-
-  const day = String(thaiDate.getUTCDate()).padStart(2, '0');
-  const month = String(thaiDate.getUTCMonth() + 1).padStart(2, '0');
-  const year = thaiDate.getUTCFullYear();
-  const hours = String(thaiDate.getUTCHours()).padStart(2, '0');
-  const minutes = String(thaiDate.getUTCMinutes()).padStart(2, '0');
-  const seconds = String(thaiDate.getUTCSeconds()).padStart(2, '0');
-
-  return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+  // Return ISO format (e.g., "2026-01-15T09:30:00.000Z")
+  return dateObj.toISOString();
 }
 
 /**

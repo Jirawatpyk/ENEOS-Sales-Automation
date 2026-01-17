@@ -490,18 +490,15 @@ export async function getLeads(
       );
     }
 
-    if (startDate) {
-      // startDate = start of day (00:00:00)
-      const startTime = new Date(startDate).getTime();
-      allLeads = allLeads.filter((lead) => parseDateFromSheets(lead.date).getTime() >= startTime);
-    }
-
-    if (endDate) {
-      // endDate = end of day (23:59:59.999) to include all leads on that day
-      const endDateTime = new Date(endDate);
-      endDateTime.setHours(23, 59, 59, 999);
-      const endTime = endDateTime.getTime();
-      allLeads = allLeads.filter((lead) => parseDateFromSheets(lead.date).getTime() <= endTime);
+    // Date filter: compare by date string (YYYY-MM-DD) to avoid timezone issues
+    // extractDateKey() returns YYYY-MM-DD from any date format (Thai or ISO)
+    if (startDate || endDate) {
+      allLeads = allLeads.filter((lead) => {
+        const leadDateKey = extractDateKey(lead.date); // Returns YYYY-MM-DD
+        if (startDate && leadDateKey < startDate) return false;
+        if (endDate && leadDateKey > endDate) return false;
+        return true;
+      });
     }
 
     // Sort

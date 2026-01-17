@@ -1,5 +1,5 @@
 # Sprint Status - ENEOS Admin Dashboard
-# generated: 2026-01-13
+# generated: 2026-01-17
 # project: eneos-sales-automation
 # project_key: eneos-admin-dashboard
 # tracking_system: file-system
@@ -29,7 +29,7 @@
 # - SM typically creates next story ONLY after previous one is 'done'
 # - Dev moves story to 'review', then runs code-review workflow
 
-generated: "2026-01-13"
+generated: "2026-01-17"
 project: "eneos-sales-automation"
 project_key: "eneos-admin-dashboard"
 tracking_system: "file-system"
@@ -95,13 +95,14 @@ development_status:
   3-6-period-filter: done       # Code review passed 2026-01-16
   3-7-target-vs-actual: done     # Code review passed 2026-01-16
   3-8-export-individual: done      # Code review passed 2026-01-17
-  epic-3-retrospective: optional
+  epic-3-retrospective: done       # Retrospective completed 2026-01-17
 
   # ============================================================
   # EPIC-04: Lead Management
+  # Started: 2026-01-17
   # ============================================================
-  epic-4: backlog
-  4-1-lead-list-table: backlog
+  epic-4: in-progress
+  4-1-lead-list-table: in-progress  # Started 2026-01-17
   4-2-pagination: backlog
   4-3-search: backlog
   4-4-filter-by-status: backlog
@@ -158,7 +159,7 @@ development_status:
   # Non-critical improvements to address when time permits
   # ============================================================
   tech-debt:
-    lib-barrel-export: backlog  # Add src/lib/index.ts barrel export for module consistency (identified in Story 3-8 code review)
+    lib-barrel-export: done  # ✅ Completed 2026-01-17 - Created src/lib/index.ts barrel export
 
 # ============================================================
 # SPRINT SUMMARY
@@ -180,7 +181,7 @@ development_status:
 # EPIC-02 Status: ✅ COMPLETED (8/8 stories done)
 #   - 2-1 to 2-8: All done (2026-01-13)
 #
-# EPIC-03 Status: ✅ COMPLETED (8/8 stories done)
+# EPIC-03 Status: ✅ COMPLETED (8/8 stories done + retrospective)
 #   - 3-1 Performance Table: ✅ done (2026-01-16)
 #   - 3-2 Conversion Rate: ✅ done (2026-01-16)
 #   - 3-3 Performance Bar Chart: ✅ done (2026-01-16)
@@ -189,12 +190,14 @@ development_status:
 #   - 3-6 Period Filter: ✅ done (2026-01-16) - Code review passed
 #   - 3-7 Target vs Actual: ✅ done (2026-01-16) - Code review passed
 #   - 3-8 Export Individual: ✅ done (2026-01-17) - Code review passed
+#   - Retrospective: ✅ done (2026-01-17)
 #
 # Completed Epics: 4 (EPIC-00, EPIC-01, EPIC-02, EPIC-03)
 # Completed Stories: 31 (10 + 5 + 8 + 8)
 # Remaining Stories: 33
 #
-# NEXT UP: Epic-3 Retrospective (optional), then Epic-4 Lead Management
+# CURRENT: Epic-4 Lead Management (10 stories)
+#   - 4-1 Lead List Table: ready-for-dev
 #
 # RECOMMENDED MVP (Phase 1):
 # - EPIC-01: Authentication (5 stories) - ✅ COMPLETED

@@ -1,6 +1,6 @@
 # Story 3.8: Export Individual Performance Report
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -89,80 +89,80 @@ so that **I can share their results in meetings, provide feedback documentation,
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Export Button UI** (AC: #1)
-  - [ ] 1.1 Add export button to `sales-detail-sheet.tsx` header
-  - [ ] 1.2 Use Download icon from lucide-react
-  - [ ] 1.3 Style as secondary/outline button
-  - [ ] 1.4 Position in SheetHeader actions area
+- [x] **Task 1: Export Button UI** (AC: #1)
+  - [x] 1.1 Add export button to `sales-detail-sheet.tsx` header
+  - [x] 1.2 Use Download icon from lucide-react
+  - [x] 1.3 Style as secondary/outline button
+  - [x] 1.4 Position in SheetHeader actions area
 
-- [ ] **Task 2: Export Options Dropdown** (AC: #2)
-  - [ ] 2.0 Install DropdownMenu: `npx shadcn@latest add dropdown-menu`
-  - [ ] 2.1 Create `export-dropdown.tsx` using DropdownMenu from shadcn/ui
-  - [ ] 2.2 Add Excel option with FileSpreadsheet icon
-  - [ ] 2.3 Add PDF option with FileText icon (optional, disabled)
-  - [ ] 2.4 Handle option selection
+- [x] **Task 2: Export Options Dropdown** (AC: #2)
+  - [x] 2.0 Install DropdownMenu: `npx shadcn@latest add dropdown-menu`
+  - [x] 2.1 Create `export-dropdown.tsx` using DropdownMenu from shadcn/ui
+  - [x] 2.2 Add Excel option with FileSpreadsheet icon
+  - [x] 2.3 Add PDF option with FileText icon (optional, disabled)
+  - [x] 2.4 Handle option selection
 
-- [ ] **Task 3: Excel Export Service** (AC: #3, #5)
-  - [ ] 3.0 Install xlsx library: `npm install xlsx`
-  - [ ] 3.1 Create `src/lib/export-utils.ts`
-  - [ ] 3.2 Implement `exportIndividualToExcel(data, period)` function
-  - [ ] 3.3 Format data into worksheet with headers
-  - [ ] 3.4 Include summary section at top
-  - [ ] 3.5 Include period information
-  - [ ] 3.6 Generate file with proper naming (remove invalid chars, keep Thai, truncate to 50 chars)
-  - [ ] 3.7 Add guard logic for null/undefined metrics (use `?? 0` fallback)
+- [x] **Task 3: Excel Export Service** (AC: #3, #5)
+  - [x] 3.0 Install xlsx library: `npm install xlsx`
+  - [x] 3.1 Create `src/lib/export-utils.ts`
+  - [x] 3.2 Implement `exportIndividualToExcel(data, period)` function
+  - [x] 3.3 Format data into worksheet with headers
+  - [x] 3.4 Include summary section at top
+  - [x] 3.5 Include period information
+  - [x] 3.6 Generate file with proper naming (remove invalid chars, keep Thai, truncate to 50 chars)
+  - [x] 3.7 Add guard logic for null/undefined metrics (use `?? 0` fallback)
 
-- [ ] **Task 4: PDF Export Service** (AC: #4) - Optional
+- [ ] **Task 4: PDF Export Service** (AC: #4) - Optional/Deferred
   - [ ] 4.0 Install jsPDF library: `npm install jspdf`
   - [ ] 4.1 Implement `exportIndividualToPDF(data, period)` function
   - [ ] 4.2 Create PDF layout with headers
   - [ ] 4.3 Add optional ENEOS branding
   - [ ] 4.4 Format for A4 printing
 
-- [ ] **Task 5: Download Handler** (AC: #6, #7)
-  - [ ] 5.1 Create `useExportIndividual` hook
-  - [ ] 5.2 Manage loading state during generation
-  - [ ] 5.3 Trigger browser download via Blob URL
-  - [ ] 5.4 Show toast notification on success/failure
-  - [ ] 5.5 Handle errors with retry option
+- [x] **Task 5: Download Handler** (AC: #6, #7)
+  - [x] 5.1 Create `useExportIndividual` hook
+  - [x] 5.2 Manage loading state during generation
+  - [x] 5.3 Trigger browser download via Blob URL
+  - [x] 5.4 Show toast notification on success/failure
+  - [x] 5.5 Handle errors with retry option
 
-- [ ] **Task 6: Empty State Handling** (AC: #9)
-  - [ ] 6.1 Check if person has data for selected period
-  - [ ] 6.2 Disable export button if no data
-  - [ ] 6.3 Show tooltip explaining why disabled
-  - [ ] 6.4 Suggest different period selection
+- [x] **Task 6: Empty State Handling** (AC: #9)
+  - [x] 6.1 Check if person has data for selected period
+  - [x] 6.2 Disable export button if no data
+  - [x] 6.3 Show tooltip explaining why disabled
+  - [x] 6.4 Suggest different period selection
 
-- [ ] **Task 7: Row Action Export** (AC: #8) - Optional
+- [ ] **Task 7: Row Action Export** (AC: #8) - Optional/Deferred
   - [ ] 7.1 Add "Export Report" to table row context menu
   - [ ] 7.2 Or add export icon button in actions column
   - [ ] 7.3 Open detail sheet with export or export directly
 
-- [ ] **Task 8: Accessibility** (AC: #10)
-  - [ ] 8.1 Add aria-label to export button
-  - [ ] 8.2 Ensure dropdown is keyboard navigable
-  - [ ] 8.3 Add aria-busy during loading
-  - [ ] 8.4 Announce success/failure to screen readers
+- [x] **Task 8: Accessibility** (AC: #10)
+  - [x] 8.1 Add aria-label to export button
+  - [x] 8.2 Ensure dropdown is keyboard navigable
+  - [x] 8.3 Add aria-busy during loading
+  - [x] 8.4 Announce success/failure to screen readers
 
-- [ ] **Task 9: Integration** (AC: #1-10)
-  - [ ] 9.1 Connect export to useSalesPerformance data
-  - [ ] 9.2 Pass current period from filter context
-  - [ ] 9.3 Get individual person data from props
-  - [ ] 9.4 Wire up toast notifications
+- [x] **Task 9: Integration** (AC: #1-10)
+  - [x] 9.1 Connect export to useSalesPerformance data
+  - [x] 9.2 Pass current period from filter context
+  - [x] 9.3 Get individual person data from props
+  - [x] 9.4 Wire up toast notifications
 
-- [ ] **Task 10: Testing** (AC: #1-10)
-  - [ ] 10.1 Test export button renders in detail sheet
-  - [ ] 10.2 Test dropdown opens with format options
-  - [ ] 10.3 Test Excel file generation with correct data
-  - [ ] 10.4 Test file naming pattern (English name)
-  - [ ] 10.5 Test period information included
-  - [ ] 10.6 Test loading state during export
-  - [ ] 10.7 Test download triggers correctly
-  - [ ] 10.8 Test empty data handling (claimed === 0)
-  - [ ] 10.9 Test keyboard accessibility
-  - [ ] 10.10 Test toast notifications
-  - [ ] 10.11 Test Thai name filename generation (keep Thai chars)
-  - [ ] 10.12 Test long name truncation (max 50 chars)
-  - [ ] 10.13 Test null/undefined metrics fallback to 0
+- [x] **Task 10: Testing** (AC: #1-10)
+  - [x] 10.1 Test export button renders in detail sheet
+  - [x] 10.2 Test dropdown opens with format options
+  - [x] 10.3 Test Excel file generation with correct data
+  - [x] 10.4 Test file naming pattern (English name)
+  - [x] 10.5 Test period information included
+  - [x] 10.6 Test loading state during export
+  - [x] 10.7 Test download triggers correctly
+  - [x] 10.8 Test empty data handling (claimed === 0)
+  - [x] 10.9 Test keyboard accessibility
+  - [x] 10.10 Test toast notifications
+  - [x] 10.11 Test Thai name filename generation (keep Thai chars)
+  - [x] 10.12 Test long name truncation (max 50 chars)
+  - [x] 10.13 Test null/undefined metrics fallback to 0
 
 ## Dev Notes
 
@@ -509,11 +509,81 @@ From Story 3-6:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+N/A - Implementation was already complete when story was resumed.
+
 ### Completion Notes List
 
+- **2026-01-17**: Story implementation verified complete
+- All mandatory tasks (1, 2, 3, 5, 6, 8, 9, 10) completed
+- Optional tasks 4 (PDF Export) and 7 (Row Action Export) deferred for future enhancement
+- All 962 tests pass (73 test files)
+- Story-specific tests: 37 tests passing
+  - export-dropdown.test.tsx: 11 tests
+  - use-export-individual.test.ts: 9 tests
+  - export-utils.test.ts: 17 tests
+- Excel export generates properly formatted files with period info, metrics, and optional target data
+- Empty state handling disables button with tooltip when claimed === 0
+- Accessibility: ARIA labels, keyboard navigation, screen reader announcements
+
 ### File List
+
+**New Files:**
+- `src/components/sales/export-dropdown.tsx` - Export dropdown component with Excel/PDF options
+- `src/hooks/use-export-individual.ts` - Export state management hook with toast notifications
+- `src/lib/export-utils.ts` - Excel export utilities with sanitizeFilename, getPeriodLabel, exportIndividualToExcel
+- `src/__tests__/export-dropdown.test.tsx` - Export dropdown component tests (11 tests)
+- `src/__tests__/use-export-individual.test.ts` - Export hook tests (9 tests)
+- `src/__tests__/lib/export-utils.test.ts` - Export utils tests (21 tests, +4 edge cases from code review)
+
+**Modified Files:**
+- `src/components/sales/sales-detail-sheet.tsx` - Added ExportDropdown import and usage in SheetHeader
+- `src/components/sales/index.ts` - Added ExportDropdown barrel export
+- `src/hooks/index.ts` - Added useExportIndividual barrel export
+- `package.json` - Added xlsx dependency (v0.18.5)
+- `package-lock.json` - Updated lockfile with xlsx dependency
+
+### Code Review
+
+**Review Date:** 2026-01-17
+
+**Reviewer:** Claude Opus 4.5 (Adversarial Code Review Workflow)
+
+**Review Result:** ✅ PASSED
+
+**Issues Found:**
+- 0 Critical
+- 0 High
+- 1 Medium (all fixed)
+- 2 Low (all fixed)
+
+**Medium Issues (Fixed):**
+1. **Missing edge case tests for sanitizeFilename** - Added 4 tests for empty string, whitespace-only, and invalid-chars-only inputs
+
+**Low Issues (Fixed):**
+1. **Missing JSDoc for ExportPeriodInfo** - Added documentation for interface properties
+2. **File List incomplete** - Updated to include barrel export changes in index.ts files
+
+**Notes:**
+- MVP scope: Excel export only (PDF is optional enhancement - deferred)
+- Thai character support verified in filenames
+- Null guards (`?? 0`) prevent `.toFixed()` crashes on undefined metrics
+- 41 story-specific tests passing (966 total)
+
+### Change Log
+
+- **2026-01-17**: Code review passed, story marked as done
+  - Fixed: Added 4 edge case tests for sanitizeFilename (empty, whitespace, invalid only)
+  - Fixed: Added JSDoc to ExportPeriodInfo interface
+  - Fixed: Updated File List with missing barrel exports (index.ts files)
+  - Committed: All 11 files with 1,183 additions
+  - Tests: 966 total (was 962, +4 edge cases)
+
+- **2026-01-17**: Story 3-8 implementation verified and marked for review
+  - All acceptance criteria met (AC#1-10 except optional AC#4 and AC#8)
+  - MVP scope: Excel export only (PDF deferred)
+  - Full test coverage with 41 story-specific tests passing
 

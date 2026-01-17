@@ -106,7 +106,7 @@ development_status:
   4-2-pagination: done  # Code review passed 2026-01-17
   4-3-search: done  # Code review passed 2026-01-17
   4-4-filter-by-status: done  # Code review passed 2026-01-17
-  4-5-filter-by-owner: review  # Dev complete 2026-01-17, ready for code review
+  4-5-filter-by-owner: done  # Code review passed 2026-01-17
   4-6-filter-by-date: ready-for-dev  # Story created 2026-01-17
   4-7-sort-columns: ready-for-dev  # Story created 2026-01-17
   4-8-lead-detail-modal: ready-for-dev  # Story created 2026-01-17

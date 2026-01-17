@@ -218,6 +218,10 @@ export interface LeadItem {
   claimedAt: string | null;       // ISO 8601
   contactedAt: string | null;     // ISO 8601
   closedAt: string | null;        // ISO 8601
+  // Additional fields from Brevo Contact Attributes
+  leadSource: string | null;      // Lead source categorization
+  jobTitle: string | null;        // Contact's job title
+  city: string | null;            // Contact's city
 }
 
 /**

@@ -450,12 +450,30 @@ export async function getLeads(
     let allLeads = await getAllLeads();
 
     // Apply filters
+    // Story 4.4/4.5: Support multi-value status filter (comma-separated)
     if (status) {
-      allLeads = allLeads.filter((lead) => lead.status === status);
+      const statuses = status.split(',').map((s) => s.trim().toLowerCase());
+      allLeads = allLeads.filter((lead) => statuses.includes(lead.status));
     }
 
+    // Story 4.5: Support multi-value owner filter (comma-separated)
+    // Special value: 'unassigned' for leads without owner (salesOwnerId is null)
     if (owner) {
-      allLeads = allLeads.filter((lead) => lead.salesOwnerId === owner);
+      const ownerIds = owner.split(',').map((id) => id.trim());
+      const includeUnassigned = ownerIds.includes('unassigned');
+      const actualOwnerIds = ownerIds.filter((id) => id !== 'unassigned');
+
+      allLeads = allLeads.filter((lead) => {
+        // Check if lead matches "unassigned" condition
+        if (includeUnassigned && !lead.salesOwnerId) {
+          return true;
+        }
+        // Check if lead matches any of the owner IDs
+        if (actualOwnerIds.length > 0 && lead.salesOwnerId && actualOwnerIds.includes(lead.salesOwnerId)) {
+          return true;
+        }
+        return false;
+      });
     }
 
     if (campaign) {
@@ -548,6 +566,10 @@ export async function getLeads(
       claimedAt: null, // TODO: ต้องเพิ่ม column นี้ใน Google Sheets
       contactedAt: null,
       closedAt: lead.closedAt,
+      // Additional fields from Brevo Contact Attributes
+      leadSource: lead.leadSource || null,
+      jobTitle: lead.jobTitle || null,
+      city: lead.city || null,
     }));
 
     // Build available filters
@@ -1723,6 +1745,48 @@ export async function exportData(
     }
   } catch (error) {
     logger.error('exportData failed', { error });
+    next(error);
+  }
+}
+
+// ===========================================
+// Sales Team Endpoint
+// ===========================================
+
+/**
+ * GET /api/admin/sales-team
+ * ดึงรายชื่อ Sales Team ทั้งหมด
+ * ใช้สำหรับ Lead Filter by Owner dropdown
+ */
+export async function getSalesTeam(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    logger.info('getSalesTeam called', { user: req.user?.email });
+
+    const salesTeam = await sheetsService.getSalesTeamAll();
+
+    // Transform to frontend format
+    const teamMembers = salesTeam.map((member) => ({
+      id: member.lineUserId,
+      name: member.name,
+      email: member.email || null,
+    }));
+
+    const response: AdminApiResponse<{ team: typeof teamMembers }> = {
+      success: true,
+      data: {
+        team: teamMembers,
+      },
+    };
+
+    logger.info('getSalesTeam completed', { count: teamMembers.length });
+
+    res.status(200).json(response);
+  } catch (error) {
+    logger.error('getSalesTeam failed', { error });
     next(error);
   }
 }

@@ -105,13 +105,17 @@ development_status:
   4-1-lead-list-table: done  # Code review passed 2026-01-17
   4-2-pagination: done  # Code review passed 2026-01-17
   4-3-search: done  # Code review passed 2026-01-17
-  4-4-filter-by-status: ready-for-dev  # Story created 2026-01-17
-  4-5-filter-by-owner: ready-for-dev  # Story created 2026-01-17
+  4-4-filter-by-status: done  # Code review passed 2026-01-17
+  4-5-filter-by-owner: review  # Dev complete 2026-01-17, ready for code review
   4-6-filter-by-date: ready-for-dev  # Story created 2026-01-17
   4-7-sort-columns: ready-for-dev  # Story created 2026-01-17
   4-8-lead-detail-modal: ready-for-dev  # Story created 2026-01-17
-  4-9-bulk-select: backlog
-  4-10-quick-export: backlog
+  4-9-bulk-select: ready-for-dev  # Story created 2026-01-17
+  4-10-quick-export: ready-for-dev  # Story created 2026-01-17
+  4-11-additional-columns: ready-for-dev  # Should Have - รวม F-04.11/12/13: leadSource, jobTitle, city columns (Story created 2026-01-17)
+  4-12-job-title-column: merged           # Merged into 4-11-additional-columns
+  4-13-city-column: merged                # Merged into 4-11-additional-columns
+  4-14-filter-by-lead-source: ready-for-dev  # Could Have - กรองตาม Lead Source (Story created 2026-01-17)
   epic-4-retrospective: optional
 
   # ============================================================

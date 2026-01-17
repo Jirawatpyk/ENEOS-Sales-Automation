@@ -283,6 +283,10 @@ eneos-sales-automation/src/
 | F-04.8 | Lead Detail Modal | Should Have | ดูรายละเอียด Lead |
 | F-04.9 | Bulk Select | Could Have | เลือกหลายรายการ |
 | F-04.10 | Quick Export | Could Have | Export รายการที่เลือก |
+| F-04.11 | Lead Source Column | Should Have | แสดง leadSource ใน table |
+| F-04.12 | Job Title Column | Should Have | แสดง jobTitle ใน table |
+| F-04.13 | City Column | Should Have | แสดง city ใน table |
+| F-04.14 | Filter by Lead Source | Could Have | กรองตาม Lead Source |
 
 ### Acceptance Criteria
 - [ ] แสดง Lead ทั้งหมดจาก Leads sheet
@@ -290,6 +294,8 @@ eneos-sales-automation/src/
 - [ ] Filter หลายตัวทำงานร่วมกันได้
 - [ ] Pagination ทำงานถูกต้อง
 - [ ] Lead Detail แสดงข้อมูลครบทุก field
+- [ ] Lead Detail แสดง leadSource, jobTitle, city
+- [ ] Table สามารถเลือกแสดง/ซ่อน columns ได้
 
 ### Dependencies
 - Backend API: GET /api/admin/leads

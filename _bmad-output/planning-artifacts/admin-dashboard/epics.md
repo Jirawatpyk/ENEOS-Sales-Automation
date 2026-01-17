@@ -283,6 +283,10 @@ eneos-sales-automation/src/
 | F-04.8 | Lead Detail Modal | Should Have | ดูรายละเอียด Lead |
 | F-04.9 | Bulk Select | Could Have | เลือกหลายรายการ |
 | F-04.10 | Quick Export | Could Have | Export รายการที่เลือก |
+| F-04.11 | Lead Source Column | Should Have | แสดง leadSource ใน table |
+| F-04.12 | Job Title Column | Should Have | แสดง jobTitle ใน table |
+| F-04.13 | City Column | Should Have | แสดง city ใน table |
+| F-04.14 | Filter by Lead Source | Could Have | กรองตาม Lead Source |
 
 ### Acceptance Criteria
 - [ ] แสดง Lead ทั้งหมดจาก Leads sheet
@@ -290,6 +294,8 @@ eneos-sales-automation/src/
 - [ ] Filter หลายตัวทำงานร่วมกันได้
 - [ ] Pagination ทำงานถูกต้อง
 - [ ] Lead Detail แสดงข้อมูลครบทุก field
+- [ ] Lead Detail แสดง leadSource, jobTitle, city
+- [ ] Table สามารถเลือกแสดง/ซ่อน columns ได้
 
 ### Dependencies
 - Backend API: GET /api/admin/leads
@@ -383,8 +389,9 @@ eneos-sales-automation/src/
 
 ### Business Value
 - ปรับแต่งระบบตามความต้องการ
-- จัดการผู้ใช้งาน
+- จัดการผู้ใช้งาน (Sales Team)
 - Monitor ระบบ
+- **Migration-Ready**: รองรับการย้ายไป Database ในอนาคต
 
 ### Features
 | ID | Feature | Priority | Description |
@@ -392,21 +399,103 @@ eneos-sales-automation/src/
 | F-07.1 | User Profile | Must Have | แสดงข้อมูลผู้ใช้ที่ Login |
 | F-07.2 | Theme Toggle | Could Have | Light/Dark mode |
 | F-07.3 | Notification Settings | Could Have | ตั้งค่าการแจ้งเตือน |
-| F-07.4 | Admin User Management | Could Have | จัดการ Admin users |
+| F-07.4 | Sales Team Management | Should Have | จัดการ Sales Team (ดู/แก้ไข email) |
 | F-07.5 | System Health | Could Have | แสดงสถานะระบบ |
 | F-07.6 | Audit Logs | Could Have | ประวัติการใช้งาน |
+
+### F-07.4: Sales Team Management (Detail)
+
+#### Current Behavior
+```
+Sales กด "รับงาน"
+        ↓
+┌─────────────────────────────────┐
+│ Leads Sheet (UPDATE) ✅ ทำอยู่แล้ว │
+│ • Sales_Owner_ID    ✅          │
+│ • Sales_Owner_Name  ✅          │
+└─────────────────────────────────┘
+        ↓
+┌─────────────────────────────────┐
+│ Sales_Team Sheet ❌              │
+│ • ไม่มีการเพิ่มอัตโนมัติ          │
+│ • ต้อง copy ไปใส่เอง manually    │
+└─────────────────────────────────┘
+```
+
+#### Pain Points (Current Manual Process)
+| # | Pain Point | Impact |
+|---|------------|--------|
+| 1 | ข้อมูลมีใน Leads แล้ว แต่ต้อง copy ไป Sales_Team เอง | Admin burden |
+| 2 | ถ้าลืมเพิ่ม → Sales ไม่โชว์ใน Owner dropdown | Filter incomplete |
+| 3 | อนาคตใช้ Database → ใส่เองไม่ได้ | Migration blocker |
+| 4 | ไม่มี audit trail ว่า Sales คนไหนเข้ามาเมื่อไหร่ | Tracking gap |
+
+#### Solution: Auto-Register Flow (Epic 7)
+```
+Sales กด "รับงาน"
+        │
+        ├──→ Leads Sheet: UPDATE (เหมือนเดิม ✅)
+        │    • Sales_Owner_ID
+        │    • Sales_Owner_Name
+        │
+        └──→ Sales_Team Sheet: INSERT IF NOT EXISTS (NEW ⭐)
+             • LINE_User_ID = Sales_Owner_ID
+             • Name = Sales_Owner_Name (มีอยู่แล้วจาก LINE Profile)
+             • Email = null (Admin ใส่ทีหลังใน Dashboard)
+             • Phone = null
+             • Created_At = timestamp
+
+        ↓
+[ภายหลัง] Admin เพิ่ม Email ใน Dashboard
+        ↓
+Sales login Admin Dashboard ได้ ✅
+```
+
+#### Backend Changes Required
+```typescript
+// src/controllers/line.controller.ts - handlePostback()
+
+// ปัจจุบัน (เหมือนเดิม):
+await updateLeadStatus(row, {
+  salesOwnerId: lineUserId,
+  salesOwnerName: displayName,  // จาก LINE Profile
+});
+
+// เพิ่มใหม่ (Epic 7):
+const existsInTeam = await getSalesTeamMember(lineUserId);
+if (!existsInTeam) {
+  await addSalesTeamMember({
+    lineUserId,
+    name: displayName,  // ใช้ชื่อเดียวกับที่ลง Leads
+    email: null,        // Admin fills later via Dashboard
+    phone: null,
+    createdAt: new Date().toISOString(),
+  });
+}
+```
+
+#### Admin Dashboard UI (F-07.4)
+- View Sales Team list (name, LINE ID, email, status)
+- Edit Sales member (add/update email, phone)
+- Deactivate Sales member (soft delete)
+- Filter: Active / Inactive / All
 
 ### Acceptance Criteria
 - [ ] แสดงชื่อและ email ของผู้ใช้
 - [ ] Theme toggle ทำงานได้ (ถ้ามี)
 - [ ] Settings บันทึกใน localStorage
+- [ ] **Sales Team auto-register เมื่อกดรับงานครั้งแรก**
+- [ ] **Admin สามารถเพิ่ม email ให้ Sales ได้**
+- [ ] **Sales ที่มี email สามารถ login Dashboard ได้**
 
 ### Dependencies
 - NextAuth.js session
 - Local storage
+- LINE Messaging API (getProfile)
+- Backend: sheets.service.ts (or future repository pattern)
 
 ### Estimated Effort
-**2 days**
+**4 days** (increased from 2 days due to auto-register feature)
 
 ---
 
@@ -421,8 +510,8 @@ eneos-sales-automation/src/
 | EPIC-04: Lead Management | P1 | 4 days | Not Started | - |
 | EPIC-05: Campaign Analytics | P2 | 4 days | Not Started | - |
 | EPIC-06: Export & Reports | P2 | 4 days | Not Started | - |
-| EPIC-07: System Settings | P3 | 2 days | Not Started | - |
-| **Total** | | **32 days** | **1/8 Complete (12.5%)** | |
+| EPIC-07: System Settings | P3 | 4 days | Not Started | - |
+| **Total** | | **34 days** | **1/8 Complete (12.5%)** | |
 
 ---
 

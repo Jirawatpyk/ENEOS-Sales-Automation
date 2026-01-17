@@ -1,6 +1,7 @@
 /**
  * ENEOS Sales Automation - Date Formatter Utility
- * Format dates for Google Sheets compatibility (Thai timezone)
+ * Format dates for Google Sheets in ISO 8601 format
+ * Supports parsing both legacy Thai format and ISO format
  */
 
 /**
@@ -26,9 +27,18 @@ export function formatDateForSheets(date: Date | string = new Date()): string {
 }
 
 /**
- * Get current time formatted for Google Sheets
+ * Get current time as ISO timestamp for Google Sheets
+ * @deprecated Use formatDateForSheets() or formatISOTimestamp() directly
  */
 export function getCurrentThaiTime(): string {
+  return formatDateForSheets(new Date());
+}
+
+/**
+ * Get current time as ISO timestamp
+ * Preferred over getCurrentThaiTime() after ISO migration
+ */
+export function getCurrentTimestamp(): string {
   return formatDateForSheets(new Date());
 }
 

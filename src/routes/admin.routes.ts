@@ -17,6 +17,7 @@ import {
   getCampaigns,
   getCampaignDetail,
   exportData,
+  getSalesTeam,
 } from '../controllers/admin.controller.js';
 import {
   adminAuthMiddleware,
@@ -138,6 +139,22 @@ router.get('/leads', requireViewer, asyncHandler(getLeads));
  * Access: viewer, manager, admin
  */
 router.get('/leads/:id', requireViewer, asyncHandler(getLeadById));
+
+// ===========================================
+// Sales Team Endpoints
+// ===========================================
+
+/**
+ * GET /api/admin/sales-team
+ * ดึงรายชื่อ Sales Team ทั้งหมด
+ * ใช้สำหรับ Lead Filter by Owner dropdown
+ *
+ * Response:
+ * - team: Array<{ id: string, name: string, email: string | null }>
+ *
+ * Access: viewer, manager, admin
+ */
+router.get('/sales-team', requireViewer, asyncHandler(getSalesTeam));
 
 // ===========================================
 // Sales Performance Endpoints

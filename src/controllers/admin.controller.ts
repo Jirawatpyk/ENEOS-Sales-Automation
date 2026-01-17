@@ -495,8 +495,12 @@ export async function getLeads(
     if (startDate || endDate) {
       allLeads = allLeads.filter((lead) => {
         const leadDateKey = extractDateKey(lead.date); // Returns YYYY-MM-DD
-        if (startDate && leadDateKey < startDate) return false;
-        if (endDate && leadDateKey > endDate) return false;
+        if (startDate && leadDateKey < startDate) {
+          return false;
+        }
+        if (endDate && leadDateKey > endDate) {
+          return false;
+        }
         return true;
       });
     }

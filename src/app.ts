@@ -180,7 +180,7 @@ app.get('/health', async (_req, res) => {
     const response = await getHealthCheckWithCache();
     const isHealthy = response.status === 'healthy';
     res.status(isHealthy ? 200 : 503).json(response);
-  } catch (error) {
+  } catch (_error) {
     // If health check fails completely, return error but don't crash
     res.status(503).json({
       status: 'unhealthy',

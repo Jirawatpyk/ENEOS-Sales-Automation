@@ -1,0 +1,91 @@
+/**
+ * Filter Helper Functions
+ * Handles lead filtering by various criteria
+ */
+
+import { PeriodInfo } from '../../../types/admin.types.js';
+import { LeadRow } from '../../../types/index.js';
+import { parseDateFromSheets } from '../../../utils/date-formatter.js';
+import { logger } from '../../../utils/logger.js';
+import { sheetsService } from '../../../services/sheets.service.js';
+
+/**
+ * กรอง leads ตาม period
+ */
+export function filterByPeriod(leads: LeadRow[], period: PeriodInfo): LeadRow[] {
+  const startTime = new Date(period.startDate).getTime();
+  const endTime = new Date(period.endDate).getTime();
+
+  return leads.filter((lead) => {
+    const leadTime = parseDateFromSheets(lead.date).getTime();
+    return leadTime >= startTime && leadTime <= endTime;
+  });
+}
+
+/**
+ * กรอง leads ตาม status (รองรับ comma-separated values)
+ */
+export function filterByStatus(leads: LeadRow[], status: string): LeadRow[] {
+  const statuses = status.split(',').map((s) => s.trim().toLowerCase());
+  return leads.filter((lead) => statuses.includes(lead.status));
+}
+
+/**
+ * กรอง leads ตาม owner (รองรับ comma-separated values และ 'unassigned')
+ */
+export function filterByOwner(leads: LeadRow[], owner: string): LeadRow[] {
+  const ownerIds = owner.split(',').map((id) => id.trim());
+  const includeUnassigned = ownerIds.includes('unassigned');
+  const actualOwnerIds = ownerIds.filter((id) => id !== 'unassigned');
+
+  return leads.filter((lead) => {
+    // Check if lead matches "unassigned" condition
+    if (includeUnassigned && !lead.salesOwnerId) {
+      return true;
+    }
+    // Check if lead matches any of the owner IDs
+    if (actualOwnerIds.length > 0 && lead.salesOwnerId && actualOwnerIds.includes(lead.salesOwnerId)) {
+      return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * กรอง leads ตาม campaign
+ */
+export function filterByCampaign(leads: LeadRow[], campaign: string): LeadRow[] {
+  return leads.filter((lead) => lead.campaignId === campaign);
+}
+
+/**
+ * กรอง leads ตาม search term (company, customerName, email)
+ */
+export function filterBySearch(leads: LeadRow[], search: string): LeadRow[] {
+  const searchLower = search.toLowerCase();
+  return leads.filter(
+    (lead) =>
+      lead.company.toLowerCase().includes(searchLower) ||
+      lead.customerName.toLowerCase().includes(searchLower) ||
+      lead.email.toLowerCase().includes(searchLower)
+  );
+}
+
+/**
+ * ดึง leads ทั้งหมดจาก Google Sheets
+ *
+ * @returns Array of leads, or empty array on error (fails gracefully)
+ * @note Returns empty array on error to prevent dashboard crash.
+ *       Error is logged for debugging. Check logs if dashboard shows empty data.
+ */
+export async function getAllLeads(): Promise<LeadRow[]> {
+  try {
+    return await sheetsService.getAllLeads();
+  } catch (error) {
+    logger.error('Failed to get all leads - dashboard will show empty data', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return [];
+  }
+}

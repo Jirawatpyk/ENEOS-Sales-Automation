@@ -307,6 +307,343 @@ describe('Admin Controller', () => {
       expect(response.data.summary.totalLeads).toBe(1);
       expect(response.data.summary.changes.totalLeads).toBe(-75); // (1-4)/4 * 100 = -75%
     });
+
+    it('should handle year crossover for monthly comparison (January → December previous year)', async () => {
+      // Mock the date to be January 15, 2026
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-15T12:00:00.000Z'));
+
+      const req = createMockRequest({ query: { period: 'month' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // January 2026 leads
+      const januaryLead = createSampleLead({
+        rowNumber: 2,
+        status: 'new',
+        date: '2026-01-10T10:00:00.000Z',
+      });
+      // December 2025 leads (previous year)
+      const decemberLeads = [
+        createSampleLead({ rowNumber: 3, status: 'new', date: '2025-12-05T10:00:00.000Z' }),
+        createSampleLead({ rowNumber: 4, status: 'new', date: '2025-12-15T10:00:00.000Z' }),
+        createSampleLead({ rowNumber: 5, status: 'new', date: '2025-12-25T10:00:00.000Z' }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue([januaryLead, ...decemberLeads]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // January has 1 lead, December (previous year) has 3 leads
+      expect(response.data.summary.totalLeads).toBe(1);
+      // Change = (1 - 3) / 3 * 100 = -66.67%
+      expect(response.data.summary.changes.totalLeads).toBeCloseTo(-66.67, 0);
+
+      vi.useRealTimers();
+    });
+
+    it('should handle year crossover for quarterly comparison (Q1 → Q4 previous year)', async () => {
+      // Mock the date to be February 15, 2026 (Q1)
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-02-15T12:00:00.000Z'));
+
+      const req = createMockRequest({ query: { period: 'quarter' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // Q1 2026 leads (Jan-Mar)
+      const q1Leads = [
+        createSampleLead({ rowNumber: 2, status: 'new', date: '2026-01-10T10:00:00.000Z' }),
+        createSampleLead({ rowNumber: 3, status: 'closed', date: '2026-02-10T10:00:00.000Z', closedAt: '2026-02-10T10:00:00.000Z', salesOwnerId: 's1', salesOwnerName: 'Test' }),
+      ];
+      // Q4 2025 leads (Oct-Dec, previous year)
+      const q4Leads = [
+        createSampleLead({ rowNumber: 4, status: 'new', date: '2025-10-05T10:00:00.000Z' }),
+        createSampleLead({ rowNumber: 5, status: 'new', date: '2025-11-15T10:00:00.000Z' }),
+        createSampleLead({ rowNumber: 6, status: 'new', date: '2025-12-25T10:00:00.000Z' }),
+        createSampleLead({ rowNumber: 7, status: 'closed', date: '2025-12-20T10:00:00.000Z', closedAt: '2025-12-20T10:00:00.000Z', salesOwnerId: 's2', salesOwnerName: 'Test2' }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue([...q1Leads, ...q4Leads]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // Q1 has 2 leads, Q4 (previous year) has 4 leads
+      expect(response.data.summary.totalLeads).toBe(2);
+      // Change = (2 - 4) / 4 * 100 = -50%
+      expect(response.data.summary.changes.totalLeads).toBe(-50);
+
+      vi.useRealTimers();
+    });
+
+    it('should handle first day of year comparison (Jan 1 today → Dec 31 yesterday)', async () => {
+      // Mock the date to be January 1, 2026
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T12:00:00.000Z'));
+
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // January 1, 2026 lead
+      const todayLead = createSampleLead({
+        rowNumber: 2,
+        status: 'new',
+        date: '2026-01-01T10:00:00.000Z',
+      });
+      // December 31, 2025 leads
+      const yesterdayLeads = [
+        createSampleLead({ rowNumber: 3, status: 'new', date: '2025-12-31T10:00:00.000Z' }),
+        createSampleLead({ rowNumber: 4, status: 'new', date: '2025-12-31T15:00:00.000Z' }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue([todayLead, ...yesterdayLeads]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // Today (Jan 1) has 1 lead, Yesterday (Dec 31 previous year) has 2 leads
+      expect(response.data.summary.totalLeads).toBe(1);
+      // Change = (1 - 2) / 2 * 100 = -50%
+      expect(response.data.summary.changes.totalLeads).toBe(-50);
+
+      vi.useRealTimers();
+    });
+  });
+
+  // ===========================================
+  // Activity Timestamp Selection (getActivityTimestamp helper)
+  // ===========================================
+  describe('Activity Timestamp Selection', () => {
+    it('should use closedAt for closed status in recentActivity', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const closedTime = '2026-01-18T10:00:00.000Z';
+      const contactedTime = '2026-01-17T09:00:00.000Z';
+      const dateTime = '2026-01-16T08:00:00.000Z';
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          status: 'closed',
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'สมชาย',
+          closedAt: closedTime,
+          contactedAt: contactedTime,
+          date: dateTime,
+        }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.recentActivity[0].timestamp).toBe(closedTime);
+    });
+
+    it('should use lostAt for lost status in recentActivity', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lostTime = '2026-01-18T11:00:00.000Z';
+      const contactedTime = '2026-01-17T09:00:00.000Z';
+      const dateTime = '2026-01-16T08:00:00.000Z';
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          status: 'lost',
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'สมชาย',
+          lostAt: lostTime,
+          contactedAt: contactedTime,
+          date: dateTime,
+        }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.recentActivity[0].timestamp).toBe(lostTime);
+    });
+
+    it('should use unreachableAt for unreachable status in recentActivity', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const unreachableTime = '2026-01-18T12:00:00.000Z';
+      const contactedTime = '2026-01-17T09:00:00.000Z';
+      const dateTime = '2026-01-16T08:00:00.000Z';
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          status: 'unreachable',
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'สมชาย',
+          unreachableAt: unreachableTime,
+          contactedAt: contactedTime,
+          date: dateTime,
+        }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.recentActivity[0].timestamp).toBe(unreachableTime);
+    });
+
+    it('should use contactedAt for contacted status in recentActivity', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const contactedTime = '2026-01-17T09:00:00.000Z';
+      const dateTime = '2026-01-16T08:00:00.000Z';
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          status: 'contacted',
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'สมชาย',
+          contactedAt: contactedTime,
+          date: dateTime,
+        }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.recentActivity[0].timestamp).toBe(contactedTime);
+    });
+
+    it('should use date for new status in recentActivity', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const dateTime = '2026-01-16T08:00:00.000Z';
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          status: 'new',
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'สมชาย',
+          date: dateTime,
+        }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.recentActivity[0].timestamp).toBe(dateTime);
+    });
+
+    it('should fallback to contactedAt when closedAt is null for closed status', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const contactedTime = '2026-01-17T09:00:00.000Z';
+      const dateTime = '2026-01-16T08:00:00.000Z';
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          status: 'closed',
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'สมชาย',
+          closedAt: '', // Empty - should fallback
+          contactedAt: contactedTime,
+          date: dateTime,
+        }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.recentActivity[0].timestamp).toBe(contactedTime);
+    });
+
+    it('should fallback to date when both closedAt and contactedAt are null', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const dateTime = '2026-01-16T08:00:00.000Z';
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          status: 'closed',
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'สมชาย',
+          closedAt: '',
+          contactedAt: '',
+          date: dateTime,
+        }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.recentActivity[0].timestamp).toBe(dateTime);
+    });
+
+    it('should sort recentActivity by the correct timestamp for each status', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // Closed lead with newest closedAt should appear first
+      const closedTime = '2026-01-18T12:00:00.000Z';
+      const contactedTime = '2026-01-18T10:00:00.000Z';
+      const lostTime = '2026-01-18T08:00:00.000Z';
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          status: 'contacted',
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'สมชาย',
+          contactedAt: contactedTime,
+          date: '2026-01-15T00:00:00.000Z',
+        }),
+        createSampleLead({
+          rowNumber: 3,
+          status: 'closed',
+          salesOwnerId: 'sales-002',
+          salesOwnerName: 'สมหญิง',
+          closedAt: closedTime,
+          contactedAt: '2026-01-16T00:00:00.000Z',
+          date: '2026-01-14T00:00:00.000Z',
+        }),
+        createSampleLead({
+          rowNumber: 4,
+          status: 'lost',
+          salesOwnerId: 'sales-003',
+          salesOwnerName: 'สมปอง',
+          lostAt: lostTime,
+          contactedAt: '2026-01-17T00:00:00.000Z',
+          date: '2026-01-13T00:00:00.000Z',
+        }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // Should be sorted: closed (12:00) > contacted (10:00) > lost (08:00)
+      expect(response.data.recentActivity[0].timestamp).toBe(closedTime);
+      expect(response.data.recentActivity[1].timestamp).toBe(contactedTime);
+      expect(response.data.recentActivity[2].timestamp).toBe(lostTime);
+    });
   });
 
   // ===========================================

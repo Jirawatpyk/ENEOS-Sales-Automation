@@ -939,6 +939,86 @@ describe('SheetsService', () => {
 
       addStatusHistorySpy.mockRestore();
     });
+
+    it('claimLead should succeed even when addStatusHistory fails (fire-and-forget)', async () => {
+      // Mock lead with UUID for history recording
+      const leadWithUUID = {
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 26),
+              'lead_test123',
+              '', // createdAt
+              '', // updatedAt
+              '', // contactedAt
+            ],
+          ],
+        },
+      };
+      mockSheets.spreadsheets.values.get.mockResolvedValue(leadWithUUID);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+      // Make status history append fail
+      mockSheets.spreadsheets.values.append.mockRejectedValue(new Error('History write failed'));
+
+      // claimLead should still succeed
+      const result = await service.claimLead(42, 'U123', 'John Doe', 'contacted');
+
+      expect(result.success).toBe(true);
+      expect(result.lead).toBeDefined();
+      // The update to the lead should still have happened
+      expect(mockSheets.spreadsheets.values.update).toHaveBeenCalled();
+    });
+
+    it('updateLeadStatus should succeed even when addStatusHistory fails (fire-and-forget)', async () => {
+      // Mock lead with owner and UUID
+      const ownedLeadWithUUID = {
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 9),
+              'U123', // Sales_Owner_ID
+              'John Doe', // Sales_Owner_Name
+              ...mockSheetsGetResponse.data.values[0].slice(11, 26),
+              'lead_test456',
+              '', // createdAt
+              '', // updatedAt
+              '', // contactedAt
+            ],
+          ],
+        },
+      };
+      mockSheets.spreadsheets.values.get.mockResolvedValue(ownedLeadWithUUID);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+      // Make status history append fail
+      mockSheets.spreadsheets.values.append.mockRejectedValue(new Error('History write failed'));
+
+      // updateLeadStatus should still succeed (returns LeadRow directly)
+      const lead = await service.updateLeadStatus(42, 'U123', 'closed');
+
+      expect(lead).toBeDefined();
+      expect(lead.status).toBe('closed');
+      // The update to the lead should still have happened
+      expect(mockSheets.spreadsheets.values.update).toHaveBeenCalled();
+    });
+
+    it('addLead should succeed even when status history append fails (fire-and-forget)', async () => {
+      // First append succeeds (lead creation)
+      // Second append fails (status history)
+      mockSheets.spreadsheets.values.append
+        .mockResolvedValueOnce(mockSheetsAppendResponse) // Lead append succeeds
+        .mockRejectedValueOnce(new Error('Status history write failed')); // History append fails
+
+      // addLead should still succeed (returns rowNumber)
+      const rowNumber = await service.addLead({
+        email: 'test@example.com',
+        company: 'Test Company',
+        customerName: 'Test User',
+      });
+
+      expect(rowNumber).toBe(42); // From mockSheetsAppendResponse
+      // Lead was created successfully despite status history failure
+      expect(mockSheets.spreadsheets.values.append).toHaveBeenCalledTimes(2);
+    });
   });
 
   // ===========================================

@@ -394,16 +394,7 @@ export class SheetsService {
     const updatedLead = await this.updateLeadWithLock(rowNumber, updates);
 
     // Fire-and-forget: Record status change in history (using UUID for Supabase compatibility)
-    // Use updatedLead.leadUUID because updateLeadWithLock generates UUID for legacy leads
-    logger.info('claimLead: checking leadUUID for status history', {
-      rowNumber,
-      leadUUID: updatedLead.leadUUID,
-      status,
-      hasUUID: !!updatedLead.leadUUID
-    });
-
     if (updatedLead.leadUUID) {
-      logger.info('claimLead: calling addStatusHistory', { leadUUID: updatedLead.leadUUID, status });
       this.addStatusHistory({
         leadUUID: updatedLead.leadUUID,
         status,
@@ -413,8 +404,6 @@ export class SheetsService {
       }).catch((err) => {
         logger.error('Failed to record status history for claimLead', { leadUUID: updatedLead.leadUUID, status, error: err });
       });
-    } else {
-      logger.warn('claimLead: skipping status history - no leadUUID', { rowNumber, status });
     }
 
     return {

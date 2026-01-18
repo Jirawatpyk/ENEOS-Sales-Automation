@@ -371,18 +371,22 @@ export class SheetsService {
     };
 
     // Set appropriate timestamp and clear others (only one status at a time)
+    // BUG FIX: Always set contactedAt when claiming a lead (needed for Closing Time calculation)
     switch (status) {
       case 'closed':
+        updates.contactedAt = currentLead.contactedAt || now; // Preserve existing or set new
         updates.closedAt = now;
         updates.lostAt = '';
         updates.unreachableAt = '';
         break;
       case 'lost':
+        updates.contactedAt = currentLead.contactedAt || now; // Preserve existing or set new
         updates.closedAt = '';
         updates.lostAt = now;
         updates.unreachableAt = '';
         break;
       case 'unreachable':
+        updates.contactedAt = currentLead.contactedAt || now; // Preserve existing or set new
         updates.closedAt = '';
         updates.lostAt = '';
         updates.unreachableAt = now;
@@ -444,6 +448,12 @@ export class SheetsService {
 
     const now = formatDateForSheets();
     const updates: Partial<Lead> = { status: newStatus };
+
+    // BUG FIX: Ensure contactedAt is set for Closing Time calculation
+    // This handles legacy leads that were claimed before contactedAt column was added
+    if (!currentLead.contactedAt && (newStatus === 'closed' || newStatus === 'lost' || newStatus === 'unreachable')) {
+      updates.contactedAt = now;
+    }
 
     switch (newStatus) {
       case 'closed':

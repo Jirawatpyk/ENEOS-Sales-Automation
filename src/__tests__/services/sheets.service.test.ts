@@ -329,6 +329,78 @@ describe('SheetsService', () => {
       expect(mockSheets.spreadsheets.values.update).toHaveBeenCalled();
     });
 
+    // BUG FIX: Ensure contactedAt is set for Closing Time calculation
+    it('should set contactedAt when claiming with closed status (for Closing Time)', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue(mockSheetsGetResponse);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+
+      await service.claimLead(42, 'U123', 'John', 'closed');
+
+      const updateCall = mockSheets.spreadsheets.values.update.mock.calls[0][0];
+      const rowData = updateCall.requestBody.values[0];
+
+      // contactedAt is at index 29 (column AD)
+      expect(rowData[29]).toBeTruthy(); // contactedAt should be set
+      // closedAt is at index 19 (column T)
+      expect(rowData[19]).toBeTruthy(); // closedAt should be set
+      expect(rowData[8]).toBe('closed'); // status should be 'closed'
+    });
+
+    it('should set contactedAt when claiming with lost status (for Closing Time)', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue(mockSheetsGetResponse);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+
+      await service.claimLead(42, 'U123', 'John', 'lost');
+
+      const updateCall = mockSheets.spreadsheets.values.update.mock.calls[0][0];
+      const rowData = updateCall.requestBody.values[0];
+
+      // contactedAt is at index 29 (column AD)
+      expect(rowData[29]).toBeTruthy(); // contactedAt should be set
+      // lostAt is at index 20 (column U)
+      expect(rowData[20]).toBeTruthy(); // lostAt should be set
+      expect(rowData[8]).toBe('lost'); // status should be 'lost'
+    });
+
+    it('should set contactedAt when claiming with unreachable status (for Closing Time)', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue(mockSheetsGetResponse);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+
+      await service.claimLead(42, 'U123', 'John', 'unreachable');
+
+      const updateCall = mockSheets.spreadsheets.values.update.mock.calls[0][0];
+      const rowData = updateCall.requestBody.values[0];
+
+      // contactedAt is at index 29 (column AD)
+      expect(rowData[29]).toBeTruthy(); // contactedAt should be set
+      // unreachableAt is at index 21 (column V)
+      expect(rowData[21]).toBeTruthy(); // unreachableAt should be set
+      expect(rowData[8]).toBe('unreachable'); // status should be 'unreachable'
+    });
+
+    it('should preserve existing contactedAt when claiming with closed status', async () => {
+      const existingContactedAt = '2026-01-15T10:00:00.000Z';
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 29),
+              existingContactedAt, // Existing contactedAt
+            ],
+          ],
+        },
+      });
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+
+      await service.claimLead(42, 'U123', 'John', 'closed');
+
+      const updateCall = mockSheets.spreadsheets.values.update.mock.calls[0][0];
+      const rowData = updateCall.requestBody.values[0];
+
+      // contactedAt should preserve existing value
+      expect(rowData[29]).toBe(existingContactedAt);
+    });
+
     it('should throw RaceConditionError when version changes between read and write (concurrent claim)', async () => {
       // Simulate race condition: another user claims the lead between getRow and updateLeadWithLock
       // First getRow (in claimLead) returns version 1
@@ -1018,6 +1090,324 @@ describe('SheetsService', () => {
       expect(rowNumber).toBe(42); // From mockSheetsAppendResponse
       // Lead was created successfully despite status history failure
       expect(mockSheets.spreadsheets.values.append).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ===========================================
+  // getSalesTeamAll
+  // ===========================================
+
+  describe('getSalesTeamAll', () => {
+    it('should return all sales team members', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U123', 'John Doe', 'john@example.com', '0812345678', 'admin'],
+            ['U456', 'Jane Smith', 'jane@example.com', '0898765432', 'sales'],
+            ['U789', 'Bob Wilson', 'bob@example.com', '0823456789'],
+          ],
+        },
+      });
+
+      const members = await service.getSalesTeamAll();
+
+      expect(members).toHaveLength(3);
+      expect(members[0]).toEqual({
+        lineUserId: 'U123',
+        name: 'John Doe',
+        email: 'john@example.com',
+        phone: '0812345678',
+        role: 'admin',
+      });
+      expect(members[1]).toEqual({
+        lineUserId: 'U456',
+        name: 'Jane Smith',
+        email: 'jane@example.com',
+        phone: '0898765432',
+        role: 'sales',
+      });
+      // Default role should be 'sales' if not specified
+      expect(members[2].role).toBe('sales');
+    });
+
+    it('should return empty array when no members', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [] },
+      });
+
+      const members = await service.getSalesTeamAll();
+
+      expect(members).toEqual([]);
+    });
+
+    it('should filter out rows without LINE User ID', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U123', 'John Doe', 'john@example.com', '0812345678', 'admin'],
+            ['', 'Empty Row', '', ''],  // Should be filtered out
+            ['U456', 'Jane Smith', 'jane@example.com', '0898765432', 'sales'],
+          ],
+        },
+      });
+
+      const members = await service.getSalesTeamAll();
+
+      expect(members).toHaveLength(2);
+      expect(members[0].lineUserId).toBe('U123');
+      expect(members[1].lineUserId).toBe('U456');
+    });
+
+    it('should handle undefined values array', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {},
+      });
+
+      const members = await service.getSalesTeamAll();
+
+      expect(members).toEqual([]);
+    });
+
+    it('should handle missing email and phone', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U123', 'John Doe'],  // Only ID and name
+          ],
+        },
+      });
+
+      const members = await service.getSalesTeamAll();
+
+      expect(members[0]).toEqual({
+        lineUserId: 'U123',
+        name: 'John Doe',
+        email: undefined,
+        phone: undefined,
+        role: 'sales',  // Default role
+      });
+    });
+  });
+
+  // ===========================================
+  // getUserByEmail
+  // ===========================================
+
+  describe('getUserByEmail', () => {
+    it('should return user when email found', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U123', 'John Doe', 'john@example.com', '0812345678', 'admin'],
+            ['U456', 'Jane Smith', 'jane@example.com', '0898765432', 'sales'],
+          ],
+        },
+      });
+
+      const user = await service.getUserByEmail('john@example.com');
+
+      expect(user).not.toBeNull();
+      expect(user?.lineUserId).toBe('U123');
+      expect(user?.name).toBe('John Doe');
+      expect(user?.email).toBe('john@example.com');
+      expect(user?.phone).toBe('0812345678');
+      expect(user?.role).toBe('admin');
+    });
+
+    it('should find email case-insensitively', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U123', 'John Doe', 'John@Example.COM', '0812345678', 'admin'],
+          ],
+        },
+      });
+
+      const user = await service.getUserByEmail('john@example.com');
+
+      expect(user).not.toBeNull();
+      expect(user?.email).toBe('John@Example.COM');
+    });
+
+    it('should return null when email not found', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U456', 'Jane Smith', 'jane@example.com', '0898765432', 'sales'],
+          ],
+        },
+      });
+
+      const user = await service.getUserByEmail('notfound@example.com');
+
+      expect(user).toBeNull();
+    });
+
+    it('should return null when sheet is empty', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [] },
+      });
+
+      const user = await service.getUserByEmail('john@example.com');
+
+      expect(user).toBeNull();
+    });
+
+    it('should return null when values is undefined', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {},
+      });
+
+      const user = await service.getUserByEmail('john@example.com');
+
+      expect(user).toBeNull();
+    });
+
+    it('should use default role "sales" when role is not specified', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U123', 'John Doe', 'john@example.com', '0812345678'],  // No role column
+          ],
+        },
+      });
+
+      const user = await service.getUserByEmail('john@example.com');
+
+      expect(user).not.toBeNull();
+      expect(user?.role).toBe('sales');
+    });
+
+    it('should skip rows without email', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U123', 'No Email User'],  // No email
+            ['U456', 'Jane Smith', 'jane@example.com', '0898765432', 'sales'],
+          ],
+        },
+      });
+
+      const user = await service.getUserByEmail('jane@example.com');
+
+      expect(user).not.toBeNull();
+      expect(user?.lineUserId).toBe('U456');
+    });
+  });
+
+  // ===========================================
+  // getLeadsCountByStatus
+  // ===========================================
+
+  describe('getLeadsCountByStatus', () => {
+    it('should return count for each status', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['2026-01-18', 'Customer1', 'email1@test.com', '', 'Company1', '', '', '', 'new'],
+            ['2026-01-18', 'Customer2', 'email2@test.com', '', 'Company2', '', '', '', 'contacted'],
+            ['2026-01-18', 'Customer3', 'email3@test.com', '', 'Company3', '', '', '', 'contacted'],
+            ['2026-01-18', 'Customer4', 'email4@test.com', '', 'Company4', '', '', '', 'closed'],
+            ['2026-01-18', 'Customer5', 'email5@test.com', '', 'Company5', '', '', '', 'lost'],
+            ['2026-01-18', 'Customer6', 'email6@test.com', '', 'Company6', '', '', '', 'unreachable'],
+          ],
+        },
+      });
+
+      const counts = await service.getLeadsCountByStatus();
+
+      expect(counts).toEqual({
+        new: 1,
+        claimed: 0,
+        contacted: 2,
+        closed: 1,
+        lost: 1,
+        unreachable: 1,
+      });
+    });
+
+    it('should return all zeros when sheet is empty', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [] },
+      });
+
+      const counts = await service.getLeadsCountByStatus();
+
+      expect(counts).toEqual({
+        new: 0,
+        claimed: 0,
+        contacted: 0,
+        closed: 0,
+        lost: 0,
+        unreachable: 0,
+      });
+    });
+
+    it('should treat missing status as "new"', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['2026-01-18', 'Customer1', 'email1@test.com', '', 'Company1', '', '', ''],  // Status column missing
+            ['2026-01-18', 'Customer2', 'email2@test.com', '', 'Company2', '', '', '', 'contacted'],
+          ],
+        },
+      });
+
+      const counts = await service.getLeadsCountByStatus();
+
+      expect(counts.new).toBe(1);
+      expect(counts.contacted).toBe(1);
+    });
+
+    it('should ignore invalid status values', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['2026-01-18', 'Customer1', 'email1@test.com', '', 'Company1', '', '', '', 'invalid_status'],
+            ['2026-01-18', 'Customer2', 'email2@test.com', '', 'Company2', '', '', '', 'contacted'],
+          ],
+        },
+      });
+
+      const counts = await service.getLeadsCountByStatus();
+
+      // 'invalid_status' should be ignored (not counted)
+      expect(counts.contacted).toBe(1);
+      expect(counts.new).toBe(0);  // Not treated as 'new' because status column exists
+    });
+
+    it('should handle undefined values array', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {},
+      });
+
+      const counts = await service.getLeadsCountByStatus();
+
+      expect(counts).toEqual({
+        new: 0,
+        claimed: 0,
+        contacted: 0,
+        closed: 0,
+        lost: 0,
+        unreachable: 0,
+      });
+    });
+
+    it('should count claimed status separately', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['2026-01-18', 'Customer1', 'email1@test.com', '', 'Company1', '', '', '', 'claimed'],
+            ['2026-01-18', 'Customer2', 'email2@test.com', '', 'Company2', '', '', '', 'claimed'],
+            ['2026-01-18', 'Customer3', 'email3@test.com', '', 'Company3', '', '', '', 'new'],
+          ],
+        },
+      });
+
+      const counts = await service.getLeadsCountByStatus();
+
+      expect(counts.claimed).toBe(2);
+      expect(counts.new).toBe(1);
     });
   });
 

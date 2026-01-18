@@ -47,6 +47,7 @@ const circuitBreaker = new CircuitBreaker(5, 60000);
  * S: talkingPoint, T: closedAt, U: lostAt, V: unreachableAt, W: version
  * X: leadSource, Y: jobTitle, Z: city
  * AA: leadUUID, AB: createdAt, AC: updatedAt (UUID Migration columns)
+ * AD: contactedAt (when sales claimed the lead)
  */
 
 
@@ -105,6 +106,8 @@ function rowToLead(row: string[], rowNumber: number): LeadRow {
     leadUUID: row[26] || null,
     createdAt: row[27] || null,
     updatedAt: row[28] || null,
+    // Contacted timestamp (column AD)
+    contactedAt: row[29] || null,
   };
 }
 
@@ -141,6 +144,8 @@ function leadToRow(lead: Partial<Lead>, version: number = 1): string[] {
     lead.leadUUID || '',
     lead.createdAt || '',
     lead.updatedAt || '',
+    // Contacted timestamp (column AD)
+    lead.contactedAt || '',
   ];
 }
 
@@ -188,7 +193,7 @@ export class SheetsService {
 
         const response = await sheets.spreadsheets.values.append({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A:AC'),
+          range: getSheetRange(this.leadsSheet, 'A:AD'),
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           requestBody: {
@@ -196,7 +201,7 @@ export class SheetsService {
           },
         });
 
-        // Extract row number from updatedRange (e.g., "Leads!A42:AC42")
+        // Extract row number from updatedRange (e.g., "Leads!A42:AD42")
         const updatedRange = response.data.updates?.updatedRange || '';
         const match = updatedRange.match(/!A(\d+):/);
         const rowNumber = match ? parseInt(match[1], 10) : 0;
@@ -219,7 +224,7 @@ export class SheetsService {
 
     return circuitBreaker.execute(async () => {
       return withRetry(async () => {
-        const range = getSheetRange(this.leadsSheet, `A${rowNumber}:AC${rowNumber}`);
+        const range = getSheetRange(this.leadsSheet, `A${rowNumber}:AD${rowNumber}`);
 
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
@@ -288,7 +293,7 @@ export class SheetsService {
       await withRetry(async () => {
         await sheets.spreadsheets.values.update({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, `A${rowNumber}:AC${rowNumber}`),
+          range: getSheetRange(this.leadsSheet, `A${rowNumber}:AD${rowNumber}`),
           valueInputOption: 'RAW',
           requestBody: {
             values: [row],
@@ -360,7 +365,8 @@ export class SheetsService {
         updates.unreachableAt = now;
         break;
       case 'contacted':
-        // รับเคสครั้งแรก - เคลียร์ทุก timestamp
+        // รับเคสครั้งแรก - set contactedAt และเคลียร์ทุก timestamp
+        updates.contactedAt = now;
         updates.closedAt = '';
         updates.lostAt = '';
         updates.unreachableAt = '';
@@ -432,7 +438,7 @@ export class SheetsService {
         // Get all leads with their leadUUID column (column AA = index 26)
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A2:AC'),
+          range: getSheetRange(this.leadsSheet, 'A2:AD'),
         });
 
         const rows = response.data.values || [];
@@ -545,7 +551,7 @@ export class SheetsService {
       return withRetry(async () => {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A2:AC'), // Skip header row, includes UUID migration columns
+          range: getSheetRange(this.leadsSheet, 'A2:AD'), // Skip header row, includes contactedAt column
         });
 
         const rows = response.data.values || [];

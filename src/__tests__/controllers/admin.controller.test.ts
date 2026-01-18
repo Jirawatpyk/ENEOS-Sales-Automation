@@ -87,6 +87,7 @@ const createSampleLead = (overrides: Partial<LeadRow> = {}): LeadRow => ({
   lostAt: null,
   unreachableAt: null,
   version: 1,
+  contactedAt: null, // When sales claimed the lead
   ...overrides,
 });
 
@@ -477,15 +478,18 @@ describe('Admin Controller', () => {
       const next = createMockNext();
 
       // Use consistent dates for metrics calculation
+      // responseTime = contactedAt - date
+      // closingTime = closedAt - contactedAt
       const baseDate = new Date();
-      const clickedDate = new Date(baseDate.getTime() + 30 * 60 * 1000); // 30 mins after base
-      const closedDate = new Date(clickedDate.getTime() + 60 * 60 * 1000); // 60 mins after clicked
+      const contactedDate = new Date(baseDate.getTime() + 30 * 60 * 1000); // 30 mins after base
+      const closedDate = new Date(contactedDate.getTime() + 60 * 60 * 1000); // 60 mins after contacted
 
       const lead = createSampleLead({
         rowNumber: 5,
         date: baseDate.toISOString(),
         salesOwnerId: 'sales-001',
-        clickedAt: clickedDate.toISOString(),
+        clickedAt: baseDate.toISOString(), // clickedAt is less relevant now
+        contactedAt: contactedDate.toISOString(),
         closedAt: closedDate.toISOString(),
       });
       mockGetRow.mockResolvedValue(lead);
@@ -493,8 +497,55 @@ describe('Admin Controller', () => {
       await getLeadById(req, res, next);
 
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      expect(response.data.metrics.responseTime).toBe(30); // 30 minutes
-      expect(response.data.metrics.closingTime).toBe(60); // 60 minutes
+      expect(response.data.metrics.responseTime).toBe(30); // 30 minutes (contactedAt - date)
+      expect(response.data.metrics.closingTime).toBe(60); // 60 minutes (closedAt - contactedAt)
+    });
+
+    it('should return 0 for metrics when contactedAt is null (legacy lead)', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // Lead without contactedAt (legacy data)
+      const lead = createSampleLead({
+        rowNumber: 5,
+        salesOwnerId: 'sales-001',
+        contactedAt: null,
+        closedAt: '2026-01-16T10:00:00.000Z',
+      });
+      mockGetRow.mockResolvedValue(lead);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.metrics.responseTime).toBe(0); // No contactedAt = 0
+      expect(response.data.metrics.closingTime).toBe(0); // No contactedAt = 0
+    });
+
+    it('should return 0 for closingTime when contactedAt > closedAt (invalid data)', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // Invalid: contactedAt after closedAt (should not happen normally)
+      const baseDate = new Date();
+      const closedDate = new Date(baseDate.getTime() + 30 * 60 * 1000);
+      const contactedDate = new Date(baseDate.getTime() + 60 * 60 * 1000); // After closedAt!
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        date: baseDate.toISOString(),
+        salesOwnerId: 'sales-001',
+        contactedAt: contactedDate.toISOString(),
+        closedAt: closedDate.toISOString(),
+      });
+      mockGetRow.mockResolvedValue(lead);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // Invalid timestamp ordering: contactedAt > closedAt should return 0
+      expect(response.data.metrics.closingTime).toBe(0);
     });
   });
 

@@ -37,10 +37,11 @@ story_location: "_bmad-output/implementation-artifacts/stories"
 
 development_status:
   # ============================================================
-  # EPIC-00: Backend API (Prerequisite) - COMPLETED
+  # EPIC-00: Backend API (Prerequisite)
   # All 10 features done (2026-01-12)
+  # Bug fix story added 2026-01-18
   # ============================================================
-  epic-0: done
+  epic-0: in-progress  # Reopened for bug fix story 0-11
   0-1-admin-auth-middleware: done
   0-2-dashboard-endpoint: done
   0-3-leads-endpoint: done
@@ -51,6 +52,10 @@ development_status:
   0-8-campaigns-endpoint: done          # Completed 2026-01-12
   0-9-campaign-detail-endpoint: done    # Completed 2026-01-12
   0-10-export-endpoint: done            # Completed 2026-01-12
+  0-11-contacted-at-metrics-fix: done    # Bug fix: Add Contacted_At column & fix metrics - Code review passed (2026-01-18)
+  0-12-status-history-tracking: ready-for-dev   # Enhancement: Store real status history in Sheets (2026-01-18)
+  0-13-period-comparison: ready-for-dev         # Enhancement: Real % change for KPI Cards (2026-01-18)
+  # Note: Claimed_At column not needed - use Contacted_At instead (flow is new → contacted directly)
   epic-0-retrospective: done
 
   # ============================================================
@@ -109,7 +114,7 @@ development_status:
   4-5-filter-by-owner: done  # Code review passed 2026-01-17
   4-6-filter-by-date: done  # Code review passed 2026-01-17
   4-7-sort-columns: done  # Code review passed 2026-01-18
-  4-8-lead-detail-modal: ready-for-dev  # Story created 2026-01-17
+  4-8-lead-detail-modal: done  # Code review passed 2026-01-18
   4-9-bulk-select: ready-for-dev  # Story created 2026-01-17
   4-10-quick-export: ready-for-dev  # Story created 2026-01-17
   4-11-additional-columns: ready-for-dev  # Should Have - รวม F-04.11/12/13: leadSource, jobTitle, city columns (Story created 2026-01-17)

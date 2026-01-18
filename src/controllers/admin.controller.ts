@@ -353,7 +353,9 @@ export async function getDashboard(
     // Stale leads (contacted แต่ไม่ update เกิน threshold วัน)
     const staleLeads = leads.filter((lead) => {
       if (lead.status !== 'contacted') {return false;}
-      const daysSinceContact = (now.getTime() - parseDateFromSheets(lead.clickedAt || lead.date).getTime()) / (1000 * 60 * 60 * 24);
+      // Use contactedAt if available, otherwise fallback to date for legacy leads
+      const contactDate = lead.contactedAt || lead.date;
+      const daysSinceContact = (now.getTime() - parseDateFromSheets(contactDate).getTime()) / (1000 * 60 * 60 * 24);
       return daysSinceContact > ALERTS.STALE_DAYS;
     });
 
@@ -573,8 +575,8 @@ export async function getLeads(
       source: lead.source,
       talkingPoint: lead.talkingPoint || '',
       clickedAt: lead.clickedAt,
-      claimedAt: null, // TODO: ต้องเพิ่ม column นี้ใน Google Sheets
-      contactedAt: null,
+      claimedAt: null, // Not used - use contactedAt instead
+      contactedAt: lead.contactedAt,
       closedAt: lead.closedAt,
       // Additional fields from Brevo Contact Attributes
       leadSource: lead.leadSource || null,
@@ -748,13 +750,30 @@ export async function getLeadById(
     history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     // คำนวณ metrics (หน่วยเป็นนาที)
+    // responseTime = time from lead creation to contacted (sales claimed)
+    // closingTime = time from contacted to closed
+    let closingTime = 0;
+    if (lead.closedAt && lead.contactedAt) {
+      const contactedTime = new Date(lead.contactedAt).getTime();
+      const closedTime = new Date(lead.closedAt).getTime();
+      if (contactedTime > closedTime) {
+        // Invalid data: contactedAt > closedAt - log warning and return 0
+        logger.warn('Invalid timestamp ordering: contactedAt > closedAt', {
+          leadRow: lead.rowNumber,
+          contactedAt: lead.contactedAt,
+          closedAt: lead.closedAt,
+        });
+        closingTime = 0;
+      } else {
+        closingTime = getMinutesBetween(lead.contactedAt, lead.closedAt);
+      }
+    }
+
     const metrics: LeadMetrics = {
-      responseTime: lead.salesOwnerId
-        ? getMinutesBetween(lead.date, lead.clickedAt)
+      responseTime: lead.contactedAt
+        ? getMinutesBetween(lead.date, lead.contactedAt)
         : 0,
-      closingTime: lead.closedAt
-        ? getMinutesBetween(lead.clickedAt || lead.date, lead.closedAt)
-        : 0,
+      closingTime,
       age: getMinutesBetween(lead.date, new Date().toISOString()),
     };
 
@@ -882,10 +901,10 @@ export async function getSalesPerformance(
 
       const conversionRate = claimed > 0 ? (closed / claimed) * 100 : 0;
 
-      // คำนวณ avg response time (นาที)
+      // คำนวณ avg response time (นาที) - time from lead creation to contacted
       const responseTimes = salesLeads
-        .filter((l) => l.salesOwnerId)
-        .map((l) => getMinutesBetween(l.date, l.clickedAt))
+        .filter((l) => l.contactedAt)
+        .map((l) => getMinutesBetween(l.date, l.contactedAt!))
         .filter((t) => t > 0);
 
       const avgResponseTime =
@@ -893,10 +912,10 @@ export async function getSalesPerformance(
           ? responseTimes.reduce((sum, t) => sum + t, 0) / responseTimes.length
           : 0;
 
-      // คำนวณ avg closing time (นาที)
+      // คำนวณ avg closing time (นาที) - time from contacted to closed
       const closingTimes = salesLeads
-        .filter((l) => l.closedAt)
-        .map((l) => getMinutesBetween(l.clickedAt || l.date, l.closedAt!))
+        .filter((l) => l.closedAt && l.contactedAt)
+        .map((l) => getMinutesBetween(l.contactedAt!, l.closedAt!))
         .filter((t) => t > 0);
 
       const avgClosingTime =

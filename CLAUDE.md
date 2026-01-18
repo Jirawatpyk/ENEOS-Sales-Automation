@@ -119,8 +119,9 @@ src/
 ระบบต้องการ 3 Sheets หลัก:
 
 1. **Leads** (Main database)
-   - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version, Lead_Source, Job_Title, City, Lead_UUID, Created_At, Updated_At
+   - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version, Lead_Source, Job_Title, City, Lead_UUID, Created_At, Updated_At, Contacted_At
    - **UUID Migration Notes:** Lead_UUID (unique identifier for Supabase migration), Created_At/Updated_At (ISO 8601 timestamps)
+   - **Metrics Notes:** Contacted_At = timestamp when sales claimed the lead (used for Response Time and Closing Time metrics)
 
 2. **Deduplication_Log** (Prevent duplicates)
    - Columns: Key, Email, Campaign_ID, Processed_At

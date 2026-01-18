@@ -99,7 +99,7 @@ describe('SheetsService', () => {
       expect(mockSheets.spreadsheets.values.append).toHaveBeenCalledWith(
         expect.objectContaining({
           spreadsheetId: 'test-sheet-id',
-          range: 'Leads!A:AC', // Updated for UUID migration columns
+          range: 'Leads!A:AD', // Updated for contactedAt column
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
         })
@@ -293,6 +293,21 @@ describe('SheetsService', () => {
           },
         })
       );
+    });
+
+    it('should set contactedAt timestamp when status is contacted', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue(mockSheetsGetResponse);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+
+      await service.claimLead(42, 'U123', 'John', 'contacted');
+
+      // Verify update was called with contactedAt in the row data
+      const updateCall = mockSheets.spreadsheets.values.update.mock.calls[0][0];
+      const rowData = updateCall.requestBody.values[0];
+
+      // contactedAt is at index 29 (column AD)
+      expect(rowData[29]).toBeTruthy(); // contactedAt should be set
+      expect(rowData[8]).toBe('contacted'); // status should be 'contacted'
     });
 
     it('should set lostAt timestamp when status is lost', async () => {

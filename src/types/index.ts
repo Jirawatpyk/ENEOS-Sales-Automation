@@ -37,6 +37,8 @@ export interface Lead {
   leadUUID: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  // Contacted timestamp (when sales claimed the lead)
+  contactedAt: string | null;
 }
 
 export type LeadStatus =

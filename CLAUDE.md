@@ -18,9 +18,9 @@ npm run lint:fix         # Fix ESLint errors automatically
 
 ### Testing
 ```bash
-npm test                 # Run all tests (Vitest) - 514 tests
+npm test                 # Run all tests (Vitest) - 711 tests
 npm run test:watch       # Run tests in watch mode
-npm run test:coverage    # Generate coverage report (75%+ coverage)
+npm run test:coverage    # Generate coverage report (79%+ coverage)
 npm run test:ui          # Open Vitest UI
 ```
 
@@ -158,7 +158,7 @@ src/
 
 ### Test Structure
 - Framework: **Vitest** with supertest for HTTP testing
-- Coverage: **75%+** (514 tests)
+- Coverage: **79%+** (711 tests)
 - Mocks: `src/__tests__/mocks/` for shared mock objects
 
 ### Key Testing Patterns

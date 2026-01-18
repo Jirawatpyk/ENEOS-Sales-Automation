@@ -392,7 +392,7 @@ export function createClaimedReplyMessage(
 ): TextMessage {
   return {
     type: 'text',
-    text: `❌ ไม่ทันครับ!\n\nเคส ${companyName} (คุณ${customerName}) นี้คุณ ${ownerName} รับไปแล้วครับ`,
+    text: `❌ ไม่ทันครับ!\n\nเคส ${companyName} (คุณ${customerName}) นี้ คุณ ${ownerName} รับไปแล้วครับ`,
   };
 }
 

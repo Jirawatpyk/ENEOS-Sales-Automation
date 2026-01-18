@@ -246,7 +246,23 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
     });
 
     if (error instanceof RaceConditionError) {
-      await lineService.replyError(replyToken, 'เกิด Race Condition กรุณาลองใหม่');
+      // Race condition = someone else claimed it at the same time
+      // Re-fetch to get the actual owner and show proper message
+      try {
+        const currentLead = await sheetsService.getRow(effectiveRowId);
+        if (currentLead?.salesOwnerName) {
+          await lineService.replyClaimed(
+            replyToken,
+            currentLead.company,
+            currentLead.customerName,
+            currentLead.salesOwnerName
+          );
+        } else {
+          await lineService.replyError(replyToken, 'มีคนรับเคสนี้ไปแล้ว กรุณาลองใหม่');
+        }
+      } catch {
+        await lineService.replyError(replyToken, 'มีคนรับเคสนี้ไปแล้ว');
+      }
     } else if (error instanceof AppError && error.code === 'ROW_NOT_FOUND') {
       await lineService.replyError(replyToken, 'ไม่พบข้อมูลเคสนี้ในระบบ');
     } else {

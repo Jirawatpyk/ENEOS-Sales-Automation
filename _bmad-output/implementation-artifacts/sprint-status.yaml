@@ -117,11 +117,11 @@ development_status:
   4-7-sort-columns: done  # Code review passed 2026-01-18
   4-8-lead-detail-modal: done  # Code review passed 2026-01-18
   4-9-bulk-select: done  # Code review passed 2026-01-18
-  4-10-quick-export: review  # Implementation complete 2026-01-18, ready for code review
-  4-11-additional-columns: ready-for-dev  # Should Have - รวม F-04.11/12/13: leadSource, jobTitle, city columns (Story created 2026-01-17)
+  4-10-quick-export: done  # ✅ Completed 2026-01-18 with code review fixes
+  4-11-additional-columns: done  # Should Have - รวม F-04.11/12/13: leadSource, jobTitle, city columns (Code review passed 2026-01-18)
   4-12-job-title-column: merged           # Merged into 4-11-additional-columns
   4-13-city-column: merged                # Merged into 4-11-additional-columns
-  4-14-filter-by-lead-source: ready-for-dev  # Could Have - กรองตาม Lead Source (Story created 2026-01-17)
+  4-14-filter-by-lead-source: done  # Could Have - กรองตาม Lead Source (Completed 2026-01-19)
   epic-4-retrospective: optional
 
   # ============================================================

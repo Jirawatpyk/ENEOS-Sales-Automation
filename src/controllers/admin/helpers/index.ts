@@ -12,6 +12,7 @@ export {
   filterByOwner,
   filterByCampaign,
   filterBySearch,
+  filterByLeadSource,
   getAllLeads,
 } from './filter.helpers.js';
 

@@ -283,6 +283,7 @@ export interface AppliedFilters {
   status?: LeadStatus;
   owner?: string;
   campaign?: string;
+  leadSource?: string; // Story 4-14: Filter by lead source
   search?: string;
   startDate?: string;
   endDate?: string;
@@ -297,6 +298,7 @@ export interface AvailableFilters {
   statuses: LeadStatus[];
   owners: OwnerOption[];
   campaigns: CampaignOption[];
+  leadSources: string[]; // Story 4-14: Available lead sources
 }
 
 /**

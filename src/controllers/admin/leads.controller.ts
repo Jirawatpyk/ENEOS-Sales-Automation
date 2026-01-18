@@ -29,6 +29,7 @@ import {
   filterByOwner,
   filterByCampaign,
   filterBySearch,
+  filterByLeadSource,
   sortLeads,
   leadRowToLeadItem,
   getMinutesBetween,
@@ -64,6 +65,7 @@ export async function getLeads(
       status,
       owner,
       campaign,
+      leadSource,
       search,
       startDate,
       endDate,
@@ -98,6 +100,11 @@ export async function getLeads(
       allLeads = filterBySearch(allLeads, search);
     }
 
+    // Story 4-14: Lead source filter
+    if (leadSource) {
+      allLeads = filterByLeadSource(allLeads, leadSource);
+    }
+
     // Date filter
     if (startDate || endDate) {
       allLeads = allLeads.filter((lead) => {
@@ -128,6 +135,10 @@ export async function getLeads(
     // Build available filters
     const allSalesIds = new Set(allLeads.map((l) => l.salesOwnerId).filter(Boolean) as string[]);
     const allCampaignIds = new Set(allLeads.map((l) => l.campaignId));
+    // Story 4-14: Get unique lead sources (filter out null/empty, sort alphabetically)
+    const allLeadSources = Array.from(
+      new Set(allLeads.map((l) => l.leadSource).filter(Boolean) as string[])
+    ).sort();
 
     const availableFilters: AvailableFilters = {
       statuses: ['new', 'claimed', 'contacted', 'closed', 'lost', 'unreachable'],
@@ -145,12 +156,14 @@ export async function getLeads(
           name: lead?.campaignName || 'Unknown',
         };
       }),
+      leadSources: allLeadSources, // Story 4-14
     };
 
     const appliedFilters: AppliedFilters = {
       status,
       owner,
       campaign,
+      leadSource, // Story 4-14
       search,
       startDate,
       endDate,

@@ -29,6 +29,7 @@ import {
   filterByOwner,
   filterByCampaign,
   filterBySearch,
+  filterByLeadSource,
   countByStatus,
   calculateChange,
   getMinutesBetween,
@@ -208,6 +209,47 @@ describe('Admin Controller Helpers', () => {
     it('should be case insensitive', () => {
       const result = filterBySearch(leads, 'ACME');
       expect(result).toHaveLength(1);
+    });
+  });
+
+  /**
+   * Story 4-14: Filter by Lead Source
+   * Tests for filterByLeadSource function
+   */
+  describe('filterByLeadSource', () => {
+    const leads = [
+      createMockLead({ leadSource: 'Email Campaign' }),
+      createMockLead({ leadSource: 'Website' }),
+      createMockLead({ leadSource: 'Referral' }),
+      createMockLead({ leadSource: null }),
+      createMockLead({ leadSource: '' }),
+    ];
+
+    it('should filter by exact lead source name', () => {
+      const result = filterByLeadSource(leads, 'Website');
+      expect(result).toHaveLength(1);
+      expect(result[0].leadSource).toBe('Website');
+    });
+
+    it('should filter by lead source with spaces', () => {
+      const result = filterByLeadSource(leads, 'Email Campaign');
+      expect(result).toHaveLength(1);
+      expect(result[0].leadSource).toBe('Email Campaign');
+    });
+
+    it('should return leads with null/empty leadSource when __unknown__ is passed', () => {
+      const result = filterByLeadSource(leads, '__unknown__');
+      expect(result).toHaveLength(2); // null and empty string
+    });
+
+    it('should return empty array when no leads match the source', () => {
+      const result = filterByLeadSource(leads, 'NonExistentSource');
+      expect(result).toHaveLength(0);
+    });
+
+    it('should be case sensitive', () => {
+      const result = filterByLeadSource(leads, 'website');
+      expect(result).toHaveLength(0);
     });
   });
 

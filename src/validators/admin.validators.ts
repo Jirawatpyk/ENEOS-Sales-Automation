@@ -73,6 +73,7 @@ export const leadsQuerySchema = z.object({
   status: leadStatusSchema.optional(),
   owner: z.string().trim().optional(),
   campaign: z.string().trim().optional(),
+  leadSource: z.string().trim().optional(), // Story 4-14: Filter by lead source
   search: z.string().trim().max(100).optional(),
   startDate: z.string().trim().optional(),
   endDate: z.string().trim().optional(),

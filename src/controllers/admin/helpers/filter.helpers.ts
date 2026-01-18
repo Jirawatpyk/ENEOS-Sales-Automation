@@ -72,6 +72,18 @@ export function filterBySearch(leads: LeadRow[], search: string): LeadRow[] {
 }
 
 /**
+ * กรอง leads ตาม leadSource
+ * Story 4-14: Filter by Lead Source
+ * Special value '__unknown__' matches leads with null/empty leadSource
+ */
+export function filterByLeadSource(leads: LeadRow[], leadSource: string): LeadRow[] {
+  if (leadSource === '__unknown__') {
+    return leads.filter((lead) => !lead.leadSource);
+  }
+  return leads.filter((lead) => lead.leadSource === leadSource);
+}
+
+/**
  * ดึง leads ทั้งหมดจาก Google Sheets
  *
  * @returns Array of leads, or empty array on error (fails gracefully)

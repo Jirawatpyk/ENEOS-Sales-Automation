@@ -17,6 +17,7 @@ import {
   AppError,
   RaceConditionError,
   VALID_LEAD_STATUSES,
+  StatusHistoryEntry,
 } from '../types/index.js';
 
 // ===========================================
@@ -158,12 +159,14 @@ export class SheetsService {
   private leadsSheet: string;
   private dedupSheet: string;
   private salesTeamSheet: string;
+  private statusHistorySheet: string;
 
   constructor() {
     this.spreadsheetId = config.google.sheetId;
     this.leadsSheet = config.google.sheets.leads;
     this.dedupSheet = config.google.sheets.dedup;
     this.salesTeamSheet = config.google.sheets.salesTeam;
+    this.statusHistorySheet = config.google.sheets.statusHistory;
   }
 
   // ===========================================
@@ -211,6 +214,21 @@ export class SheetsService {
           email: lead.email,
           leadUUID: enrichedLead.leadUUID,
         });
+
+        // Fire-and-forget: Record initial "new" status in history (using UUID for Supabase compatibility)
+        if (rowNumber > 0 && enrichedLead.leadUUID) {
+          this.addStatusHistory({
+            leadUUID: enrichedLead.leadUUID,
+            status: 'new',
+            changedById: 'System',
+            changedByName: 'System',
+            timestamp: now,
+            notes: 'Lead created from webhook',
+          }).catch((err) => {
+            logger.error('Failed to record initial status history', { leadUUID: enrichedLead.leadUUID, error: err });
+          });
+        }
+
         return rowNumber;
       });
     });
@@ -375,6 +393,30 @@ export class SheetsService {
 
     const updatedLead = await this.updateLeadWithLock(rowNumber, updates);
 
+    // Fire-and-forget: Record status change in history (using UUID for Supabase compatibility)
+    // Use updatedLead.leadUUID because updateLeadWithLock generates UUID for legacy leads
+    logger.info('claimLead: checking leadUUID for status history', {
+      rowNumber,
+      leadUUID: updatedLead.leadUUID,
+      status,
+      hasUUID: !!updatedLead.leadUUID
+    });
+
+    if (updatedLead.leadUUID) {
+      logger.info('claimLead: calling addStatusHistory', { leadUUID: updatedLead.leadUUID, status });
+      this.addStatusHistory({
+        leadUUID: updatedLead.leadUUID,
+        status,
+        changedById: salesUserId,
+        changedByName: salesUserName,
+        timestamp: now,
+      }).catch((err) => {
+        logger.error('Failed to record status history for claimLead', { leadUUID: updatedLead.leadUUID, status, error: err });
+      });
+    } else {
+      logger.warn('claimLead: skipping status history - no leadUUID', { rowNumber, status });
+    }
+
     return {
       success: true,
       lead: updatedLead,
@@ -418,7 +460,23 @@ export class SheetsService {
         break;
     }
 
-    return this.updateLeadWithLock(rowNumber, updates);
+    const updatedLead = await this.updateLeadWithLock(rowNumber, updates);
+
+    // Fire-and-forget: Record status change in history (using UUID for Supabase compatibility)
+    // Use updatedLead.leadUUID because updateLeadWithLock generates UUID for legacy leads
+    if (updatedLead.leadUUID) {
+      this.addStatusHistory({
+        leadUUID: updatedLead.leadUUID,
+        status: newStatus,
+        changedById: salesUserId,
+        changedByName: currentLead.salesOwnerName || 'Unknown',
+        timestamp: now,
+      }).catch((err) => {
+        logger.error('Failed to record status history for updateLeadStatus', { leadUUID: updatedLead.leadUUID, status: newStatus, error: err });
+      });
+    }
+
+    return updatedLead;
   }
 
   // ===========================================
@@ -778,6 +836,89 @@ export class SheetsService {
 
         logger.info('Leads count by status result', counts);
         return counts;
+      });
+    });
+  }
+
+  // ===========================================
+  // Status History Operations
+  // ===========================================
+
+  /**
+   * Add a status history entry (fire-and-forget)
+   * Errors are logged but don't throw to avoid blocking main operations
+   * Uses UUID for future Supabase migration compatibility
+   */
+  async addStatusHistory(entry: StatusHistoryEntry): Promise<void> {
+    logger.debug('Adding status history entry', { leadUUID: entry.leadUUID, status: entry.status });
+
+    try {
+      await circuitBreaker.execute(async () => {
+        await withRetry(async () => {
+          await sheets.spreadsheets.values.append({
+            spreadsheetId: this.spreadsheetId,
+            range: getSheetRange(this.statusHistorySheet, 'A:F'),
+            valueInputOption: 'RAW',
+            insertDataOption: 'INSERT_ROWS',
+            requestBody: {
+              values: [[
+                entry.leadUUID,
+                entry.status,
+                entry.changedById,
+                entry.changedByName,
+                entry.timestamp,
+                entry.notes || '',
+              ]],
+            },
+          });
+        });
+      });
+
+      logger.info('Status history entry added', { leadUUID: entry.leadUUID, status: entry.status });
+    } catch (error) {
+      // Fire-and-forget: log error but don't throw
+      logger.error('Failed to add status history entry', {
+        leadUUID: entry.leadUUID,
+        status: entry.status,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Get status history for a lead by UUID
+   * Returns sorted array of StatusHistoryEntry (oldest first)
+   * Uses UUID for future Supabase migration compatibility
+   */
+  async getStatusHistory(leadUUID: string): Promise<StatusHistoryEntry[]> {
+    logger.debug('Getting status history', { leadUUID });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.statusHistorySheet, 'A2:F'), // Skip header row
+        });
+
+        const rows = response.data.values || [];
+
+        // Filter rows for this lead UUID and map to StatusHistoryEntry
+        const history: StatusHistoryEntry[] = rows
+          .filter((row) => row[0] === leadUUID)
+          .map((row) => ({
+            leadUUID: row[0] || '',
+            status: row[1] as LeadStatus,
+            changedById: row[2] || '',
+            changedByName: row[3] || '',
+            timestamp: row[4] || '',
+            notes: row[5] || undefined,
+          }));
+
+        // Sort by timestamp ascending (oldest first)
+        history.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        logger.debug('Status history retrieved', { leadUUID, count: history.length });
+        return history;
       });
     });
   }

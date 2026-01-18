@@ -65,6 +65,24 @@ export const VALID_LEAD_STATUSES: LeadStatus[] = [
 ];
 
 // ===========================================
+// Status History Types
+// ===========================================
+
+/**
+ * Status History Entry for Google Sheets storage
+ * Columns: Lead_UUID, Status, Changed_By_ID, Changed_By_Name, Timestamp, Notes
+ * Uses UUID for future Supabase migration compatibility
+ */
+export interface StatusHistoryEntry {
+  leadUUID: string;
+  status: LeadStatus;
+  changedById: string;
+  changedByName: string;
+  timestamp: string;
+  notes?: string;
+}
+
+// ===========================================
 // Brevo Webhook Types
 // ===========================================
 

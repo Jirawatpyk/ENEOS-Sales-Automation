@@ -697,54 +697,63 @@ export async function getLeadById(
       return;
     }
 
-    // สร้าง status history (mock - ในอนาคตควรเก็บจริงใน Sheets)
-    const history: StatusHistoryItem[] = [];
+    // Get real status history from Status_History sheet (using UUID for Supabase compatibility)
+    const historyEntries = lead.leadUUID
+      ? await sheetsService.getStatusHistory(lead.leadUUID)
+      : [];
 
-    if (lead.closedAt) {
+    let history: StatusHistoryItem[];
+
+    if (historyEntries.length > 0) {
+      // Use real history from sheet
+      history = historyEntries.map((entry) => ({
+        status: entry.status,
+        by: entry.changedByName,
+        timestamp: entry.timestamp,
+      }));
+    } else {
+      // Fallback: Reconstruct history from timestamps for legacy leads
+      history = [];
+
+      if (lead.closedAt) {
+        history.push({
+          status: 'closed',
+          by: lead.salesOwnerName || 'Unknown',
+          timestamp: lead.closedAt,
+        });
+      }
+
+      if (lead.lostAt) {
+        history.push({
+          status: 'lost',
+          by: lead.salesOwnerName || 'Unknown',
+          timestamp: lead.lostAt,
+        });
+      }
+
+      if (lead.unreachableAt) {
+        history.push({
+          status: 'unreachable',
+          by: lead.salesOwnerName || 'Unknown',
+          timestamp: lead.unreachableAt,
+        });
+      }
+
+      if (lead.contactedAt) {
+        history.push({
+          status: 'contacted',
+          by: lead.salesOwnerName || 'Unknown',
+          timestamp: lead.contactedAt,
+        });
+      }
+
+      // Add creation event for legacy leads
       history.push({
-        status: 'closed',
-        by: lead.salesOwnerName || 'Unknown',
-        timestamp: lead.closedAt,
+        status: 'new',
+        by: 'System',
+        timestamp: lead.date,
       });
     }
-
-    if (lead.lostAt) {
-      history.push({
-        status: 'lost',
-        by: lead.salesOwnerName || 'Unknown',
-        timestamp: lead.lostAt,
-      });
-    }
-
-    if (lead.unreachableAt) {
-      history.push({
-        status: 'unreachable',
-        by: lead.salesOwnerName || 'Unknown',
-        timestamp: lead.unreachableAt,
-      });
-    }
-
-    if (lead.status === 'contacted' || lead.closedAt || lead.lostAt) {
-      history.push({
-        status: 'contacted',
-        by: lead.salesOwnerName || 'Unknown',
-        timestamp: lead.clickedAt || lead.date,
-      });
-    }
-
-    if (lead.salesOwnerId) {
-      history.push({
-        status: 'claimed',
-        by: lead.salesOwnerName || 'Unknown',
-        timestamp: lead.clickedAt || lead.date,
-      });
-    }
-
-    history.push({
-      status: 'new',
-      by: 'System',
-      timestamp: lead.date,
-    });
 
     // Sort history (newest first)
     history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

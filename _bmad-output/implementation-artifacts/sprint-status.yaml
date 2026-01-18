@@ -53,7 +53,7 @@ development_status:
   0-9-campaign-detail-endpoint: done    # Completed 2026-01-12
   0-10-export-endpoint: done            # Completed 2026-01-12
   0-11-contacted-at-metrics-fix: done    # Bug fix: Add Contacted_At column & fix metrics - Code review passed (2026-01-18)
-  0-12-status-history-tracking: ready-for-dev   # Enhancement: Store real status history in Sheets (2026-01-18)
+  0-12-status-history-tracking: done            # Enhancement: Store real status history in Sheets - Code review passed (2026-01-18)
   0-13-period-comparison: ready-for-dev         # Enhancement: Real % change for KPI Cards (2026-01-18)
   # Note: Claimed_At column not needed - use Contacted_At instead (flow is new → contacted directly)
   epic-0-retrospective: done

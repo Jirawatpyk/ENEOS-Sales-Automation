@@ -40,6 +40,7 @@ vi.mock('../../config/index.js', () => ({
         leads: 'Leads',
         dedup: 'Deduplication_Log',
         salesTeam: 'Sales_Team',
+        statusHistory: 'Status_History',
       },
     },
   },
@@ -600,6 +601,275 @@ describe('SheetsService', () => {
 
       expect(lead).not.toBeNull();
       expect(lead?.rowNumber).toBe(2); // Row 2 (first data row after header)
+    });
+  });
+
+  // ===========================================
+  // Status History Operations
+  // ===========================================
+
+  describe('addStatusHistory', () => {
+    it('should add status history entry successfully', async () => {
+      mockSheets.spreadsheets.values.append.mockResolvedValue({});
+
+      await service.addStatusHistory({
+        leadUUID: 'lead_abc123',
+        status: 'contacted',
+        changedById: 'U123',
+        changedByName: 'John Doe',
+        timestamp: '2026-01-18T10:00:00.000Z',
+        notes: 'First contact',
+      });
+
+      expect(mockSheets.spreadsheets.values.append).toHaveBeenCalledWith(
+        expect.objectContaining({
+          spreadsheetId: 'test-sheet-id',
+          range: 'Status_History!A:F',
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [['lead_abc123', 'contacted', 'U123', 'John Doe', '2026-01-18T10:00:00.000Z', 'First contact']],
+          },
+        })
+      );
+    });
+
+    it('should log error but not throw when write fails (fire-and-forget)', async () => {
+      mockSheets.spreadsheets.values.append.mockRejectedValue(new Error('API Error'));
+
+      // Should not throw
+      await expect(service.addStatusHistory({
+        leadUUID: 'lead_abc123',
+        status: 'contacted',
+        changedById: 'U123',
+        changedByName: 'John Doe',
+        timestamp: '2026-01-18T10:00:00.000Z',
+      })).resolves.toBeUndefined();
+    });
+
+    it('should handle empty notes gracefully', async () => {
+      mockSheets.spreadsheets.values.append.mockResolvedValue({});
+
+      await service.addStatusHistory({
+        leadUUID: 'lead_abc123',
+        status: 'new',
+        changedById: 'System',
+        changedByName: 'System',
+        timestamp: '2026-01-18T10:00:00.000Z',
+      });
+
+      expect(mockSheets.spreadsheets.values.append).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestBody: {
+            values: [['lead_abc123', 'new', 'System', 'System', '2026-01-18T10:00:00.000Z', '']],
+          },
+        })
+      );
+    });
+  });
+
+  describe('getStatusHistory', () => {
+    it('should return history entries for a lead sorted by timestamp', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['lead_abc123', 'contacted', 'U123', 'John', '2026-01-18T10:00:00.000Z', ''],
+            ['lead_abc123', 'new', 'System', 'System', '2026-01-18T08:00:00.000Z', 'Created'],
+            ['lead_xyz999', 'new', 'System', 'System', '2026-01-18T09:00:00.000Z', ''], // Different lead
+            ['lead_abc123', 'closed', 'U123', 'John', '2026-01-18T12:00:00.000Z', 'Deal done'],
+          ],
+        },
+      });
+
+      const history = await service.getStatusHistory('lead_abc123');
+
+      expect(history).toHaveLength(3);
+      // Should be sorted by timestamp ascending (oldest first)
+      expect(history[0].status).toBe('new');
+      expect(history[1].status).toBe('contacted');
+      expect(history[2].status).toBe('closed');
+    });
+
+    it('should return empty array when no history found', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['lead_xyz999', 'new', 'System', 'System', '2026-01-18T08:00:00.000Z', ''],
+          ],
+        },
+      });
+
+      const history = await service.getStatusHistory('lead_abc123');
+
+      expect(history).toEqual([]);
+    });
+
+    it('should return empty array when sheet is empty', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [] },
+      });
+
+      const history = await service.getStatusHistory('lead_abc123');
+
+      expect(history).toEqual([]);
+    });
+
+    it('should handle missing notes field', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['lead_abc123', 'new', 'System', 'System', '2026-01-18T08:00:00.000Z'], // Missing notes column
+          ],
+        },
+      });
+
+      const history = await service.getStatusHistory('lead_abc123');
+
+      expect(history).toHaveLength(1);
+      expect(history[0].notes).toBeUndefined();
+    });
+  });
+
+  // ===========================================
+  // Status History Integration Tests
+  // ===========================================
+
+  describe('Status History Integration', () => {
+    it('should record initial "new" status when addLead is called (fire-and-forget)', async () => {
+      // Mock the append for both leads and status history
+      mockSheets.spreadsheets.values.append.mockResolvedValue(mockSheetsAppendResponse);
+
+      const addStatusHistorySpy = vi.spyOn(service, 'addStatusHistory');
+
+      await service.addLead({
+        email: 'test@example.com',
+        company: 'Test Company',
+        customerName: 'Test User',
+      });
+
+      // Verify addStatusHistory was called with initial "new" status
+      expect(addStatusHistorySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'new',
+          changedById: 'System',
+          changedByName: 'System',
+          notes: 'Lead created from webhook',
+        })
+      );
+
+      addStatusHistorySpy.mockRestore();
+    });
+
+    it('should record status history when claimLead is called (fire-and-forget)', async () => {
+      // Mock lead with UUID for history recording
+      const leadWithUUID = {
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 26),
+              'lead_test123', // leadUUID at index 26
+              '2026-01-18T08:00:00.000Z', // createdAt
+              '2026-01-18T08:00:00.000Z', // updatedAt
+              '', // contactedAt
+            ],
+          ],
+        },
+      };
+      mockSheets.spreadsheets.values.get.mockResolvedValue(leadWithUUID);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+      mockSheets.spreadsheets.values.append.mockResolvedValue({});
+
+      const addStatusHistorySpy = vi.spyOn(service, 'addStatusHistory');
+
+      await service.claimLead(42, 'U123', 'John Doe', 'contacted');
+
+      // Verify addStatusHistory was called
+      expect(addStatusHistorySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leadUUID: 'lead_test123',
+          status: 'contacted',
+          changedById: 'U123',
+          changedByName: 'John Doe',
+        })
+      );
+
+      addStatusHistorySpy.mockRestore();
+    });
+
+    it('should record status history when updateLeadStatus is called (fire-and-forget)', async () => {
+      // Mock lead with UUID and owner for status update
+      const ownedLeadWithUUID = {
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 9),
+              'U123', // salesOwnerId
+              'John Doe', // salesOwnerName
+              ...mockSheetsGetResponse.data.values[0].slice(11, 26),
+              'lead_test456', // leadUUID at index 26
+              '2026-01-18T08:00:00.000Z', // createdAt
+              '2026-01-18T08:00:00.000Z', // updatedAt
+              '2026-01-18T09:00:00.000Z', // contactedAt
+            ],
+          ],
+        },
+      };
+      mockSheets.spreadsheets.values.get.mockResolvedValue(ownedLeadWithUUID);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+      mockSheets.spreadsheets.values.append.mockResolvedValue({});
+
+      const addStatusHistorySpy = vi.spyOn(service, 'addStatusHistory');
+
+      await service.updateLeadStatus(42, 'U123', 'closed');
+
+      // Verify addStatusHistory was called
+      expect(addStatusHistorySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leadUUID: 'lead_test456',
+          status: 'closed',
+          changedById: 'U123',
+          changedByName: 'John Doe',
+        })
+      );
+
+      addStatusHistorySpy.mockRestore();
+    });
+
+    it('should record status history for legacy leads after UUID is generated', async () => {
+      // Mock lead WITHOUT initial UUID (legacy lead)
+      // updateLeadWithLock will generate a UUID for it
+      const legacyLeadWithoutUUID = {
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 26),
+              '', // NO leadUUID initially
+              '', // createdAt
+              '', // updatedAt
+              '', // contactedAt
+            ],
+          ],
+        },
+      };
+      mockSheets.spreadsheets.values.get.mockResolvedValue(legacyLeadWithoutUUID);
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+      mockSheets.spreadsheets.values.append.mockResolvedValue({});
+
+      const addStatusHistorySpy = vi.spyOn(service, 'addStatusHistory');
+
+      await service.claimLead(42, 'U123', 'John Doe', 'contacted');
+
+      // Verify addStatusHistory WAS called because updateLeadWithLock generates UUID for legacy leads
+      expect(addStatusHistorySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'contacted',
+          changedById: 'U123',
+          changedByName: 'John Doe',
+        })
+      );
+      // UUID should be generated (starts with 'lead_')
+      expect(addStatusHistorySpy.mock.calls[0][0].leadUUID).toMatch(/^lead_/);
+
+      addStatusHistorySpy.mockRestore();
     });
   });
 

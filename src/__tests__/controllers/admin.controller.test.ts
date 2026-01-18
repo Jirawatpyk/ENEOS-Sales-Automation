@@ -11,12 +11,14 @@ import type { LeadRow } from '../../types/index.js';
 const mockGetAllLeads = vi.fn();
 const mockGetRow = vi.fn();
 const mockGetSalesTeamMember = vi.fn();
+const mockGetStatusHistory = vi.fn();
 
 vi.mock('../../services/sheets.service.js', () => ({
   sheetsService: {
     getAllLeads: () => mockGetAllLeads(),
     getRow: (row: number) => mockGetRow(row),
     getSalesTeamMember: (id: string) => mockGetSalesTeamMember(id),
+    getStatusHistory: (leadUUID: string) => mockGetStatusHistory(leadUUID),
   },
 }));
 
@@ -102,6 +104,7 @@ describe('Admin Controller', () => {
     mockGetAllLeads.mockResolvedValue([]);
     mockGetRow.mockResolvedValue(null);
     mockGetSalesTeamMember.mockResolvedValue(null);
+    mockGetStatusHistory.mockResolvedValue([]); // Default to empty history (fallback mode)
   });
 
   afterEach(() => {

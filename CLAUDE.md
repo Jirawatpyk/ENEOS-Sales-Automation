@@ -18,7 +18,7 @@ npm run lint:fix         # Fix ESLint errors automatically
 
 ### Testing
 ```bash
-npm test                 # Run all tests (Vitest) - 301 tests
+npm test                 # Run all tests (Vitest) - 514 tests
 npm run test:watch       # Run tests in watch mode
 npm run test:coverage    # Generate coverage report (75%+ coverage)
 npm run test:ui          # Open Vitest UI
@@ -116,7 +116,7 @@ src/
 
 ## Google Sheets Structure
 
-ระบบต้องการ 3 Sheets หลัก:
+ระบบต้องการ 4 Sheets หลัก:
 
 1. **Leads** (Main database)
    - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version, Lead_Source, Job_Title, City, Lead_UUID, Created_At, Updated_At, Contacted_At
@@ -128,6 +128,13 @@ src/
 
 3. **Sales_Team** (User mapping)
    - Columns: LINE_User_ID, Name, Email, Phone
+
+4. **Status_History** (Status change audit log)
+   - Columns: Lead_UUID, Status, Changed_By_ID, Changed_By_Name, Timestamp, Notes
+   - **Purpose:** Track all status changes for leads (new → contacted → closed/lost/unreachable)
+   - **Fire-and-forget:** History writes are async to not block main operations
+   - **Fallback:** Legacy leads without history use reconstructed timestamps
+   - **UUID Migration:** Uses Lead_UUID (not row number) for Supabase compatibility
 
 ## Environment Variables
 
@@ -151,7 +158,7 @@ src/
 
 ### Test Structure
 - Framework: **Vitest** with supertest for HTTP testing
-- Coverage: **75%+** (301 tests)
+- Coverage: **75%+** (514 tests)
 - Mocks: `src/__tests__/mocks/` for shared mock objects
 
 ### Key Testing Patterns

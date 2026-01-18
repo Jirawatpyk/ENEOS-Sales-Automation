@@ -196,9 +196,27 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       return;
     }
 
-    // Check if this is a status update from the owner
-    if (result.lead.salesOwnerId === userId) {
-      // Owner is updating their own lead
+    // Check if this is a NEW claim or owner updating status
+    if (result.isNewClaim) {
+      // First time claim - show success message
+      leadsClaimedTotal.inc({ status: 'contacted' });
+      await lineService.replySuccess(
+        replyToken,
+        userName,
+        result.lead.company,
+        result.lead.customerName,
+        action
+      );
+      lineNotificationTotal.inc({ status: 'success', type: 'reply' });
+
+      logger.info('Lead claimed successfully', {
+        rowId: effectiveRowId,
+        leadId,
+        owner: userName,
+        status: action,
+      });
+    } else {
+      // Owner is updating their own lead status
       const isClosedSale = action === 'closed';
       const isLostSale = action === 'lost';
 
@@ -218,26 +236,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
         newStatus: action,
         owner: userName,
       });
-      return;
     }
-
-    // New claim successful
-    leadsClaimedTotal.inc({ status: 'contacted' });
-    await lineService.replySuccess(
-      replyToken,
-      userName,
-      result.lead.company,
-      result.lead.customerName,
-      action
-    );
-    lineNotificationTotal.inc({ status: 'success', type: 'reply' });
-
-    logger.info('Lead claimed successfully', {
-      rowId: effectiveRowId,
-      leadId,
-      owner: userName,
-      status: action,
-    });
   } catch (error) {
     logger.error('Error processing postback', {
       error: error instanceof Error ? error.message : 'Unknown error',

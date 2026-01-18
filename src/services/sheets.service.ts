@@ -333,7 +333,7 @@ export class SheetsService {
     salesUserId: string,
     salesUserName: string,
     status: LeadStatus = 'contacted'
-  ): Promise<{ success: boolean; lead: LeadRow; alreadyClaimed: boolean; owner?: string }> {
+  ): Promise<{ success: boolean; lead: LeadRow; alreadyClaimed: boolean; isNewClaim: boolean; owner?: string }> {
     logger.info('Attempting to claim lead', { rowNumber, salesUserId });
 
     const currentLead = await this.getRow(rowNumber);
@@ -341,6 +341,9 @@ export class SheetsService {
     if (!currentLead) {
       throw new AppError(`Row ${rowNumber} not found`, 404, 'ROW_NOT_FOUND');
     }
+
+    // Determine if this is a new claim (lead was previously unclaimed)
+    const isNewClaim = !currentLead.salesOwnerId;
 
     // Check if already claimed by someone else
     if (currentLead.salesOwnerId && currentLead.salesOwnerId !== salesUserId) {
@@ -354,6 +357,7 @@ export class SheetsService {
         success: false,
         lead: currentLead,
         alreadyClaimed: true,
+        isNewClaim: false,
         owner: currentLead.salesOwnerName || currentLead.salesOwnerId,
       };
     }
@@ -413,6 +417,7 @@ export class SheetsService {
       success: true,
       lead: updatedLead,
       alreadyClaimed: false,
+      isNewClaim,
     };
   }
 

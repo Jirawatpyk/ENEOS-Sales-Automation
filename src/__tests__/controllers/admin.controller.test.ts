@@ -28,6 +28,7 @@ import {
   getLeads,
   getLeadById,
   getSalesPerformance,
+  getCampaigns,
 } from '../../controllers/admin.controller.js';
 
 // ===========================================
@@ -214,6 +215,97 @@ describe('Admin Controller', () => {
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.success).toBe(true);
       expect(response.data.summary.totalLeads).toBe(0);
+    });
+
+    it('should calculate period comparison changes correctly', async () => {
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // 3 leads today, 2 leads yesterday
+      mockGetAllLeads.mockResolvedValue([
+        // Today's leads
+        createSampleLead({ rowNumber: 2, status: 'new', date: today.toISOString() }),
+        createSampleLead({ rowNumber: 3, status: 'claimed', salesOwnerId: 'sales-001', date: today.toISOString() }),
+        createSampleLead({ rowNumber: 4, status: 'closed', salesOwnerId: 'sales-001', closedAt: today.toISOString(), date: today.toISOString() }),
+        // Yesterday's leads
+        createSampleLead({ rowNumber: 5, status: 'new', date: yesterday.toISOString() }),
+        createSampleLead({ rowNumber: 6, status: 'closed', salesOwnerId: 'sales-002', closedAt: yesterday.toISOString(), date: yesterday.toISOString() }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.summary.totalLeads).toBe(3); // 3 today
+      expect(response.data.summary.changes.totalLeads).toBe(50); // (3-2)/2 * 100 = 50%
+    });
+
+    it('should return 100% change when previous period has 0 leads', async () => {
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const today = new Date();
+
+      // Only today's leads, no yesterday leads
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({ rowNumber: 2, status: 'new', date: today.toISOString() }),
+        createSampleLead({ rowNumber: 3, status: 'closed', salesOwnerId: 'sales-001', closedAt: today.toISOString(), date: today.toISOString() }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.summary.changes.totalLeads).toBe(100); // New data = +100%
+      expect(response.data.summary.changes.closed).toBe(100);
+    });
+
+    it('should return 0% change when both periods have 0 leads', async () => {
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // No leads at all
+      mockGetAllLeads.mockResolvedValue([]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.summary.changes.totalLeads).toBe(0);
+      expect(response.data.summary.changes.claimed).toBe(0);
+      expect(response.data.summary.changes.closed).toBe(0);
+    });
+
+    it('should calculate negative change when current period has fewer leads', async () => {
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      // 1 lead today, 4 leads yesterday
+      mockGetAllLeads.mockResolvedValue([
+        // Today's lead
+        createSampleLead({ rowNumber: 2, status: 'new', date: today.toISOString() }),
+        // Yesterday's leads
+        createSampleLead({ rowNumber: 3, status: 'new', date: yesterday.toISOString() }),
+        createSampleLead({ rowNumber: 4, status: 'new', date: yesterday.toISOString() }),
+        createSampleLead({ rowNumber: 5, status: 'new', date: yesterday.toISOString() }),
+        createSampleLead({ rowNumber: 6, status: 'new', date: yesterday.toISOString() }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.summary.totalLeads).toBe(1);
+      expect(response.data.summary.changes.totalLeads).toBe(-75); // (1-4)/4 * 100 = -75%
     });
   });
 
@@ -743,6 +835,298 @@ describe('Admin Controller', () => {
       expect(sales1.stats.claimed).toBe(4);
       expect(sales1.stats.closed).toBe(1);
       expect(sales1.stats.conversionRate).toBe(25); // 1/4 * 100 = 25%
+    });
+
+    it('should calculate comparison with previous period', async () => {
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      mockGetAllLeads.mockResolvedValue([
+        // Today: 2 claimed, 1 closed
+        createSampleLead({
+          rowNumber: 2,
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'Sales 1',
+          status: 'closed',
+          closedAt: today.toISOString(),
+          date: today.toISOString(),
+        }),
+        createSampleLead({
+          rowNumber: 3,
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'Sales 1',
+          status: 'claimed',
+          date: today.toISOString(),
+        }),
+        // Yesterday: 1 claimed, 1 closed
+        createSampleLead({
+          rowNumber: 4,
+          salesOwnerId: 'sales-002',
+          salesOwnerName: 'Sales 2',
+          status: 'closed',
+          closedAt: yesterday.toISOString(),
+          date: yesterday.toISOString(),
+        }),
+      ]);
+
+      await getSalesPerformance(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.comparison).toBeDefined();
+      expect(response.data.comparison.previousPeriod.claimed).toBe(1);
+      expect(response.data.comparison.previousPeriod.closed).toBe(1);
+      expect(response.data.comparison.changes.claimed).toBe(100); // 2 vs 1 = +100%
+      expect(response.data.comparison.changes.closed).toBe(0); // 1 vs 1 = 0%
+    });
+
+    it('should handle no previous period data for comparison', async () => {
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const today = new Date();
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          salesOwnerId: 'sales-001',
+          salesOwnerName: 'Sales 1',
+          status: 'closed',
+          closedAt: today.toISOString(),
+          date: today.toISOString(),
+        }),
+      ]);
+
+      await getSalesPerformance(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.comparison.previousPeriod.claimed).toBe(0);
+      expect(response.data.comparison.previousPeriod.closed).toBe(0);
+      expect(response.data.comparison.changes.claimed).toBe(100); // New data
+      expect(response.data.comparison.changes.closed).toBe(100);
+    });
+  });
+
+  // ===========================================
+  // Period Calculation Edge Cases (Story 0-13)
+  // ===========================================
+  describe('Period Calculation Edge Cases', () => {
+    it('should calculate week period comparison correctly', async () => {
+      const req = createMockRequest({ query: { period: 'week' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const now = new Date();
+      const thisWeek = new Date(now);
+      const lastWeek = new Date(now);
+      lastWeek.setDate(lastWeek.getDate() - 7);
+
+      mockGetAllLeads.mockResolvedValue([
+        // This week: 4 leads
+        createSampleLead({ rowNumber: 2, status: 'new', date: thisWeek.toISOString() }),
+        createSampleLead({ rowNumber: 3, status: 'claimed', salesOwnerId: 'sales-001', date: thisWeek.toISOString() }),
+        createSampleLead({ rowNumber: 4, status: 'closed', salesOwnerId: 'sales-001', closedAt: thisWeek.toISOString(), date: thisWeek.toISOString() }),
+        createSampleLead({ rowNumber: 5, status: 'closed', salesOwnerId: 'sales-002', closedAt: thisWeek.toISOString(), date: thisWeek.toISOString() }),
+        // Last week: 2 leads
+        createSampleLead({ rowNumber: 6, status: 'new', date: lastWeek.toISOString() }),
+        createSampleLead({ rowNumber: 7, status: 'closed', salesOwnerId: 'sales-001', closedAt: lastWeek.toISOString(), date: lastWeek.toISOString() }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.summary.totalLeads).toBe(4); // 4 this week
+      expect(response.data.summary.changes.totalLeads).toBe(100); // (4-2)/2 * 100 = 100%
+      expect(response.data.summary.changes.closed).toBe(100); // (2-1)/1 * 100 = 100%
+    });
+
+    it('should calculate month period comparison correctly', async () => {
+      const req = createMockRequest({ query: { period: 'month' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const now = new Date();
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 15);
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
+
+      mockGetAllLeads.mockResolvedValue([
+        // This month: 3 leads
+        createSampleLead({ rowNumber: 2, status: 'new', date: thisMonth.toISOString() }),
+        createSampleLead({ rowNumber: 3, status: 'closed', salesOwnerId: 'sales-001', closedAt: thisMonth.toISOString(), date: thisMonth.toISOString() }),
+        createSampleLead({ rowNumber: 4, status: 'claimed', salesOwnerId: 'sales-002', date: thisMonth.toISOString() }),
+        // Last month: 6 leads (decline scenario)
+        createSampleLead({ rowNumber: 5, status: 'new', date: lastMonth.toISOString() }),
+        createSampleLead({ rowNumber: 6, status: 'new', date: lastMonth.toISOString() }),
+        createSampleLead({ rowNumber: 7, status: 'closed', salesOwnerId: 'sales-001', closedAt: lastMonth.toISOString(), date: lastMonth.toISOString() }),
+        createSampleLead({ rowNumber: 8, status: 'closed', salesOwnerId: 'sales-002', closedAt: lastMonth.toISOString(), date: lastMonth.toISOString() }),
+        createSampleLead({ rowNumber: 9, status: 'claimed', salesOwnerId: 'sales-001', date: lastMonth.toISOString() }),
+        createSampleLead({ rowNumber: 10, status: 'claimed', salesOwnerId: 'sales-002', date: lastMonth.toISOString() }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.summary.totalLeads).toBe(3); // 3 this month
+      expect(response.data.summary.changes.totalLeads).toBe(-50); // (3-6)/6 * 100 = -50%
+      expect(response.data.summary.changes.closed).toBe(-50); // (1-2)/2 * 100 = -50%
+    });
+
+    it('should handle custom period with same duration before', async () => {
+      const req = createMockRequest({
+        query: {
+          period: 'custom',
+          startDate: '2026-01-10',
+          endDate: '2026-01-15', // 6 days
+        },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      mockGetAllLeads.mockResolvedValue([
+        // Current period (Jan 10-15): 2 leads
+        createSampleLead({ rowNumber: 2, status: 'new', date: '2026-01-12T10:00:00.000Z' }),
+        createSampleLead({ rowNumber: 3, status: 'closed', salesOwnerId: 'sales-001', closedAt: '2026-01-14T10:00:00.000Z', date: '2026-01-14T10:00:00.000Z' }),
+        // Previous period (Jan 4-9): 1 lead
+        createSampleLead({ rowNumber: 4, status: 'new', date: '2026-01-06T10:00:00.000Z' }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.summary.totalLeads).toBe(2);
+      expect(response.data.summary.changes.totalLeads).toBe(100); // (2-1)/1 * 100 = 100%
+    });
+  });
+
+  // ===========================================
+  // getCampaigns (Story 0-13 - Campaign Comparison)
+  // ===========================================
+  describe('getCampaigns', () => {
+    it('should return campaign data with comparison', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          campaignId: 'campaign-001',
+          campaignName: 'Campaign A',
+          status: 'closed',
+          closedAt: getCurrentDateISO(),
+        }),
+        createSampleLead({
+          rowNumber: 3,
+          campaignId: 'campaign-001',
+          campaignName: 'Campaign A',
+          status: 'claimed',
+          salesOwnerId: 'sales-001',
+        }),
+        createSampleLead({
+          rowNumber: 4,
+          campaignId: 'campaign-002',
+          campaignName: 'Campaign B',
+          status: 'new',
+        }),
+      ]);
+
+      await getCampaigns(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.success).toBe(true);
+      expect(response.data).toHaveProperty('campaigns');
+      expect(response.data).toHaveProperty('totals');
+      expect(response.data).toHaveProperty('comparison');
+      expect(response.data).toHaveProperty('period');
+    });
+
+    it('should calculate campaign comparison with previous period', async () => {
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      mockGetAllLeads.mockResolvedValue([
+        // Today: 3 leads, 2 closed
+        createSampleLead({
+          rowNumber: 2,
+          campaignId: 'campaign-001',
+          status: 'closed',
+          closedAt: today.toISOString(),
+          date: today.toISOString(),
+        }),
+        createSampleLead({
+          rowNumber: 3,
+          campaignId: 'campaign-001',
+          status: 'closed',
+          closedAt: today.toISOString(),
+          date: today.toISOString(),
+        }),
+        createSampleLead({
+          rowNumber: 4,
+          campaignId: 'campaign-001',
+          status: 'new',
+          date: today.toISOString(),
+        }),
+        // Yesterday: 2 leads, 1 closed
+        createSampleLead({
+          rowNumber: 5,
+          campaignId: 'campaign-001',
+          status: 'closed',
+          closedAt: yesterday.toISOString(),
+          date: yesterday.toISOString(),
+        }),
+        createSampleLead({
+          rowNumber: 6,
+          campaignId: 'campaign-001',
+          status: 'new',
+          date: yesterday.toISOString(),
+        }),
+      ]);
+
+      await getCampaigns(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.comparison).toBeDefined();
+      expect(response.data.comparison.previousPeriod.leads).toBe(2);
+      expect(response.data.comparison.previousPeriod.closed).toBe(1);
+      expect(response.data.comparison.changes.leads).toBe(50); // (3-2)/2 * 100 = 50%
+      expect(response.data.comparison.changes.closed).toBe(100); // (2-1)/1 * 100 = 100%
+    });
+
+    it('should handle no previous period campaign data', async () => {
+      const req = createMockRequest({ query: { period: 'today' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const today = new Date();
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          campaignId: 'campaign-001',
+          status: 'closed',
+          closedAt: today.toISOString(),
+          date: today.toISOString(),
+        }),
+      ]);
+
+      await getCampaigns(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.comparison.previousPeriod.leads).toBe(0);
+      expect(response.data.comparison.previousPeriod.closed).toBe(0);
+      expect(response.data.comparison.changes.leads).toBe(100); // New data = +100%
+      expect(response.data.comparison.changes.closed).toBe(100);
     });
   });
 });

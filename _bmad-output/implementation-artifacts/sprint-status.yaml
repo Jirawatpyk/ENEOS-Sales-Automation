@@ -54,7 +54,7 @@ development_status:
   0-10-export-endpoint: done            # Completed 2026-01-12
   0-11-contacted-at-metrics-fix: done    # Bug fix: Add Contacted_At column & fix metrics - Code review passed (2026-01-18)
   0-12-status-history-tracking: done            # Enhancement: Store real status history in Sheets - Code review passed (2026-01-18)
-  0-13-period-comparison: ready-for-dev         # Enhancement: Real % change for KPI Cards (2026-01-18)
+  0-13-period-comparison: done                  # Enhancement: Real % change for KPI Cards - Code review passed (2026-01-18)
   # Note: Claimed_At column not needed - use Contacted_At instead (flow is new → contacted directly)
   epic-0-retrospective: done
 
@@ -115,7 +115,7 @@ development_status:
   4-6-filter-by-date: done  # Code review passed 2026-01-17
   4-7-sort-columns: done  # Code review passed 2026-01-18
   4-8-lead-detail-modal: done  # Code review passed 2026-01-18
-  4-9-bulk-select: ready-for-dev  # Story created 2026-01-17
+  4-9-bulk-select: done  # Code review passed 2026-01-18
   4-10-quick-export: ready-for-dev  # Story created 2026-01-17
   4-11-additional-columns: ready-for-dev  # Should Have - รวม F-04.11/12/13: leadSource, jobTitle, city columns (Story created 2026-01-17)
   4-12-job-title-column: merged           # Merged into 4-11-additional-columns

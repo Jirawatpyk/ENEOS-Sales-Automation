@@ -121,6 +121,83 @@ function parsePeriod(
 }
 
 /**
+ * คำนวณ period ก่อนหน้าสำหรับการเปรียบเทียบ
+ * - today → yesterday
+ * - week → last week (same 7 days, shifted back)
+ * - month → last month
+ * - quarter → last quarter
+ * - year → last year
+ * - custom → same duration before start date
+ *
+ * Note: Uses local time methods consistent with parsePeriod()
+ * Both functions must use the same timezone approach for correct comparison
+ */
+function getPreviousPeriod(currentPeriod: PeriodInfo): PeriodInfo {
+  const start = new Date(currentPeriod.startDate);
+  const end = new Date(currentPeriod.endDate);
+
+  let prevStart: Date;
+  let prevEnd: Date;
+
+  switch (currentPeriod.type) {
+    case 'today':
+      // Yesterday (use local time consistent with parsePeriod)
+      prevStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 1);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 1, 23, 59, 59, 999);
+      break;
+
+    case 'yesterday':
+      // Day before yesterday
+      prevStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 1);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 1, 23, 59, 59, 999);
+      break;
+
+    case 'week': {
+      // Last week (7 days before)
+      prevStart = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000);
+      prevEnd = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    }
+
+    case 'month': {
+      // Last month (use local time consistent with parsePeriod)
+      prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59, 999); // Last day of previous month
+      break;
+    }
+
+    case 'quarter': {
+      // Last quarter (3 months before, use local time)
+      prevStart = new Date(start.getFullYear(), start.getMonth() - 3, 1);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59, 999);
+      break;
+    }
+
+    case 'year': {
+      // Last year (use local time)
+      prevStart = new Date(start.getFullYear() - 1, 0, 1);
+      prevEnd = new Date(start.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+      break;
+    }
+
+    case 'custom':
+    default: {
+      // Same duration before start date
+      const durationMs = end.getTime() - start.getTime();
+      prevEnd = new Date(start.getTime() - 1); // 1ms before current start
+      prevStart = new Date(prevEnd.getTime() - durationMs);
+      break;
+    }
+  }
+
+  return {
+    type: currentPeriod.type,
+    startDate: prevStart.toISOString(),
+    endDate: prevEnd.toISOString(),
+  };
+}
+
+/**
  * คำนวณจำนวนนาทีระหว่าง 2 วันที่
  */
 function getMinutesBetween(start: string | null, end: string | null): number {
@@ -227,10 +304,13 @@ export async function getDashboard(
     const conversionRate = totalLeads > 0 ? (statusCount.closed / totalLeads) * 100 : 0;
 
     // คำนวณข้อมูลเปรียบเทียบกับช่วงก่อน (สำหรับ changes)
-    // TODO: ต้องดึงข้อมูลช่วงก่อนหน้ามาเปรียบเทียบ
-    const previousPeriodLeads = 0; // Placeholder
-    const previousClaimed = 0;
-    const previousClosed = 0;
+    const previousPeriod = getPreviousPeriod(period);
+    const previousLeads = filterByPeriod(allLeads, previousPeriod);
+    const previousStatusCount = countByStatus(previousLeads);
+
+    const previousPeriodLeads = previousLeads.length;
+    const previousClaimed = previousStatusCount.claimed;
+    const previousClosed = previousStatusCount.closed;
 
     const summary: DashboardSummary = {
       totalLeads,
@@ -241,9 +321,9 @@ export async function getDashboard(
       unreachable: statusCount.unreachable,
       conversionRate: Number(conversionRate.toFixed(2)),
       changes: {
-        totalLeads: calculateChange(totalLeads, previousPeriodLeads),
-        claimed: calculateChange(statusCount.claimed, previousClaimed),
-        closed: calculateChange(statusCount.closed, previousClosed),
+        totalLeads: Number(calculateChange(totalLeads, previousPeriodLeads).toFixed(2)),
+        claimed: Number(calculateChange(statusCount.claimed, previousClaimed).toFixed(2)),
+        closed: Number(calculateChange(statusCount.closed, previousClosed).toFixed(2)),
       },
     };
 
@@ -1032,17 +1112,25 @@ export async function getSalesPerformance(
       );
     }
 
-    // TODO: คำนวณ comparison กับช่วงก่อนหน้า
+    // คำนวณ comparison กับช่วงก่อนหน้า
+    const previousPeriod = getPreviousPeriod(period);
+    const previousLeads = filterByPeriod(allLeads, previousPeriod);
+    const previousClaimed = previousLeads.filter((l) => l.salesOwnerId).length;
+    const previousClosed = previousLeads.filter((l) => l.status === 'closed').length;
+    const previousConversionRate = previousClaimed > 0
+      ? Number(((previousClosed / previousClaimed) * 100).toFixed(2))
+      : 0;
+
     const comparison: SalesComparison = {
       previousPeriod: {
-        claimed: 0,
-        closed: 0,
-        conversionRate: 0,
+        claimed: previousClaimed,
+        closed: previousClosed,
+        conversionRate: previousConversionRate,
       },
       changes: {
-        claimed: 0,
-        closed: 0,
-        conversionRate: 0,
+        claimed: Number(calculateChange(totals.claimed, previousClaimed).toFixed(2)),
+        closed: Number(calculateChange(totals.closed, previousClosed).toFixed(2)),
+        conversionRate: Number(calculateChange(totals.conversionRate, previousConversionRate).toFixed(2)),
       },
     };
 
@@ -1404,17 +1492,25 @@ export async function getCampaigns(
       totals.conversionRate = Number(((totals.closed / totals.leads) * 100).toFixed(2));
     }
 
-    // TODO: Calculate comparison with previous period
+    // Calculate comparison with previous period
+    const previousPeriod = getPreviousPeriod(period);
+    const previousLeads = filterByPeriod(allLeads, previousPeriod);
+    const previousLeadsCount = previousLeads.length;
+    const previousClosed = previousLeads.filter((l) => l.status === 'closed').length;
+    const previousConversionRate = previousLeadsCount > 0
+      ? Number(((previousClosed / previousLeadsCount) * 100).toFixed(2))
+      : 0;
+
     const comparison = {
       previousPeriod: {
-        leads: 0,
-        closed: 0,
-        conversionRate: 0,
+        leads: previousLeadsCount,
+        closed: previousClosed,
+        conversionRate: previousConversionRate,
       },
       changes: {
-        leads: 0,
-        closed: 0,
-        conversionRate: 0,
+        leads: Number(calculateChange(totals.leads, previousLeadsCount).toFixed(2)),
+        closed: Number(calculateChange(totals.closed, previousClosed).toFixed(2)),
+        conversionRate: Number(calculateChange(totals.conversionRate, previousConversionRate).toFixed(2)),
       },
     };
 

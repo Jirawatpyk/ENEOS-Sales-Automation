@@ -272,7 +272,8 @@ export class SheetsService {
     logger.info('Updating lead with lock', { rowNumber, updates });
 
     return circuitBreaker.execute(async () => {
-      // Get current row data
+      // Always fetch current data for race condition detection
+      // This second read is intentional - it detects concurrent modifications
       const currentLead = await this.getRow(rowNumber);
 
       if (!currentLead) {
@@ -391,7 +392,9 @@ export class SheetsService {
         break;
     }
 
-    const updatedLead = await this.updateLeadWithLock(rowNumber, updates);
+    // Pass version for optimistic locking - the second getRow in updateLeadWithLock
+    // is intentional for race condition detection (detects concurrent modifications)
+    const updatedLead = await this.updateLeadWithLock(rowNumber, updates, currentLead.version);
 
     // Fire-and-forget: Record status change in history (using UUID for Supabase compatibility)
     if (updatedLead.leadUUID) {
@@ -449,7 +452,9 @@ export class SheetsService {
         break;
     }
 
-    const updatedLead = await this.updateLeadWithLock(rowNumber, updates);
+    // Pass version for optimistic locking - the second getRow in updateLeadWithLock
+    // is intentional for race condition detection (detects concurrent modifications)
+    const updatedLead = await this.updateLeadWithLock(rowNumber, updates, currentLead.version);
 
     // Fire-and-forget: Record status change in history (using UUID for Supabase compatibility)
     // Use updatedLead.leadUUID because updateLeadWithLock generates UUID for legacy leads

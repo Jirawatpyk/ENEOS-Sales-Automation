@@ -121,23 +121,51 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
 
   const { action, rowId, leadId } = postbackData;
 
+  // Helper function to get user profile with fallback
+  const getUserProfileSafe = async (): Promise<string> => {
+    try {
+      if (groupId) {
+        const profile = await lineService.getGroupMemberProfile(groupId, userId);
+        return profile.displayName;
+      } else {
+        const profile = await lineService.getUserProfile(userId);
+        return profile.displayName;
+      }
+    } catch (profileError) {
+      logger.warn('Could not get user profile, using userId', {
+        userId,
+        error: profileError instanceof Error ? profileError.message : 'Unknown error',
+      });
+      return userId.substring(0, 10) + '...';
+    }
+  };
+
   // Determine the row number to use
   // Priority: leadId (new UUID format) > rowId (legacy format)
   let effectiveRowId: number;
+  let userName: string;
 
   if (leadId) {
-    // UUID-based lookup
-    const leadData = await sheetsService.findLeadByUUID(leadId);
+    // UUID-based lookup - run findLeadByUUID and getUserProfile in PARALLEL
+    // This saves ~200-500ms by not waiting for getUserProfile sequentially
+    const [leadData, profileName] = await Promise.all([
+      sheetsService.findLeadByUUID(leadId),
+      getUserProfileSafe(),
+    ]);
+
     if (!leadData) {
       logger.warn('Lead not found by UUID', { leadId });
       await lineService.replyError(replyToken, 'ไม่พบข้อมูลเคสนี้ในระบบ');
       return;
     }
     effectiveRowId = leadData.rowNumber;
+    userName = profileName;
     logger.info('Resolved leadId to rowNumber', { leadId, rowNumber: effectiveRowId });
   } else if (rowId !== undefined) {
     // Legacy row-based lookup (backward compatibility)
+    // No parallel optimization possible here since we only need getUserProfile
     effectiveRowId = rowId;
+    userName = await getUserProfileSafe();
     logger.info('Using legacy rowId', { rowId });
   } else {
     logger.warn('No leadId or rowId in postback', { data: postback?.data });
@@ -146,24 +174,6 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
   }
 
   try {
-    // Get user profile for display name
-    let userName = 'Unknown';
-    try {
-      if (groupId) {
-        const profile = await lineService.getGroupMemberProfile(groupId, userId);
-        userName = profile.displayName;
-      } else {
-        const profile = await lineService.getUserProfile(userId);
-        userName = profile.displayName;
-      }
-    } catch (profileError) {
-      logger.warn('Could not get user profile, using userId', {
-        userId,
-        error: profileError instanceof Error ? profileError.message : 'Unknown error',
-      });
-      userName = userId.substring(0, 10) + '...';
-    }
-
     // Claim or update lead
     const result = await sheetsService.claimLead(effectiveRowId, userId, userName, action);
 

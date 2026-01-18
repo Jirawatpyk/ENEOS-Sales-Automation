@@ -328,6 +328,32 @@ describe('SheetsService', () => {
 
       expect(mockSheets.spreadsheets.values.update).toHaveBeenCalled();
     });
+
+    it('should throw RaceConditionError when version changes between read and write (concurrent claim)', async () => {
+      // Simulate race condition: another user claims the lead between getRow and updateLeadWithLock
+      // First getRow (in claimLead) returns version 1
+      // Second getRow (inside updateLeadWithLock) returns version 2 (someone else updated)
+      const version1Response = mockSheetsGetResponse;
+      const version2Response = {
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 22),
+              '2', // Version changed from 1 to 2
+              ...mockSheetsGetResponse.data.values[0].slice(23),
+            ],
+          ],
+        },
+      };
+
+      mockSheets.spreadsheets.values.get
+        .mockResolvedValueOnce(version1Response) // claimLead reads version 1
+        .mockResolvedValueOnce(version2Response); // updateLeadWithLock reads version 2
+
+      await expect(service.claimLead(42, 'U123', 'John Doe', 'contacted')).rejects.toThrow(
+        'Version mismatch'
+      );
+    });
   });
 
   describe('updateLeadStatus', () => {
@@ -389,6 +415,48 @@ describe('SheetsService', () => {
       });
 
       await expect(service.updateLeadStatus(999, 'U123', 'closed')).rejects.toThrow('Row 999 not found');
+    });
+
+    it('should throw RaceConditionError when version changes between read and write (concurrent update)', async () => {
+      // Simulate race condition: another user updates the lead between getRow and updateLeadWithLock
+      // First getRow (in updateLeadStatus) returns version 1 with owner U123
+      // Second getRow (inside updateLeadWithLock) returns version 2 (someone else updated)
+      const version1WithOwner = {
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 9),
+              'U123', // Owner
+              'John Doe',
+              ...mockSheetsGetResponse.data.values[0].slice(11, 22),
+              '1', // Version 1
+              ...mockSheetsGetResponse.data.values[0].slice(23),
+            ],
+          ],
+        },
+      };
+      const version2WithOwner = {
+        data: {
+          values: [
+            [
+              ...mockSheetsGetResponse.data.values[0].slice(0, 9),
+              'U123', // Owner
+              'John Doe',
+              ...mockSheetsGetResponse.data.values[0].slice(11, 22),
+              '2', // Version changed to 2
+              ...mockSheetsGetResponse.data.values[0].slice(23),
+            ],
+          ],
+        },
+      };
+
+      mockSheets.spreadsheets.values.get
+        .mockResolvedValueOnce(version1WithOwner) // updateLeadStatus reads version 1
+        .mockResolvedValueOnce(version2WithOwner); // updateLeadWithLock reads version 2
+
+      await expect(service.updateLeadStatus(42, 'U123', 'closed')).rejects.toThrow(
+        'Version mismatch'
+      );
     });
   });
 

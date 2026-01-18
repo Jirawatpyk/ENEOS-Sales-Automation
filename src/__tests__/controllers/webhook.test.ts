@@ -249,5 +249,352 @@ describe('Webhook Controller', () => {
         })
       );
     });
+
+    it('should include timestamp in response', () => {
+      mockReq = {};
+
+      verifyWebhook(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timestamp: expect.any(String),
+        })
+      );
+    });
+  });
+
+  describe('handleBrevoWebhook - error handling', () => {
+    it('should add to DLQ when sheets service throws error', async () => {
+      const { addFailedBrevoWebhook } = await import('../../services/dead-letter-queue.service.js');
+      vi.mocked(sheetsService.addLead).mockRejectedValueOnce(new Error('Sheets API error'));
+
+      mockReq = { body: mockBrevoClickPayload, requestId: 'req-test-123' };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(addFailedBrevoWebhook).toHaveBeenCalledWith(
+        mockBrevoClickPayload,
+        expect.any(Error),
+        'req-test-123'
+      );
+      expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
+    });
+
+    it('should re-throw non-DuplicateLeadError from deduplication', async () => {
+      const genericError = new Error('Database connection failed');
+      vi.mocked(deduplicationService.checkOrThrow).mockRejectedValue(genericError);
+
+      mockReq = { body: mockBrevoClickPayload, requestId: 'req-456' };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(mockNext).toHaveBeenCalledWith(genericError);
+    });
+  });
+
+  describe('handleBrevoWebhook - feature flags', () => {
+    it('should skip AI enrichment when disabled', async () => {
+      // Reset module to change config
+      vi.doMock('../../config/index.js', () => ({
+        config: {
+          features: {
+            aiEnrichment: false,
+            deduplication: true,
+            lineNotifications: true,
+          },
+          isProd: false,
+        },
+      }));
+
+      // Re-import controller with new config
+      vi.resetModules();
+      const { handleBrevoWebhook: handler } = await import('../../controllers/webhook.controller.js');
+      const geminiModule = await import('../../services/gemini.service.js');
+
+      mockReq = { body: mockBrevoClickPayload };
+
+      await handler(mockReq as Request, mockRes as Response, mockNext);
+
+      // AI should not be called when disabled
+      expect(geminiModule.geminiService.analyzeCompany).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+
+      // Restore original mock
+      vi.doMock('../../config/index.js', () => ({
+        config: {
+          features: {
+            aiEnrichment: true,
+            deduplication: true,
+            lineNotifications: true,
+          },
+          isProd: false,
+        },
+      }));
+    });
+
+    it('should skip LINE notification when disabled', async () => {
+      // Reset module to change config
+      vi.doMock('../../config/index.js', () => ({
+        config: {
+          features: {
+            aiEnrichment: true,
+            deduplication: true,
+            lineNotifications: false,
+          },
+          isProd: false,
+        },
+      }));
+
+      // Re-import controller with new config
+      vi.resetModules();
+      const { handleBrevoWebhook: handler } = await import('../../controllers/webhook.controller.js');
+      const lineModule = await import('../../services/line.service.js');
+
+      mockReq = { body: mockBrevoClickPayload };
+
+      await handler(mockReq as Request, mockRes as Response, mockNext);
+
+      // LINE should not be called when disabled
+      expect(lineModule.lineService.pushLeadNotification).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+
+      // Restore original mock
+      vi.doMock('../../config/index.js', () => ({
+        config: {
+          features: {
+            aiEnrichment: true,
+            deduplication: true,
+            lineNotifications: true,
+          },
+          isProd: false,
+        },
+      }));
+    });
+  });
+
+  describe('handleBrevoWebhook - payload handling', () => {
+    it('should handle payload without event field (defaults to click)', async () => {
+      const payloadWithoutEvent = { ...mockBrevoClickPayload };
+      delete (payloadWithoutEvent as Record<string, unknown>).event;
+
+      mockReq = { body: payloadWithoutEvent };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      // Should still process as click event
+      expect(sheetsService.addLead).toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+    });
+
+    it('should use Brevo website if provided over AI guess', async () => {
+      const payloadWithWebsite = {
+        ...mockBrevoClickPayload,
+        website: 'https://brevo-provided.com',
+      };
+
+      mockReq = { body: payloadWithWebsite };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(sheetsService.addLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          website: 'https://brevo-provided.com',
+        })
+      );
+    });
+
+    it('should format phone number correctly', async () => {
+      const payloadWithPhone = {
+        ...mockBrevoClickPayload,
+        phone: '081-234-5678',
+      };
+
+      mockReq = { body: payloadWithPhone };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(sheetsService.addLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phone: expect.any(String),
+        })
+      );
+    });
+
+    it('should include new Brevo contact attributes', async () => {
+      const payloadWithAttributes = {
+        ...mockBrevoClickPayload,
+        LEAD_SOURCE: 'Facebook Ads',
+        JOB_TITLE: 'CEO',
+        CITY: 'Bangkok',
+      };
+
+      mockReq = { body: payloadWithAttributes };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(sheetsService.addLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leadSource: expect.any(String),
+        })
+      );
+    });
+
+    it('should handle missing optional fields gracefully', async () => {
+      const minimalPayload = {
+        event: 'click',
+        email: 'minimal@test.com',
+        campaign_id: 123,
+        campaign_name: 'Test',
+        'message-id': 'msg-123',
+        date: '2026-01-19',
+      };
+
+      mockReq = { body: minimalPayload };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(sheetsService.addLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'minimal@test.com',
+          customerName: expect.any(String),
+          company: expect.any(String),
+        })
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+    });
+  });
+
+  describe('testWebhook', () => {
+    it('should return 403 in production mode', async () => {
+      // Mock production config
+      vi.doMock('../../config/index.js', () => ({
+        config: {
+          features: {
+            aiEnrichment: true,
+            deduplication: true,
+            lineNotifications: true,
+          },
+          isProd: true,
+        },
+      }));
+
+      vi.resetModules();
+      const { testWebhook: prodTestWebhook } = await import('../../controllers/webhook.controller.js');
+
+      const prodMockRes = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn().mockReturnThis(),
+      };
+      mockReq = { body: {} };
+
+      await prodTestWebhook(mockReq as Request, prodMockRes as unknown as Response);
+
+      expect(prodMockRes.status).toHaveBeenCalledWith(403);
+      expect(prodMockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: 'Test endpoint disabled in production',
+        })
+      );
+    });
+
+    it('should return mock payload in development mode', async () => {
+      // Reset to dev config
+      vi.doMock('../../config/index.js', () => ({
+        config: {
+          features: {
+            aiEnrichment: true,
+            deduplication: true,
+            lineNotifications: true,
+          },
+          isProd: false,
+        },
+      }));
+
+      vi.resetModules();
+      const { testWebhook: devTestWebhook } = await import('../../controllers/webhook.controller.js');
+
+      const devMockRes = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn().mockReturnThis(),
+      };
+      mockReq = { body: {} };
+
+      await devTestWebhook(mockReq as Request, devMockRes as unknown as Response);
+
+      expect(devMockRes.status).toHaveBeenCalledWith(200);
+      expect(devMockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Test webhook processed',
+          mockPayload: expect.objectContaining({
+            event: 'click',
+            email: 'test@example.com',
+          }),
+        })
+      );
+    });
+
+    it('should inject mock payload into request body', async () => {
+      // Reset to dev config
+      vi.doMock('../../config/index.js', () => ({
+        config: {
+          features: {
+            aiEnrichment: true,
+            deduplication: true,
+            lineNotifications: true,
+          },
+          isProd: false,
+        },
+      }));
+
+      vi.resetModules();
+      const { testWebhook: devTestWebhook } = await import('../../controllers/webhook.controller.js');
+
+      const devMockRes = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn().mockReturnThis(),
+      };
+      mockReq = { body: {} };
+
+      await devTestWebhook(mockReq as Request, devMockRes as unknown as Response);
+
+      expect(mockReq.body).toEqual(
+        expect.objectContaining({
+          event: 'click',
+          email: 'test@example.com',
+          firstname: 'Test',
+          lastname: 'User',
+        })
+      );
+    });
   });
 });

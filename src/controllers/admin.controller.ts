@@ -386,11 +386,28 @@ export async function getDashboard(
       .map((person, index) => ({ ...person, rank: index + 1 }));
 
     // Recent Activity
+    // Helper: Get the appropriate timestamp based on lead status
+    const getActivityTimestamp = (lead: LeadRow): string => {
+      switch (lead.status) {
+        case 'closed':
+          return lead.closedAt || lead.contactedAt || lead.date;
+        case 'lost':
+          return lead.lostAt || lead.contactedAt || lead.date;
+        case 'unreachable':
+          return lead.unreachableAt || lead.contactedAt || lead.date;
+        case 'contacted':
+          return lead.contactedAt || lead.date;
+        case 'new':
+        default:
+          return lead.date;
+      }
+    };
+
     const recentActivity: ActivityItem[] = leads
       .filter((lead) => lead.salesOwnerId)
       .sort((a, b) => {
-        const aTime = a.closedAt || a.clickedAt || a.date;
-        const bTime = b.closedAt || b.clickedAt || b.date;
+        const aTime = getActivityTimestamp(a);
+        const bTime = getActivityTimestamp(b);
         return new Date(bTime).getTime() - new Date(aTime).getTime();
       })
       .slice(0, DASHBOARD.RECENT_ACTIVITY_LIMIT)
@@ -402,7 +419,7 @@ export async function getDashboard(
         leadId: lead.rowNumber,
         company: lead.company,
         customerName: lead.customerName,
-        timestamp: lead.closedAt || lead.clickedAt || lead.date,
+        timestamp: getActivityTimestamp(lead),
       }));
 
     // Alerts
@@ -588,6 +605,12 @@ export async function getLeads(
     }
 
     // Sort
+    // Helper: safely parse date to timestamp, returns 0 for invalid dates
+    const safeGetTime = (dateStr: string): number => {
+      const time = new Date(dateStr).getTime();
+      return isNaN(time) ? 0 : time;
+    };
+
     allLeads.sort((a, b) => {
       let aValue: string | number = '';
       let bValue: string | number = '';
@@ -595,12 +618,12 @@ export async function getLeads(
       switch (sortBy) {
         case 'date':
         case 'createdAt': // createdAt is alias for date
-          aValue = new Date(a.date).getTime();
-          bValue = new Date(b.date).getTime();
+          aValue = safeGetTime(a.date);
+          bValue = safeGetTime(b.date);
           break;
         case 'company':
-          aValue = a.company;
-          bValue = b.company;
+          aValue = a.company.toLowerCase();
+          bValue = b.company.toLowerCase();
           break;
         case 'status':
           aValue = a.status;
@@ -612,14 +635,14 @@ export async function getLeads(
           bValue = (b.salesOwnerName || '').toLowerCase();
           break;
         default:
-          aValue = new Date(a.date).getTime();
-          bValue = new Date(b.date).getTime();
+          aValue = safeGetTime(a.date);
+          bValue = safeGetTime(b.date);
       }
 
       if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
       } else {
-        return aValue < bValue ? 1 : -1;
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
       }
     });
 

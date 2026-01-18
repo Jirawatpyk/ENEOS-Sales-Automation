@@ -720,3 +720,71 @@ Frontend: 1345 tests passed
 
 **Fix Result:** ✅ RESOLVED - Sort by Sales Owner now works correctly
 
+---
+
+### Backend Fix (Runtime Bug #2)
+
+**Date:** 2026-01-18
+**Issue:** Sort by Created Date not working correctly
+
+#### Root Cause
+
+JavaScript `Date.getTime()` returns `NaN` for invalid date strings. NaN comparisons always return `false`, breaking the sort algorithm:
+
+```javascript
+new Date('').getTime()        // → NaN
+new Date('invalid').getTime() // → NaN
+
+NaN > 100  // → false
+NaN < 100  // → false (always false!)
+```
+
+If any lead has empty or invalid date format, the entire sort fails silently.
+
+#### Backend Files Changed
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/controllers/admin.controller.ts` | Modified | Added `safeGetTime()` helper, improved sort comparison logic |
+
+#### Changes Applied
+
+**admin.controller.ts:591-630**
+```typescript
+// Helper: safely parse date to timestamp, returns 0 for invalid dates
+const safeGetTime = (dateStr: string): number => {
+  const time = new Date(dateStr).getTime();
+  return isNaN(time) ? 0 : time;
+};
+
+allLeads.sort((a, b) => {
+  // ...
+  case 'createdAt':
+    aValue = safeGetTime(a.date);  // Safe from NaN
+    bValue = safeGetTime(b.date);
+    break;
+  // ...
+
+  // Improved comparison with 3 outcomes (1, -1, 0)
+  if (sortOrder === 'asc') {
+    return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+  } else {
+    return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+  }
+});
+```
+
+#### Additional Improvements
+
+1. **Company sort** - Added `.toLowerCase()` for case-insensitive sorting
+2. **Comparison logic** - Changed from 2 outcomes to 3 outcomes (handles equality)
+
+#### Test Results
+
+```
+Backend: 531 tests passed (1 timeout unrelated)
+Type check: passed
+```
+
+**Fix Result:** ✅ RESOLVED - Sort by Created Date now works correctly with defensive NaN handling
+

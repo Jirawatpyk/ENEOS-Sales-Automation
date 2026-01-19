@@ -492,6 +492,141 @@ describe('Webhook Controller', () => {
     });
   });
 
+  describe('handleBrevoWebhook - metrics', () => {
+    it('should increment leadsProcessed counter on success', async () => {
+      mockReq = { body: mockBrevoClickPayload };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      // Lead should be processed successfully
+      expect(sheetsService.addLead).toHaveBeenCalled();
+    });
+
+    it('should increment duplicateLeadsTotal when duplicate detected', async () => {
+      const { DuplicateLeadError } = await import('../../types/index.js');
+      vi.mocked(deduplicationService.checkOrThrow).mockRejectedValue(
+        new DuplicateLeadError('test@example.com', '12345')
+      );
+
+      mockReq = { body: mockBrevoClickPayload };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Duplicate lead - already processed',
+        })
+      );
+    });
+
+    it('should track AI analysis duration and status', async () => {
+      mockReq = { body: mockBrevoClickPayload };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(geminiService.analyzeCompany).toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+    });
+  });
+
+  describe('handleBrevoWebhook - lead creation', () => {
+    it('should create lead with correct structure', async () => {
+      mockReq = { body: mockBrevoClickPayload };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(sheetsService.addLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: mockBrevoClickPayload.email,
+          status: 'new',
+          source: 'Brevo',
+        })
+      );
+    });
+
+    it('should use default customer name when not provided', async () => {
+      const payloadNoName = {
+        ...mockBrevoClickPayload,
+        firstname: undefined,
+        lastname: undefined,
+      };
+      delete (payloadNoName as Record<string, unknown>).firstname;
+      delete (payloadNoName as Record<string, unknown>).lastname;
+
+      mockReq = { body: payloadNoName };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(sheetsService.addLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customerName: expect.any(String),
+        })
+      );
+    });
+
+    it('should use default company when not provided', async () => {
+      const payloadNoCompany = { ...mockBrevoClickPayload };
+      delete (payloadNoCompany as Record<string, unknown>).company;
+
+      mockReq = { body: payloadNoCompany };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(sheetsService.addLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          company: expect.any(String),
+        })
+      );
+    });
+
+    it('should return lead data in response', async () => {
+      vi.mocked(sheetsService.addLead).mockResolvedValueOnce(42);
+      mockReq = { body: mockBrevoClickPayload };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            rowNumber: 42,
+            email: mockBrevoClickPayload.email,
+            industry: mockCompanyAnalysis.industry,
+          }),
+        })
+      );
+    });
+  });
+
   describe('testWebhook', () => {
     it('should return 403 in production mode', async () => {
       // Mock production config

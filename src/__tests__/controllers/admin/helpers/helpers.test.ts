@@ -32,12 +32,15 @@ import {
   filterByLeadSource,
   countByStatus,
   calculateChange,
+  calculateConversionRate,
+  aggregateSalesStats,
   getMinutesBetween,
   getWeekNumber,
   safeGetTime,
   calculateAverage,
   getActivityTimestamp,
   sortLeads,
+  sortByNumericField,
 } from '../../../../controllers/admin/helpers/index.js';
 
 // Helper to create mock lead
@@ -293,6 +296,74 @@ describe('Admin Controller Helpers', () => {
     });
   });
 
+  describe('calculateConversionRate', () => {
+    it('should calculate conversion rate correctly', () => {
+      expect(calculateConversionRate(25, 100)).toBe(25);
+      expect(calculateConversionRate(1, 3)).toBeCloseTo(33.33, 2);
+    });
+
+    it('should return 0 when total is 0', () => {
+      expect(calculateConversionRate(0, 0)).toBe(0);
+      expect(calculateConversionRate(5, 0)).toBe(0);
+    });
+
+    it('should return 100 when all closed', () => {
+      expect(calculateConversionRate(10, 10)).toBe(100);
+    });
+
+    it('should round to 2 decimal places', () => {
+      expect(calculateConversionRate(1, 7)).toBeCloseTo(14.29, 2);
+    });
+  });
+
+  describe('aggregateSalesStats', () => {
+    it('should count all status types correctly', () => {
+      const leads = [
+        createMockLead({ status: 'contacted' }),
+        createMockLead({ status: 'contacted' }),
+        createMockLead({ status: 'closed' }),
+        createMockLead({ status: 'lost' }),
+        createMockLead({ status: 'unreachable' }),
+      ];
+
+      const result = aggregateSalesStats(leads);
+      expect(result.claimed).toBe(5); // Total number of leads
+      expect(result.contacted).toBe(2);
+      expect(result.closed).toBe(1);
+      expect(result.lost).toBe(1);
+      expect(result.unreachable).toBe(1);
+    });
+
+    it('should return zeros for empty array', () => {
+      const result = aggregateSalesStats([]);
+      expect(result.claimed).toBe(0);
+      expect(result.contacted).toBe(0);
+      expect(result.closed).toBe(0);
+      expect(result.lost).toBe(0);
+      expect(result.unreachable).toBe(0);
+    });
+
+    it('should handle leads with only new status', () => {
+      const leads = [
+        createMockLead({ status: 'new' }),
+        createMockLead({ status: 'new' }),
+      ];
+
+      const result = aggregateSalesStats(leads);
+      expect(result.claimed).toBe(2); // Total claimed
+      expect(result.contacted).toBe(0);
+      expect(result.closed).toBe(0);
+    });
+
+    it('should handle single lead', () => {
+      const leads = [createMockLead({ status: 'closed' })];
+
+      const result = aggregateSalesStats(leads);
+      expect(result.claimed).toBe(1);
+      expect(result.closed).toBe(1);
+    });
+  });
+
   describe('getMinutesBetween', () => {
     it('should calculate minutes between two dates', () => {
       const start = '2026-01-15T10:00:00.000Z';
@@ -394,6 +465,111 @@ describe('Admin Controller Helpers', () => {
     it('should handle unknown sortBy field with fallback to date', () => {
       const result = sortLeads(leads, 'unknownField', 'desc');
       expect(result[0].date).toBe('2026-01-15');
+    });
+
+    it('should sort by status', () => {
+      const leadsWithStatus = [
+        createMockLead({ status: 'new' }),
+        createMockLead({ status: 'closed' }),
+        createMockLead({ status: 'contacted' }),
+      ];
+      const result = sortLeads(leadsWithStatus, 'status', 'asc');
+      expect(result[0].status).toBe('closed');
+      expect(result[1].status).toBe('contacted');
+      expect(result[2].status).toBe('new');
+    });
+
+    it('should sort by status descending', () => {
+      const leadsWithStatus = [
+        createMockLead({ status: 'closed' }),
+        createMockLead({ status: 'new' }),
+        createMockLead({ status: 'contacted' }),
+      ];
+      const result = sortLeads(leadsWithStatus, 'status', 'desc');
+      expect(result[0].status).toBe('new');
+      expect(result[2].status).toBe('closed');
+    });
+
+    it('should sort by salesOwnerName', () => {
+      const leadsWithOwners = [
+        createMockLead({ salesOwnerName: 'Charlie' }),
+        createMockLead({ salesOwnerName: 'Alice' }),
+        createMockLead({ salesOwnerName: 'Bob' }),
+      ];
+      const result = sortLeads(leadsWithOwners, 'salesOwnerName', 'asc');
+      expect(result[0].salesOwnerName).toBe('Alice');
+      expect(result[1].salesOwnerName).toBe('Bob');
+      expect(result[2].salesOwnerName).toBe('Charlie');
+    });
+
+    it('should sort by salesOwnerName with null values', () => {
+      const leadsWithNullOwners = [
+        createMockLead({ salesOwnerName: 'Bob' }),
+        createMockLead({ salesOwnerName: null }),
+        createMockLead({ salesOwnerName: 'Alice' }),
+      ];
+      const result = sortLeads(leadsWithNullOwners, 'salesOwnerName', 'asc');
+      // null converts to empty string, so it comes first in asc
+      expect(result[0].salesOwnerName).toBeNull();
+      expect(result[1].salesOwnerName).toBe('Alice');
+      expect(result[2].salesOwnerName).toBe('Bob');
+    });
+
+    it('should sort by createdAt as alias for date', () => {
+      const result = sortLeads(leads, 'createdAt', 'asc');
+      expect(result[0].date).toBe('2026-01-05');
+      expect(result[2].date).toBe('2026-01-15');
+    });
+  });
+
+  describe('sortByNumericField', () => {
+    interface SalesStats {
+      name: string;
+      totalLeads: number;
+      closedLeads: number;
+    }
+
+    const salesData: SalesStats[] = [
+      { name: 'Alice', totalLeads: 10, closedLeads: 5 },
+      { name: 'Bob', totalLeads: 20, closedLeads: 8 },
+      { name: 'Charlie', totalLeads: 15, closedLeads: 12 },
+    ];
+
+    it('should sort by numeric field descending (default)', () => {
+      const result = sortByNumericField(salesData, (s) => s.totalLeads);
+      expect(result[0].name).toBe('Bob');
+      expect(result[1].name).toBe('Charlie');
+      expect(result[2].name).toBe('Alice');
+    });
+
+    it('should sort by numeric field ascending', () => {
+      const result = sortByNumericField(salesData, (s) => s.totalLeads, 'asc');
+      expect(result[0].name).toBe('Alice');
+      expect(result[1].name).toBe('Charlie');
+      expect(result[2].name).toBe('Bob');
+    });
+
+    it('should sort by different field', () => {
+      const result = sortByNumericField(salesData, (s) => s.closedLeads, 'desc');
+      expect(result[0].name).toBe('Charlie');
+      expect(result[0].closedLeads).toBe(12);
+    });
+
+    it('should not mutate original array', () => {
+      const original = [...salesData];
+      sortByNumericField(salesData, (s) => s.totalLeads);
+      expect(salesData).toEqual(original);
+    });
+
+    it('should handle empty array', () => {
+      const result = sortByNumericField([], (s: SalesStats) => s.totalLeads);
+      expect(result).toEqual([]);
+    });
+
+    it('should handle single item array', () => {
+      const single = [{ name: 'Solo', totalLeads: 5, closedLeads: 2 }];
+      const result = sortByNumericField(single, (s) => s.totalLeads);
+      expect(result).toEqual(single);
     });
   });
 });

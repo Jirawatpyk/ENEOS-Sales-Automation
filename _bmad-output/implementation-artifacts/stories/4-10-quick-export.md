@@ -1,6 +1,6 @@
 # Story 4.10: Quick Export
 
-Status: ready-for-dev
+Status: complete
 
 ## Story
 
@@ -83,64 +83,65 @@ so that **I can share lead information with colleagues, prepare meeting material
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create Lead Export Utilities** (AC: #3, #4)
-  - [ ] 1.1 Create `src/lib/export-leads.ts`
-  - [ ] 1.2 Implement `exportLeadsToExcel(leads)` using XLSX library
-  - [ ] 1.3 Implement `exportLeadsToCSV(leads)` with UTF-8 BOM
-  - [ ] 1.4 Define export columns (Company, Contact, Email, etc.)
-  - [ ] 1.5 Format dates and phone numbers in export
-  - [ ] 1.6 Generate filename with current date
+- [x] **Task 1: Create Lead Export Utilities** (AC: #3, #4)
+  - [x] 1.1 Create `src/lib/export-leads.ts`
+  - [x] 1.2 Implement `exportLeadsToExcel(leads)` using XLSX library
+  - [x] 1.3 Implement `exportLeadsToCSV(leads)` with UTF-8 BOM
+  - [x] 1.4 Define export columns (Company, Contact, Email, etc.)
+  - [x] 1.5 Format dates and phone numbers in export
+  - [x] 1.6 Generate filename with current date
 
-- [ ] **Task 2: Create useExportLeads Hook** (AC: #6, #7)
-  - [ ] 2.1 Create `src/hooks/use-export-leads.ts`
-  - [ ] 2.2 Manage `isExporting` loading state
-  - [ ] 2.3 Implement `exportToExcel(leads)` function
-  - [ ] 2.4 Implement `exportToCSV(leads)` function
-  - [ ] 2.5 Show success/error toast notifications
-  - [ ] 2.6 Handle errors with console logging
+- [x] **Task 2: Create useExportLeads Hook** (AC: #6, #7)
+  - [x] 2.1 Create `src/hooks/use-export-leads.ts`
+  - [x] 2.2 Manage `isExporting` loading state
+  - [x] 2.3 Implement `exportToExcel(leads)` function
+  - [x] 2.4 Implement `exportToCSV(leads)` function
+  - [x] 2.5 Show success/error toast notifications
+  - [x] 2.6 Handle errors with console logging
 
-- [ ] **Task 3: Create LeadExportDropdown Component** (AC: #1, #2)
-  - [ ] 3.1 Create `src/components/leads/lead-export-dropdown.tsx`
-  - [ ] 3.2 Use DropdownMenu from shadcn/ui (already installed from Story 3-8)
-  - [ ] 3.3 Add Excel option with FileSpreadsheet icon
-  - [ ] 3.4 Add CSV option with FileText icon
-  - [ ] 3.5 Show loading spinner when exporting
-  - [ ] 3.6 Disable dropdown during export
+- [x] **Task 3: Create LeadExportDropdown Component** (AC: #1, #2)
+  - [x] 3.1 Create `src/components/leads/lead-export-dropdown.tsx`
+  - [x] 3.2 Use DropdownMenu from shadcn/ui (already installed from Story 3-8)
+  - [x] 3.3 Add Excel option with FileSpreadsheet icon
+  - [x] 3.4 Add CSV option with FileText icon
+  - [x] 3.5 Show loading spinner when exporting
+  - [x] 3.6 Disable dropdown during export
 
-- [ ] **Task 4: Update SelectionToolbar** (AC: #1)
-  - [ ] 4.1 Add LeadExportDropdown to `selection-toolbar.tsx`
-  - [ ] 4.2 Pass selected leads data to export functions
-  - [ ] 4.3 Show count in button: "Export ({count})"
-  - [ ] 4.4 Position after selection count, before clear button
+- [x] **Task 4: Update SelectionToolbar** (AC: #1)
+  - [x] 4.1 Add LeadExportDropdown to `selection-toolbar.tsx`
+  - [x] 4.2 Pass selected leads data to export functions
+  - [x] 4.3 Show count in button: "Export ({count})"
+  - [x] 4.4 Position after selection count, before clear button
 
-- [ ] **Task 5: Large Selection Confirmation** (AC: #8)
-  - [ ] 5.1 Create confirmation dialog for >100 leads
-  - [ ] 5.2 Show lead count and size warning
-  - [ ] 5.3 Add "Export anyway" and "Cancel" buttons
-  - [ ] 5.4 Use AlertDialog from shadcn/ui
+- [x] **Task 5: Large Selection Confirmation** (AC: #8)
+  - [x] 5.1 Create confirmation dialog for >100 leads
+  - [x] 5.2 Show lead count and size warning
+  - [x] 5.3 Add "Export anyway" and "Cancel" buttons
+  - [x] 5.4 Use AlertDialog from shadcn/ui
 
-- [ ] **Task 6: Export All Feature** (AC: #5, #9)
-  - [ ] 6.1 Add "Export All" button to table toolbar (when no selection)
-  - [ ] 6.2 Export all leads matching current filters
-  - [ ] 6.3 Respect current sort order
-  - [ ] 6.4 Show confirmation for large datasets (>500 leads)
+- [x] **Task 6: Export All Feature** (AC: #5, #9) - Tech Debt completed 2026-01-19
+  - [x] 6.1 Add "Export All" button to table toolbar (when no selection)
+  - [x] 6.2 Export all leads matching current filters via pagination
+  - [x] 6.3 Respect current sort order
+  - [x] 6.4 Show confirmation for large datasets (>500 leads)
+  - [x] 6.5 Added leadSource, jobTitle, city columns to export
 
-- [ ] **Task 7: Testing** (AC: #1-10)
-  - [ ] 7.1 Test export button appears in selection toolbar
-  - [ ] 7.2 Test Excel export generates valid file
-  - [ ] 7.3 Test CSV export with UTF-8 BOM
-  - [ ] 7.4 Test export content includes correct columns
-  - [ ] 7.5 Test loading state during export
-  - [ ] 7.6 Test success toast notification
-  - [ ] 7.7 Test large selection confirmation dialog
-  - [ ] 7.8 Test keyboard accessibility
-  - [ ] 7.9 Test error handling
+- [x] **Task 7: Testing** (AC: #1-10)
+  - [x] 7.1 Test export button appears in selection toolbar
+  - [x] 7.2 Test Excel export generates valid file
+  - [x] 7.3 Test CSV export with UTF-8 BOM
+  - [x] 7.4 Test export content includes correct columns
+  - [x] 7.5 Test loading state during export
+  - [x] 7.6 Test success toast notification
+  - [x] 7.7 Test large selection confirmation dialog
+  - [x] 7.8 Test keyboard accessibility
+  - [x] 7.9 Test error handling
 
-- [ ] **Task 8: Integration** (AC: #1-10)
-  - [ ] 8.1 Wire up with useLeadSelection from Story 4-9
-  - [ ] 8.2 Get selected leads data from table
-  - [ ] 8.3 Connect toast notifications
-  - [ ] 8.4 Add barrel exports to components/leads/index.ts
+- [x] **Task 8: Integration** (AC: #1-10)
+  - [x] 8.1 Wire up with useLeadSelection from Story 4-9
+  - [x] 8.2 Get selected leads data from table
+  - [x] 8.3 Connect toast notifications
+  - [x] 8.4 Add barrel exports to components/leads/index.ts
 
 ## Dev Notes
 
@@ -784,9 +785,47 @@ This story is intentionally lightweight to deliver quick value.
 - [x] Accessibility requirements addressed (keyboard, screen reader)
 - [x] Testing patterns provided
 
+## Implementation Notes
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `src/lib/export-leads.ts` | Lead export utilities (Excel/CSV) |
+| `src/hooks/use-export-leads.ts` | Export state management hook |
+| `src/components/ui/alert-dialog.tsx` | shadcn/ui AlertDialog component |
+| `src/components/leads/export-confirmation-dialog.tsx` | Large selection confirmation dialog |
+| `src/components/leads/lead-export-dropdown.tsx` | Export format dropdown component |
+| `src/__tests__/lib/export-leads.test.ts` | Export utilities tests (22 tests) |
+| `src/__tests__/use-export-leads.test.tsx` | useExportLeads hook tests (13 tests) |
+| `src/__tests__/lead-export-dropdown.test.tsx` | LeadExportDropdown tests (13 tests) |
+| `src/__tests__/export-confirmation-dialog.test.tsx` | ExportConfirmationDialog tests (9 tests) |
+| `src/__tests__/utils/mock-lead.ts` | Shared mock lead factory for tests |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `src/components/leads/selection-toolbar.tsx` | Added LeadExportDropdown, new selectedLeads prop |
+| `src/components/leads/lead-table-container.tsx` | Added selectedLeads calculation with useMemo |
+| `src/components/leads/index.ts` | Added barrel exports for new components |
+| `src/hooks/index.ts` | Added barrel exports for useExportLeads |
+| `src/__tests__/selection-toolbar.test.tsx` | Updated tests with selectedLeads prop, added mock |
+| `src/__tests__/lead-table-container.test.tsx` | Added LeadExportDropdown mock |
+
+### Dependencies Added
+- `@radix-ui/react-alert-dialog` - For shadcn/ui AlertDialog component
+
+### Test Coverage
+- 57 new tests added for Story 4-10 (after code review fixes)
+- All 1542 tests pass across 109 test files
+- TypeScript compilation passes with no errors
+
 ## Change Log
 
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-17 | Story created by SM Agent | Claude |
 | 2026-01-17 | Code Review: Fixed 5 issues (confirmation dialog, export all, selectedCount) | Claude |
+| 2026-01-18 | Implementation complete - Tasks 1-5, 7-8 done. Task 6 (Export All) deferred to Epic 6 | Claude Dev Agent |
+| 2026-01-18 | Code Review: Fixed 5 issues - Added ExportConfirmationDialog tests, aria-live for SR, extracted delay constant, created shared mock-lead helper | Claude Dev Agent |
+| 2026-01-19 | Tech Debt: Completed Task 6 (Export All) with paginated API fetch, progress tracking. Added leadSource, jobTitle, city to export columns. Tests: 1619 total | Claude Dev Agent |
+| 2026-01-19 | Code Review: Fixed 10 issues - barrel exports, parallel batch fetching, component tests (42 new tests). Total: 1652 tests | Claude Dev Agent |

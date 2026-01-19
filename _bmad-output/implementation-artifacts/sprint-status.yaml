@@ -107,7 +107,7 @@ development_status:
   # EPIC-04: Lead Management
   # Started: 2026-01-17
   # ============================================================
-  epic-4: in-progress
+  epic-4: done  # All 12 stories completed, retrospective done 2026-01-19
   4-1-lead-list-table: done  # Code review passed 2026-01-17
   4-2-pagination: done  # Code review passed 2026-01-17
   4-3-search: done  # Code review passed 2026-01-17
@@ -122,7 +122,7 @@ development_status:
   4-12-job-title-column: merged           # Merged into 4-11-additional-columns
   4-13-city-column: merged                # Merged into 4-11-additional-columns
   4-14-filter-by-lead-source: done  # Could Have - กรองตาม Lead Source (Completed 2026-01-19)
-  epic-4-retrospective: optional
+  epic-4-retrospective: done  # Retrospective completed 2026-01-19, API Contract created
 
   # ============================================================
   # EPIC-05: Campaign Analytics
@@ -154,13 +154,14 @@ development_status:
 
   # ============================================================
   # EPIC-07: System Settings
+  # Started: 2026-01-19
   # ============================================================
-  epic-7: backlog
-  7-1-user-profile: backlog
-  7-2-theme-toggle: backlog
-  7-3-notification-settings: backlog
-  7-4-admin-user-management: backlog
-  7-5-system-health: backlog
+  epic-7: in-progress
+  7-1-user-profile: done  # Code review passed, all fixes applied 2026-01-19
+  7-2-theme-toggle: done  # Code review passed, all fixes applied 2026-01-19
+  7-3-notification-settings: in-progress  # Started 2026-01-19
+  7-4-admin-user-management: ready-for-dev  # Story created 2026-01-19
+  7-5-system-health: ready-for-dev  # Story created 2026-01-19
   7-6-audit-logs: backlog
   7-7-activity-log-page: backlog            # Could Have - Full activity log page with Status_History data (currently links to /leads)
   epic-7-retrospective: optional

@@ -91,13 +91,17 @@ export function parseDateFromSheets(dateStr: string): Date {
 /**
  * Extract date key (YYYY-MM-DD) from Thai format or ISO format
  * For grouping leads by date
+ * Uses Thai timezone (UTC+7) for consistent grouping regardless of server location
  */
 export function extractDateKey(dateStr: string): string {
   const date = parseDateFromSheets(dateStr);
-  // Return in YYYY-MM-DD format for sorting
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  // Convert to Thai timezone (UTC+7) for consistent date grouping
+  const thaiOffset = 7 * 60 * 60 * 1000; // 7 hours in ms
+  const thaiDate = new Date(date.getTime() + thaiOffset);
+  // Use UTC methods on the shifted date to get Thai date components
+  const year = thaiDate.getUTCFullYear();
+  const month = String(thaiDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(thaiDate.getUTCDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 

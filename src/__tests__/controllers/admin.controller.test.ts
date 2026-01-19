@@ -200,6 +200,46 @@ describe('Admin Controller', () => {
       expect(response.data.statusDistribution.closed).toBe(1);
     });
 
+    it('should sort topSales by closed count descending', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // Create leads with different closed counts per sales owner
+      mockGetAllLeads.mockResolvedValue([
+        // Sales A: 1 closed
+        createSampleLead({ rowNumber: 2, status: 'closed', salesOwnerId: 'sales-A', salesOwnerName: 'ทดสอบ A', closedAt: getCurrentDateISO() }),
+        createSampleLead({ rowNumber: 3, status: 'contacted', salesOwnerId: 'sales-A', salesOwnerName: 'ทดสอบ A' }),
+        // Sales B: 3 closed (should be rank 1)
+        createSampleLead({ rowNumber: 4, status: 'closed', salesOwnerId: 'sales-B', salesOwnerName: 'TaOz B', closedAt: getCurrentDateISO() }),
+        createSampleLead({ rowNumber: 5, status: 'closed', salesOwnerId: 'sales-B', salesOwnerName: 'TaOz B', closedAt: getCurrentDateISO() }),
+        createSampleLead({ rowNumber: 6, status: 'closed', salesOwnerId: 'sales-B', salesOwnerName: 'TaOz B', closedAt: getCurrentDateISO() }),
+        createSampleLead({ rowNumber: 7, status: 'contacted', salesOwnerId: 'sales-B', salesOwnerName: 'TaOz B' }),
+        // Sales C: 2 closed (should be rank 2)
+        createSampleLead({ rowNumber: 8, status: 'closed', salesOwnerId: 'sales-C', salesOwnerName: 'Sales C', closedAt: getCurrentDateISO() }),
+        createSampleLead({ rowNumber: 9, status: 'closed', salesOwnerId: 'sales-C', salesOwnerName: 'Sales C', closedAt: getCurrentDateISO() }),
+      ]);
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const topSales = response.data.topSales;
+
+      // Should be sorted by closed descending
+      expect(topSales).toHaveLength(3);
+      expect(topSales[0].name).toBe('TaOz B');
+      expect(topSales[0].closed).toBe(3);
+      expect(topSales[0].rank).toBe(1);
+
+      expect(topSales[1].name).toBe('Sales C');
+      expect(topSales[1].closed).toBe(2);
+      expect(topSales[1].rank).toBe(2);
+
+      expect(topSales[2].name).toBe('ทดสอบ A');
+      expect(topSales[2].closed).toBe(1);
+      expect(topSales[2].rank).toBe(3);
+    });
+
     it('should handle getAllLeads error gracefully and return empty data', async () => {
       const req = createMockRequest();
       const res = createMockResponse();

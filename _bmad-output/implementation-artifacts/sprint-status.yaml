@@ -159,11 +159,11 @@ development_status:
   epic-7: in-progress
   7-1-user-profile: done  # Code review passed, all fixes applied 2026-01-19
   7-2-theme-toggle: done  # Code review passed, all fixes applied 2026-01-19
-  7-3-notification-settings: in-progress  # Started 2026-01-19
+  7-3-notification-settings: done  # Code review passed, all fixes applied 2026-01-19
   7-4-admin-user-management: ready-for-dev  # Story created 2026-01-19
   7-5-system-health: ready-for-dev  # Story created 2026-01-19
   7-6-audit-logs: backlog
-  7-7-activity-log-page: backlog            # Could Have - Full activity log page with Status_History data (currently links to /leads)
+  7-7-activity-log-page: ready-for-dev  # Could Have - Full activity log page with Status_History data (Story created 2026-01-19)
   epic-7-retrospective: optional
 
   # ============================================================

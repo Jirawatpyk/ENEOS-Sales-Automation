@@ -83,6 +83,7 @@ development_status:
   2-3-status-distribution: done            # Must Have - Done 2026-01-13
   2-4-top-sales-table: done               # Must Have - Code review passed 2026-01-13
   2-5-recent-activity: done              # Should Have - Code review passed 2026-01-13
+  2-5-1-view-all-activity-link-fix: ready-for-dev  # Fix: Admin → /settings/activity, Viewer → hide link (2026-01-20)
   2-6-alerts-panel: done                  # Should Have - Code review passed 2026-01-13
   2-7-date-filter: done                   # Should Have - Code review passed 2026-01-13
   2-8-auto-refresh: done                  # Could Have - Code review passed 2026-01-13
@@ -160,10 +161,10 @@ development_status:
   7-1-user-profile: done  # Code review passed, all fixes applied 2026-01-19
   7-2-theme-toggle: done  # Code review passed, all fixes applied 2026-01-19
   7-3-notification-settings: done  # Code review passed, all fixes applied 2026-01-19
-  7-4-admin-user-management: in-progress  # Started 2026-01-20
+  7-4-admin-user-management: done  # Code review passed 2026-01-20
   7-5-system-health: done  # Code review passed + Auth bug fix applied 2026-01-20
   7-6-audit-logs: backlog
-  7-7-activity-log-page: ready-for-dev  # Could Have - Full activity log page with Status_History data (Story created 2026-01-19)
+  7-7-activity-log-page: done  # Code review passed 2026-01-20 - Full activity log page with Status_History data
   epic-7-retrospective: optional
 
   # ============================================================
@@ -231,3 +232,15 @@ development_status:
 # - /api/admin/campaigns ✅
 # - /api/admin/campaigns/:id ✅
 # - /api/admin/export ✅
+# - /api/admin/activity-log ✅ (added 2026-01-20)
+#
+# ============================================================
+# CRITICAL ISSUES (Process Improvements Needed)
+# ============================================================
+# ISSUE-001: DEV Agent not updating documentation files
+#   - Date: 2026-01-20
+#   - Issue: DEV Agent completed Story 7-7 implementation but did not
+#     update sprint-status.yaml to reflect 'done' status
+#   - Impact: Tracking dashboard shows incorrect progress
+#   - Action: SM must verify sprint-status.yaml updates after each story
+#   - Resolution: Added mandatory doc update to code review checklist

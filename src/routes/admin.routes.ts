@@ -22,6 +22,8 @@ import {
   getSalesTeamList,
   getSalesTeamMemberById,
   updateSalesTeamMember,
+  // Activity Log (Story 7-7)
+  getActivityLog,
 } from '../controllers/admin.controller.js';
 import {
   adminAuthMiddleware,
@@ -215,6 +217,31 @@ router.get('/sales-team/:lineUserId', requireAdmin, asyncHandler(getSalesTeamMem
  * Access: admin only (AC#5, AC#6, AC#7)
  */
 router.patch('/sales-team/:lineUserId', requireAdmin, asyncHandler(updateSalesTeamMember));
+
+// ===========================================
+// Activity Log Endpoint (Story 7-7)
+// ===========================================
+
+/**
+ * GET /api/admin/activity-log
+ * Get all activity log entries with pagination and filters
+ *
+ * Query params:
+ * - page: number (default: 1)
+ * - limit: number (default: 20, max: 100)
+ * - from: ISO date (start date filter)
+ * - to: ISO date (end date filter)
+ * - status: Comma-separated status values (e.g., 'contacted,closed')
+ * - changedBy: LINE User ID or 'System'
+ *
+ * Response:
+ * - data.entries: Array<ActivityLogEntry>
+ * - data.pagination: { page, limit, total, totalPages, hasNext, hasPrev }
+ * - data.filters.changedByOptions: Unique changedBy values
+ *
+ * Access: admin only (AC#1: Only admin users can view activity log)
+ */
+router.get('/activity-log', requireAdmin, asyncHandler(getActivityLog));
 
 // ===========================================
 // Sales Performance Endpoints

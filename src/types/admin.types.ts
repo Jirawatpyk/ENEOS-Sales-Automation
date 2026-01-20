@@ -800,3 +800,59 @@ export interface RecentCampaignLead {
   status: LeadStatus;
   date: string;                  // ISO 8601
 }
+
+// ============================================================================
+// Activity Log Types (Story 7-7)
+// ============================================================================
+
+/**
+ * Activity Log Entry
+ * Combines Status_History data with Lead company name
+ * GET /api/admin/activity-log
+ */
+export interface ActivityLogEntry {
+  id: string;                    // Unique ID for React key (leadUUID + timestamp)
+  leadUUID: string;
+  rowNumber: number;             // Required for Lead Detail Modal (uses row ID)
+  companyName: string;           // From Leads sheet join
+  status: LeadStatus;
+  changedById: string;
+  changedByName: string;
+  timestamp: string;             // ISO 8601
+  notes: string | null;
+}
+
+/**
+ * Activity Log Response
+ * GET /api/admin/activity-log
+ */
+export interface ActivityLogResponse {
+  entries: ActivityLogEntry[];
+  pagination: PaginationMeta;
+  filters: {
+    changedByOptions: { id: string; name: string }[];  // Unique changedBy values
+  };
+}
+
+/**
+ * Activity Log Query Parameters
+ * GET /api/admin/activity-log
+ */
+export interface ActivityLogQueryParams extends PaginationQueryParams {
+  from?: string;                 // ISO date - start date filter
+  to?: string;                   // ISO date - end date filter
+  status?: string;               // Comma-separated status values (e.g., 'contacted,closed')
+  changedBy?: string;            // LINE User ID or 'System'
+}
+
+/**
+ * Options for getAllStatusHistory in sheets.service.ts
+ */
+export interface GetAllStatusHistoryOptions {
+  page?: number;
+  limit?: number;
+  from?: string;                 // ISO date
+  to?: string;                   // ISO date
+  status?: string[];             // Filter by status values
+  changedBy?: string;            // LINE User ID or 'System'
+}

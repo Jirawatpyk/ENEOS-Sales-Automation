@@ -20,3 +20,5 @@ export {
   getSalesTeamMemberById,
   updateSalesTeamMember,
 } from './admin/team-management.controller.js';
+// Activity Log (Story 7-7)
+export { getActivityLog } from './admin/activity-log.controller.js';

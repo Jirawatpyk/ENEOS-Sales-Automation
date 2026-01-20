@@ -1101,6 +1101,142 @@ export class SheetsService {
     });
   }
 
+  /**
+   * Get all status history entries with pagination and filters
+   * Used by Activity Log page (Story 7-7)
+   * Joins with Leads data to get company name and row number
+   *
+   * @param options - Pagination and filter options
+   * @returns Paginated status history entries with lead data
+   */
+  async getAllStatusHistory(options: {
+    page?: number;
+    limit?: number;
+    from?: string;
+    to?: string;
+    status?: string[];
+    changedBy?: string;
+  } = {}): Promise<{
+    entries: Array<{
+      id: string;
+      leadUUID: string;
+      rowNumber: number;
+      companyName: string;
+      status: LeadStatus;
+      changedById: string;
+      changedByName: string;
+      timestamp: string;
+      notes: string | null;
+    }>;
+    total: number;
+    changedByOptions: { id: string; name: string }[];
+  }> {
+    const { page = 1, limit = 20, from, to, status, changedBy } = options;
+    logger.info('Getting all status history', { page, limit, from, to, status, changedBy });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        // Fetch all status history rows
+        const historyResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.statusHistorySheet, 'A2:F'),
+        });
+
+        const historyRows = historyResponse.data.values || [];
+
+        // Fetch all leads to join with company name
+        const leadsResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.leadsSheet, 'A2:AA'),
+        });
+
+        const leadRows = leadsResponse.data.values || [];
+
+        // Create a map of leadUUID to lead data (company name and row number)
+        const leadMap = new Map<string, { companyName: string; rowNumber: number }>();
+        leadRows.forEach((row, index) => {
+          const leadUUID = row[26]; // Column AA = leadUUID
+          if (leadUUID) {
+            leadMap.set(leadUUID, {
+              companyName: row[4] || 'Unknown', // Column E = company
+              rowNumber: index + 2, // Row 2 = first data row
+            });
+          }
+        });
+
+        // Extract unique changedBy options for filter dropdown
+        const changedBySet = new Map<string, string>();
+        historyRows.forEach((row) => {
+          const id = row[2] || '';
+          const name = row[3] || '';
+          if (id && !changedBySet.has(id)) {
+            changedBySet.set(id, name);
+          }
+        });
+        const changedByOptions = Array.from(changedBySet.entries()).map(([id, name]) => ({
+          id,
+          name,
+        }));
+
+        // Map and join history with lead data
+        let entries = historyRows.map((row) => {
+          const leadUUID = row[0] || '';
+          const leadData = leadMap.get(leadUUID);
+
+          return {
+            id: `${leadUUID}_${row[4] || ''}`, // leadUUID + timestamp as unique ID
+            leadUUID,
+            rowNumber: leadData?.rowNumber || 0,
+            companyName: leadData?.companyName || 'Unknown',
+            status: row[1] as LeadStatus,
+            changedById: row[2] || '',
+            changedByName: row[3] || '',
+            timestamp: row[4] || '',
+            notes: row[5] || null,
+          };
+        });
+
+        // Apply filters
+        if (from) {
+          const fromDate = new Date(from);
+          entries = entries.filter((e) => new Date(e.timestamp) >= fromDate);
+        }
+
+        if (to) {
+          const toDate = new Date(to);
+          // Set to end of day
+          toDate.setHours(23, 59, 59, 999);
+          entries = entries.filter((e) => new Date(e.timestamp) <= toDate);
+        }
+
+        if (status && status.length > 0) {
+          entries = entries.filter((e) => status.includes(e.status));
+        }
+
+        if (changedBy) {
+          entries = entries.filter((e) => e.changedById === changedBy);
+        }
+
+        // Sort by timestamp descending (newest first)
+        entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        const total = entries.length;
+
+        // Apply pagination
+        const startIndex = (page - 1) * limit;
+        const paginatedEntries = entries.slice(startIndex, startIndex + limit);
+
+        logger.info('Status history retrieved', { total, page, limit, returned: paginatedEntries.length });
+
+        return {
+          entries: paginatedEntries,
+          total,
+          changedByOptions,
+        };
+      });
+    });
+  }
+
   // ===========================================
   // Health Check
   // ===========================================

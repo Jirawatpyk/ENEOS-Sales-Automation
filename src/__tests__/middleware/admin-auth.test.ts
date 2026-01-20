@@ -293,6 +293,35 @@ describe('Admin Auth Middleware', () => {
       expect(next).toHaveBeenCalledWith();
       expect(req.user?.email).toBe('user@eqho.com');
     });
+
+    it('should reject inactive user with ACCOUNT_INACTIVE error', async () => {
+      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
+      _testOnly.resetOAuthClient();
+
+      mockVerifyIdToken.mockResolvedValue({
+        getPayload: () => ({
+          email: 'inactive@eneos.co.th',
+          name: 'Inactive User',
+          sub: 'google-id-inactive',
+        }),
+      });
+
+      mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'inactive' });
+
+      const req = createMockRequest({
+        headers: { authorization: 'Bearer valid-token' },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(error.statusCode).toBe(403);
+      expect(error.code).toBe('ACCOUNT_INACTIVE');
+      expect(error.message).toContain('deactivated');
+    });
   });
 
   // ===========================================
@@ -370,6 +399,81 @@ describe('Admin Auth Middleware', () => {
 
       const role = await _testOnly.getUserRole('user@eneos.co.th');
       expect(role).toBe('viewer');
+    });
+
+    it('should throw ACCOUNT_INACTIVE error when user status is inactive', async () => {
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+
+      mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'inactive' });
+
+      await expect(_testOnly.getUserRole('inactive@eneos.co.th')).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'ACCOUNT_INACTIVE',
+      });
+    });
+
+    it('should allow login when user status is active', async () => {
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+
+      mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'active' });
+
+      const role = await _testOnly.getUserRole('active@eneos.co.th');
+      expect(role).toBe('admin');
+    });
+
+    it('should allow login when user status is not specified (default active)', async () => {
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+
+      mockGetUserByEmail.mockResolvedValue({ role: 'sales' }); // No status field
+
+      const role = await _testOnly.getUserRole('user@eneos.co.th');
+      expect(role).toBe('viewer');
+    });
+
+    it('should block inactive user even with empty role', async () => {
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+
+      // Edge case: user has status=inactive but no role specified
+      mockGetUserByEmail.mockResolvedValue({ role: '', status: 'inactive' });
+
+      await expect(_testOnly.getUserRole('inactive-no-role@eneos.co.th')).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'ACCOUNT_INACTIVE',
+      });
+    });
+
+    it('should block inactive user even with null role', async () => {
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+
+      // Edge case: user has status=inactive and role is null
+      mockGetUserByEmail.mockResolvedValue({ role: null, status: 'inactive' });
+
+      await expect(_testOnly.getUserRole('inactive-null-role@eneos.co.th')).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'ACCOUNT_INACTIVE',
+      });
+    });
+
+    it('should use ADMIN_EMAILS fallback only when user NOT in sheet', async () => {
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+
+      // User not found in sheet, falls back to ADMIN_EMAILS
+      mockGetUserByEmail.mockResolvedValue(null);
+
+      const role = await _testOnly.getUserRole('admin@eneos.co.th');
+      expect(role).toBe('admin');
+    });
+
+    it('should block inactive admin@eneos.co.th even if in ADMIN_EMAILS', async () => {
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+
+      // User IS in sheet with inactive status - should be blocked before ADMIN_EMAILS check
+      mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'inactive' });
+
+      await expect(_testOnly.getUserRole('admin@eneos.co.th')).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'ACCOUNT_INACTIVE',
+      });
     });
   });
 

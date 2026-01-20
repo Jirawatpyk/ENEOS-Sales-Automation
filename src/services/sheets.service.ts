@@ -781,16 +781,19 @@ export class SheetsService {
 
   /**
    * Get user by email (for authentication)
-   * Returns user info with role from Sales_Team sheet
+   * Returns user info with role and status from Sales_Team sheet
+   * Columns: A=lineUserId, B=name, C=email, D=phone, E=role, F=createdAt, G=status
    */
-  async getUserByEmail(email: string): Promise<(SalesTeamMember & { role: string }) | null> {
+  async getUserByEmail(
+    email: string
+  ): Promise<(SalesTeamMember & { role: string; status: 'active' | 'inactive' }) | null> {
     logger.info('Getting user by email', { email });
 
     return circuitBreaker.execute(async () => {
       return withRetry(async () => {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.salesTeamSheet, 'A2:E'), // Include Role column (E)
+          range: getSheetRange(this.salesTeamSheet, 'A2:G'), // Include Role (E), CreatedAt (F), Status (G)
         });
 
         const rows = response.data.values || [];
@@ -807,6 +810,7 @@ export class SheetsService {
           email: userRow[2],
           phone: userRow[3] || undefined,
           role: userRow[4] || 'sales', // Default to 'sales' if not specified
+          status: (userRow[6] || 'active') as 'active' | 'inactive', // Default to 'active' if not specified
         };
       });
     });

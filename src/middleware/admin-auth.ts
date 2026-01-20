@@ -291,31 +291,56 @@ export const requireViewer = requireRole(['admin', 'viewer']);
  * - 'sales' → 'viewer' (read-only)
  * - other/null → 'viewer' (default)
  *
+ * Status check:
+ * - 'active' → allow login
+ * - 'inactive' → reject with 403 ACCOUNT_INACTIVE
+ *
  * @param email - Email ของ user
  * @returns User role (default: 'viewer')
+ * @throws AppError if user is inactive
  */
 async function getUserRole(email: string): Promise<UserRole> {
   try {
     // ลองดึงจาก Google Sheets ก่อน
     const user = await sheetsService.getUserByEmail(email);
 
-    if (user && user.role) {
-      const sheetRole = user.role.toLowerCase();
-
-      // Map sheet role to dashboard role
-      if (sheetRole === 'admin') {
-        logger.debug('User role: admin', { email, sheetRole });
-        return 'admin';
+    if (user) {
+      // Check if user is inactive - reject login
+      // Security: This check runs BEFORE ADMIN_EMAILS fallback, so inactive users in sheet are always blocked
+      if (user.status === 'inactive') {
+        logger.warn('Inactive user attempted login - access denied', {
+          email,
+          status: user.status,
+          lineUserId: user.lineUserId,
+          action: 'LOGIN_BLOCKED',
+        });
+        throw new AppError(
+          'Your account has been deactivated. Please contact administrator.',
+          403,
+          'ACCOUNT_INACTIVE'
+        );
       }
 
-      // 'sales' or any other role → viewer
-      logger.debug('User role: viewer', { email, sheetRole });
-      return 'viewer';
+      if (user.role) {
+        const sheetRole = user.role.toLowerCase();
+
+        // Map sheet role to dashboard role
+        if (sheetRole === 'admin') {
+          logger.debug('User role: admin', { email, sheetRole });
+          return 'admin';
+        }
+
+        // 'sales' or any other role → viewer
+        logger.debug('User role: viewer', { email, sheetRole });
+        return 'viewer';
+      }
     }
 
     // Fallback: ตรวจสอบ ADMIN_EMAILS
+    // NOTE: ADMIN_EMAILS users who are NOT in Sales_Team sheet cannot be deactivated via sheet.
+    // To deactivate an ADMIN_EMAILS user: add them to Sales_Team sheet with status='inactive'
     if (ADMIN_EMAILS.includes(email.toLowerCase())) {
-      logger.debug('User is in ADMIN_EMAILS list', { email });
+      logger.info('ADMIN_EMAILS fallback used (user not in Sales_Team sheet)', { email });
       return 'admin';
     }
 
@@ -323,13 +348,22 @@ async function getUserRole(email: string): Promise<UserRole> {
     logger.debug('Using default viewer role', { email });
     return 'viewer';
   } catch (error) {
+    // Re-throw AppError (like ACCOUNT_INACTIVE)
+    if (error instanceof AppError) {
+      throw error;
+    }
+
     logger.error('Failed to fetch user role from Sheets', {
       email,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
 
     // Fallback: ตรวจสอบ ADMIN_EMAILS แม้ Sheets error
+    // NOTE: If Sheets fails and user is in ADMIN_EMAILS, they can login without status check.
+    // This is intentional for emergency access when Sheets is down.
+    // AppError (ACCOUNT_INACTIVE) is re-thrown above, so known inactive users are still blocked.
     if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+      logger.info('ADMIN_EMAILS emergency fallback used (Sheets error)', { email });
       return 'admin';
     }
 

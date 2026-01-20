@@ -1194,12 +1194,13 @@ describe('SheetsService', () => {
   // ===========================================
 
   describe('getUserByEmail', () => {
-    it('should return user when email found', async () => {
+    // Columns: A=lineUserId, B=name, C=email, D=phone, E=role, F=createdAt, G=status
+    it('should return user with status when email found', async () => {
       mockSheets.spreadsheets.values.get.mockResolvedValue({
         data: {
           values: [
-            ['U123', 'John Doe', 'john@example.com', '0812345678', 'admin'],
-            ['U456', 'Jane Smith', 'jane@example.com', '0898765432', 'sales'],
+            ['U123', 'John Doe', 'john@example.com', '0812345678', 'admin', '2024-01-15T10:00:00Z', 'active'],
+            ['U456', 'Jane Smith', 'jane@example.com', '0898765432', 'sales', '2024-02-20T14:30:00Z', 'inactive'],
           ],
         },
       });
@@ -1212,6 +1213,37 @@ describe('SheetsService', () => {
       expect(user?.email).toBe('john@example.com');
       expect(user?.phone).toBe('0812345678');
       expect(user?.role).toBe('admin');
+      expect(user?.status).toBe('active');
+    });
+
+    it('should return inactive status when user is inactive', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U456', 'Jane Smith', 'jane@example.com', '0898765432', 'sales', '2024-02-20T14:30:00Z', 'inactive'],
+          ],
+        },
+      });
+
+      const user = await service.getUserByEmail('jane@example.com');
+
+      expect(user).not.toBeNull();
+      expect(user?.status).toBe('inactive');
+    });
+
+    it('should default status to active when not specified', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['U123', 'John Doe', 'john@example.com', '0812345678', 'admin'], // No createdAt, no status
+          ],
+        },
+      });
+
+      const user = await service.getUserByEmail('john@example.com');
+
+      expect(user).not.toBeNull();
+      expect(user?.status).toBe('active');
     });
 
     it('should find email case-insensitively', async () => {

@@ -113,7 +113,7 @@ export async function getSalesTeamMemberById(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { lineUserId } = req.params;
+    const lineUserId = req.params.lineUserId as string;
     logger.info('getSalesTeamMemberById called', { lineUserId, user: req.user?.email });
 
     const member = await sheetsService.getSalesTeamMemberById(lineUserId);
@@ -159,7 +159,7 @@ export async function updateSalesTeamMember(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { lineUserId } = req.params;
+    const lineUserId = req.params.lineUserId as string;
     logger.info('updateSalesTeamMember called', {
       lineUserId,
       body: req.body,

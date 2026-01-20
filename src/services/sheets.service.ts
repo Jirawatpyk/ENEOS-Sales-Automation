@@ -14,6 +14,9 @@ import {
   LeadRow,
   LeadStatus,
   SalesTeamMember,
+  SalesTeamMemberFull,
+  SalesTeamFilter,
+  SalesTeamMemberUpdate,
   AppError,
   RaceConditionError,
   VALID_LEAD_STATUSES,
@@ -804,6 +807,168 @@ export class SheetsService {
           email: userRow[2],
           phone: userRow[3] || undefined,
           role: userRow[4] || 'sales', // Default to 'sales' if not specified
+        };
+      });
+    });
+  }
+
+  // ===========================================
+  // Team Management Operations (Story 7-4)
+  // ===========================================
+
+  /**
+   * Get all sales team members with optional filtering
+   * Used by Team Management page (/settings/team)
+   *
+   * Sheet columns: A=lineUserId, B=name, C=email, D=phone, E=role, F=createdAt, G=status
+   *
+   * @param filter - Optional filter for status and role
+   * @returns Array of SalesTeamMemberFull
+   */
+  async getAllSalesTeamMembers(filter?: SalesTeamFilter): Promise<SalesTeamMemberFull[]> {
+    logger.info('Getting all sales team members with filters', { filter });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, 'A2:G'), // A:G to include all columns
+        });
+
+        const rows = response.data.values || [];
+
+        let members: SalesTeamMemberFull[] = rows
+          .filter((row) => row[0]) // Ensure LINE User ID exists
+          .map((row) => ({
+            lineUserId: row[0],
+            name: row[1] || '',
+            email: row[2] || null,
+            phone: row[3] || null,
+            role: (row[4] || 'sales') as 'admin' | 'sales',
+            createdAt: row[5] || '',
+            status: (row[6] || 'active') as 'active' | 'inactive',
+          }));
+
+        // Apply status filter (default to 'active')
+        const statusFilter = filter?.status || 'active';
+        if (statusFilter !== 'all') {
+          members = members.filter((m) => m.status === statusFilter);
+        }
+
+        // Apply role filter
+        if (filter?.role && filter.role !== 'all') {
+          members = members.filter((m) => m.role === filter.role);
+        }
+
+        logger.info('Sales team members retrieved', { count: members.length, filter });
+        return members;
+      });
+    });
+  }
+
+  /**
+   * Get a single sales team member by LINE User ID
+   * Used by Team Management edit functionality
+   *
+   * @param lineUserId - LINE User ID
+   * @returns SalesTeamMemberFull or null if not found
+   */
+  async getSalesTeamMemberById(lineUserId: string): Promise<SalesTeamMemberFull | null> {
+    logger.info('Getting sales team member by ID', { lineUserId });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, 'A2:G'),
+        });
+
+        const rows = response.data.values || [];
+        const memberRow = rows.find((row) => row[0] === lineUserId);
+
+        if (!memberRow) {
+          logger.warn('Sales team member not found', { lineUserId });
+          return null;
+        }
+
+        return {
+          lineUserId: memberRow[0],
+          name: memberRow[1] || '',
+          email: memberRow[2] || null,
+          phone: memberRow[3] || null,
+          role: (memberRow[4] || 'sales') as 'admin' | 'sales',
+          createdAt: memberRow[5] || '',
+          status: (memberRow[6] || 'active') as 'active' | 'inactive',
+        };
+      });
+    });
+  }
+
+  /**
+   * Update a sales team member's details
+   * Can update: email, phone, role, status
+   * Cannot update: lineUserId, name (from LINE), createdAt
+   *
+   * @param lineUserId - LINE User ID
+   * @param updates - Fields to update
+   * @returns Updated SalesTeamMemberFull or null if not found
+   */
+  async updateSalesTeamMember(
+    lineUserId: string,
+    updates: SalesTeamMemberUpdate
+  ): Promise<SalesTeamMemberFull | null> {
+    logger.info('Updating sales team member', { lineUserId, updates });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        // First, find the row
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, 'A2:G'),
+        });
+
+        const rows = response.data.values || [];
+        const rowIndex = rows.findIndex((row) => row[0] === lineUserId);
+
+        if (rowIndex === -1) {
+          logger.warn('Sales team member not found for update', { lineUserId });
+          return null;
+        }
+
+        const currentRow = rows[rowIndex];
+
+        // Build updated row (preserve immutable fields: lineUserId, name, createdAt)
+        const updatedRow = [
+          currentRow[0], // lineUserId (immutable)
+          currentRow[1], // name (immutable from LINE)
+          updates.email !== undefined ? (updates.email || '') : (currentRow[2] || ''),
+          updates.phone !== undefined ? (updates.phone || '') : (currentRow[3] || ''),
+          updates.role || currentRow[4] || 'sales',
+          currentRow[5] || '', // createdAt (immutable)
+          updates.status || currentRow[6] || 'active',
+        ];
+
+        // Update the row (rowIndex + 2 because header is row 1, data starts at 2, array is 0-indexed)
+        const actualRow = rowIndex + 2;
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, `A${actualRow}:G${actualRow}`),
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [updatedRow],
+          },
+        });
+
+        logger.info('Sales team member updated', { lineUserId, actualRow });
+
+        return {
+          lineUserId: updatedRow[0],
+          name: updatedRow[1],
+          email: updatedRow[2] || null,
+          phone: updatedRow[3] || null,
+          role: updatedRow[4] as 'admin' | 'sales',
+          createdAt: updatedRow[5],
+          status: updatedRow[6] as 'active' | 'inactive',
         };
       });
     });

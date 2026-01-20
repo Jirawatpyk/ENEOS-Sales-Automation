@@ -18,6 +18,10 @@ import {
   getCampaignDetail,
   exportData,
   getSalesTeam,
+  // Team Management (Story 7-4)
+  getSalesTeamList,
+  getSalesTeamMemberById,
+  updateSalesTeamMember,
 } from '../controllers/admin.controller.js';
 import {
   adminAuthMiddleware,
@@ -155,6 +159,62 @@ router.get('/leads/:id', requireViewer, asyncHandler(getLeadById));
  * Access: viewer, manager, admin
  */
 router.get('/sales-team', requireViewer, asyncHandler(getSalesTeam));
+
+// ===========================================
+// Team Management Endpoints (Story 7-4)
+// Admin-only endpoints for managing sales team members
+// ===========================================
+
+/**
+ * GET /api/admin/sales-team/list
+ * ดึงรายชื่อ Sales Team พร้อม status, role, createdAt
+ * ใช้สำหรับ Settings > Team Management page
+ *
+ * Query params:
+ * - status: active | inactive | all (default: active)
+ * - role: admin | sales | all (default: all)
+ *
+ * Response:
+ * - data: Array<SalesTeamMemberFull>
+ * - total: number
+ *
+ * Access: admin only (AC#10: Viewers cannot access team management)
+ */
+router.get('/sales-team/list', requireAdmin, asyncHandler(getSalesTeamList));
+
+/**
+ * GET /api/admin/sales-team/:lineUserId
+ * ดึงข้อมูล Sales Team member คนเดียว
+ *
+ * Params:
+ * - lineUserId: LINE User ID
+ *
+ * Response:
+ * - data: SalesTeamMemberFull
+ *
+ * Access: admin only
+ */
+router.get('/sales-team/:lineUserId', requireAdmin, asyncHandler(getSalesTeamMemberById));
+
+/**
+ * PATCH /api/admin/sales-team/:lineUserId
+ * อัพเดทข้อมูล Sales Team member
+ *
+ * Params:
+ * - lineUserId: LINE User ID
+ *
+ * Body (all optional):
+ * - email: string | null (must be @eneos.co.th if string)
+ * - phone: string | null
+ * - role: 'admin' | 'sales'
+ * - status: 'active' | 'inactive'
+ *
+ * Response:
+ * - data: SalesTeamMemberFull (updated)
+ *
+ * Access: admin only (AC#5, AC#6, AC#7)
+ */
+router.patch('/sales-team/:lineUserId', requireAdmin, asyncHandler(updateSalesTeamMember));
 
 // ===========================================
 // Sales Performance Endpoints

@@ -14,3 +14,9 @@ export { getSalesPerformance, getSalesPerformanceTrend } from './admin/sales.con
 export { getCampaigns, getCampaignDetail } from './admin/campaigns.controller.js';
 export { exportData } from './admin/export.controller.js';
 export { getSalesTeam } from './admin/team.controller.js';
+// Team Management (Story 7-4)
+export {
+  getSalesTeamList,
+  getSalesTeamMemberById,
+  updateSalesTeamMember,
+} from './admin/team-management.controller.js';

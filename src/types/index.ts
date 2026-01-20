@@ -207,9 +207,43 @@ export interface SheetConfig {
 export interface SalesTeamMember {
   lineUserId: string;
   name: string;
-  email?: string;
-  phone?: string;
+  email?: string | null;
+  phone?: string | null;
   role?: string; // admin | sales (sales maps to viewer in dashboard)
+  createdAt?: string; // ISO 8601 timestamp
+  status?: 'active' | 'inactive'; // Team member status for login control
+}
+
+/**
+ * Extended SalesTeamMember with all fields populated
+ * Used by Team Management API (Story 7-4)
+ */
+export interface SalesTeamMemberFull {
+  lineUserId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: 'admin' | 'sales';
+  createdAt: string;
+  status: 'active' | 'inactive';
+}
+
+/**
+ * Filter options for getAllSalesTeamMembers
+ */
+export interface SalesTeamFilter {
+  status?: 'active' | 'inactive' | 'all';
+  role?: 'admin' | 'sales' | 'all';
+}
+
+/**
+ * Update payload for updateSalesTeamMember
+ */
+export interface SalesTeamMemberUpdate {
+  email?: string | null;
+  phone?: string | null;
+  role?: 'admin' | 'sales';
+  status?: 'active' | 'inactive';
 }
 
 // ===========================================

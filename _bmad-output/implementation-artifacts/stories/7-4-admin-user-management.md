@@ -1332,6 +1332,12 @@ N/A
    - Replaced Card wrapper with simple div container for consistent Settings page layout
    - Fixed maskLineUserId edge case: changed length check from `< 10` to `<= 8`
    - Note: Commits 7777e55, ca0857e, 5683e9e modified Sales Performance components (Story 3.x) for cross-cutting UI alignment fixes
+11. **UX Enhancement - Phone Column** (2026-01-26):
+   - Added Phone column to team member table (commit dcbd631)
+   - Improves UX: users can see phone numbers without opening edit modal
+   - Column order: LINE ID, Name, Email, Phone, Role, Status, Created At, Edit
+   - Original AC#1 only specified Name, LINE ID, Email, Role, Status, Created At
+   - Phone was editable but not visible - now consistent with other editable fields
 
 ### File List
 

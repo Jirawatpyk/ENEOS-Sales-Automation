@@ -155,6 +155,48 @@ All dates are in ISO 8601 format: `2024-01-15T10:30:00.000Z`
 ?period=custom&startDate=2024-01-01&endDate=2024-01-31  // Custom range
 ```
 
+### 3.7 Field Format Changes (2026-01-26)
+
+**Industry Field Migration**
+
+The `industry` field format has been changed from **Thai-specific descriptions** to **generic English categories**.
+
+**Before (Thai format):**
+```json
+{
+  "industry": "การผลิตผงชูรสและวัตถุปรุงแต่งรสอาหาร"
+}
+```
+
+**After (Generic English):**
+```json
+{
+  "industry": "Food & Beverage"  // Generic English category
+}
+```
+
+**⚠️ Migration Notes:**
+- **Field removed:** `dbdSectorDescription` (merged into `industry`)
+- **Field changed:** `industry` now uses generic English instead of Thai
+- **Fields from Google Search Grounding** (accurate DBD data when grounding enabled):
+  - `capital` - ทุนจดทะเบียน (e.g., "796,362,800 บาท")
+  - `juristicId` - เลขทะเบียนนิติบุคคล 13 หลัก
+  - `dbdSector` - DBD Sector code (e.g., "F&B-M", "MFG-A")
+  - `province` - จังหวัด (e.g., "กรุงเทพมหานคร")
+  - `fullAddress` - ที่อยู่เต็มของบริษัท
+- Existing leads in database may have Thai-format industry values
+- New leads created after 2026-01-26 will use generic English format
+- Frontend should handle both formats gracefully during transition period
+
+**Example Values:**
+- "Food & Beverage"
+- "Manufacturing"
+- "Construction & Building"
+- "Trading & Distribution"
+- "IT & Technology"
+- "Automotive"
+- "Unknown" (when AI cannot determine)
+
 ---
 
 ## 4. Dashboard Endpoints
@@ -517,9 +559,13 @@ Authorization: Bearer <token>
       "email": "john.doe@abc.com",
       "phone": "081-234-5678",
       "company": "ABC Corporation",
-      "industry": "Manufacturing",
+      "industry": "Manufacturing",  // Generic English category (changed from Thai on 2026-01-26)
       "website": "https://abc.com",
       "capital": "10,000,000 THB",
+      "juristicId": "0107536000012",  // เลขทะเบียนนิติบุคคล 13 หลัก
+      "dbdSector": "MFG-A",  // DBD Sector code
+      "province": "กรุงเทพมหานคร",  // จังหวัด
+      "fullAddress": "123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110",
       "status": "closed",
       "owner": {
         "id": "U123456789",
@@ -566,6 +612,55 @@ Authorization: Bearer <token>
 }
 ```
 
+#### Example: Filter by Claimed Status
+
+The `status=claimed` filter returns leads that have been assigned to a sales owner (regardless of their actual status value).
+
+**Request:**
+```http
+GET /api/admin/leads?status=claimed&page=1&limit=10
+Authorization: Bearer <token>
+```
+
+**Behavior:**
+- Returns leads where `Sales_Owner_ID IS NOT NULL`
+- Lead can have any status (contacted, closed, lost, etc.)
+- Use case: View all leads currently assigned to sales team
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "row": 42,
+      "status": "contacted",
+      "salesOwnerId": "U123456789",
+      "salesOwnerName": "สมชาย",
+      ...
+    },
+    {
+      "row": 43,
+      "status": "closed",
+      "salesOwnerId": "U234567890",
+      "salesOwnerName": "สมหญิง",
+      ...
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 89,
+    "totalPages": 9
+  }
+}
+```
+
+**Note:**
+- `claimed` is NOT a status value stored in the database
+- `claimed` is a special filter parameter for convenience
+- To get unclaimed leads, use `status=new` with no owner filter
+
 ### 6.2 GET /api/admin/leads/:rowNumber
 
 Get single lead details.
@@ -592,6 +687,10 @@ Authorization: Bearer <token>
     "industry": "Manufacturing",
     "website": "https://abc.com",
     "capital": "10,000,000 THB",
+    "juristicId": "0107536000012",
+    "dbdSector": "MFG-A",
+    "province": "กรุงเทพมหานคร",
+    "fullAddress": "123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110",
     "status": "closed",
     "owner": {
       "id": "U123456789",
@@ -674,8 +773,9 @@ Authorization: Bearer <token>
       { "id": "U234567890", "name": "สมหญิง", "count": 22 }
     ],
     "byIndustry": [
-      { "industry": "Manufacturing", "count": 45 },
-      { "industry": "Automotive", "count": 32 }
+      { "industry": "Manufacturing", "count": 45 },  // Generic English values (changed from Thai on 2026-01-26)
+      { "industry": "Automotive", "count": 32 },
+      { "industry": "Food & Beverage", "count": 28 }
     ],
     "averages": {
       "responseTime": 30,
@@ -1138,4 +1238,5 @@ curl -X GET "http://localhost:3000/api/admin/export?type=leads&format=xlsx" \
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.1.0 | 2026-01-26 | Tech Writer + Amelia | Changed `industry` field from Thai to generic English format. Removed `dbdSectorDescription`. |
 | 1.0.0 | 2024-01 | Claude | Initial document |

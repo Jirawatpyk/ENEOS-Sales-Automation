@@ -132,6 +132,18 @@ so that **I can understand the full context of each lead and track sales perform
   - [ ] 8.2 Test data refresh after filter change
   - [ ] 8.3 Test network error handling
 
+- [x] **Task 9: Reorder Company Information Fields** (UI Enhancement)
+  - [x] 9.1 Reorder Company Information section in Lead Detail Modal
+    - Company (1st)
+    - DBD Sector (2nd)
+    - Industry (3rd - changed label from "Industry (AI)" to "Industry")
+    - Juristic ID (4th)
+    - Capital (5th)
+    - Website (6th)
+    - Address (7th - kept at bottom)
+  - [x] 9.2 Update label "Industry (AI)" → "Industry"
+  - [x] 9.3 Add numbered comments for clarity
+
 ## Dev Notes
 
 ### Type Definitions
@@ -627,5 +639,6 @@ The component signature remains the same (`LeadDetailSheetProps`), ensuring back
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-01-26 | UI Enhancement: Reordered Company Information fields (Task 9) | Claude Sonnet 4.5 |
 | 2026-01-17 | Code review passed - 3 issues fixed | Claude |
 | 2026-01-17 | Story created by SM Agent | Claude |

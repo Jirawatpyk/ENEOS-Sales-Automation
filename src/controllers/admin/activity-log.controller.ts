@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
 import { sheetsService } from '../../services/sheets.service.js';
 import { VALID_LEAD_STATUSES } from '../../types/index.js';
+import { leadRowToLeadItem } from './helpers/transform.helpers.js';
 
 // ===========================================
 // Validation Schemas
@@ -102,10 +103,16 @@ export async function getActivityLog(
     // Calculate pagination metadata
     const totalPages = Math.ceil(result.total / limit);
 
+    // Transform LeadRow to LeadItem for each entry
+    const transformedEntries = result.entries.map((entry) => ({
+      ...entry,
+      lead: leadRowToLeadItem(entry.lead),
+    }));
+
     res.status(200).json({
       success: true,
       data: {
-        entries: result.entries,
+        entries: transformedEntries,
         pagination: {
           page,
           limit,

@@ -825,7 +825,7 @@ export interface RecentCampaignLead {
 
 /**
  * Activity Log Entry
- * Combines Status_History data with Lead company name
+ * Combines Status_History data with full Lead data
  * GET /api/admin/activity-log
  */
 export interface ActivityLogEntry {
@@ -838,6 +838,8 @@ export interface ActivityLogEntry {
   changedByName: string;
   timestamp: string;             // ISO 8601
   notes: string | null;
+  // Full lead data for detail modal (includes grounding fields)
+  lead: LeadItem;
 }
 
 /**

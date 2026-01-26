@@ -83,7 +83,7 @@ development_status:
   2-3-status-distribution: done            # Must Have - Done 2026-01-13
   2-4-top-sales-table: done               # Must Have - Code review passed 2026-01-13
   2-5-recent-activity: done              # Should Have - Code review passed 2026-01-13
-  2-5-1-view-all-activity-link-fix: ready-for-dev  # Fix: Admin → /settings/activity, Viewer → hide link (2026-01-20)
+  2-5-1-view-all-activity-link-fix: done  # Fix: Admin → /settings/activity, Viewer → hide link (Code review passed 2026-01-21)
   2-6-alerts-panel: done                  # Should Have - Code review passed 2026-01-13
   2-7-date-filter: done                   # Should Have - Code review passed 2026-01-13
   2-8-auto-refresh: done                  # Could Have - Code review passed 2026-01-13
@@ -107,8 +107,9 @@ development_status:
   # ============================================================
   # EPIC-04: Lead Management
   # Started: 2026-01-17
+  # Reopened: 2026-01-26 for Google Search Grounding UI
   # ============================================================
-  epic-4: done  # All 12 stories completed, retrospective done 2026-01-19
+  epic-4: in-progress  # Reopened for Story 4-15 grounding fields UI
   4-1-lead-list-table: done  # Code review passed 2026-01-17
   4-2-pagination: done  # Code review passed 2026-01-17
   4-3-search: done  # Code review passed 2026-01-17
@@ -123,6 +124,7 @@ development_status:
   4-12-job-title-column: merged           # Merged into 4-11-additional-columns
   4-13-city-column: merged                # Merged into 4-11-additional-columns
   4-14-filter-by-lead-source: done  # Could Have - กรองตาม Lead Source (Completed 2026-01-19)
+  4-15-grounding-fields-ui: in-progress  # Display DBD Sector, Capital, Location columns + Full Address in detail (Started 2026-01-26)
   epic-4-retrospective: done  # Retrospective completed 2026-01-19, API Contract created
 
   # ============================================================
@@ -141,9 +143,10 @@ development_status:
 
   # ============================================================
   # EPIC-06: Export & Reports
+  # Started: 2026-01-26
   # ============================================================
-  epic-6: backlog
-  6-1-export-to-excel: backlog
+  epic-6: in-progress
+  6-1-export-to-excel: ready-for-dev  # Story created 2026-01-26 by Bob (SM Agent)
   6-2-export-to-pdf: backlog
   6-3-quick-reports: backlog
   6-4-custom-date-range: backlog

@@ -1326,6 +1326,12 @@ N/A
    - AC#4: Added Thai phone format validation (0[689]XXXXXXXX)
    - AC#10: Changed from forbidden page to redirect with toast (matches AC exactly)
    - Added tests for phone validation, role confirmation dialog, and redirect behavior
+10. **UI Consistency Improvements** (2026-01-26):
+   - Removed duplicate Card header/description to match Activity Log pattern (commit 0b2cfb0)
+   - Added bg-muted/50 background to table header for visual consistency (commit 931ad0a)
+   - Replaced Card wrapper with simple div container for consistent Settings page layout
+   - Fixed maskLineUserId edge case: changed length check from `< 10` to `<= 8`
+   - Note: Commits 7777e55, ca0857e, 5683e9e modified Sales Performance components (Story 3.x) for cross-cutting UI alignment fixes
 
 ### File List
 

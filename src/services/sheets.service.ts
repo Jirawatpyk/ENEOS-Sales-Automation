@@ -8,6 +8,9 @@ import { config } from '../config/index.js';
 import { sheetsLogger as logger } from '../utils/logger.js';
 import { withRetry, CircuitBreaker } from '../utils/retry.js';
 import { formatDateForSheets, formatISOTimestamp } from '../utils/date-formatter.js';
+
+// Constants
+const DEFAULT_COMPANY_NAME = 'Unknown';
 import { generateLeadUUID } from '../utils/uuid.js';
 import {
   Lead,
@@ -1147,6 +1150,8 @@ export class SheetsService {
       changedByName: string;
       timestamp: string;
       notes: string | null;
+      // Full lead data for detail modal
+      lead: LeadRow;
     }>;
     total: number;
     changedByOptions: { id: string; name: string }[];
@@ -1164,7 +1169,7 @@ export class SheetsService {
 
         const historyRows = historyResponse.data.values || [];
 
-        // Fetch all leads to join with company name and grounding fields
+        // Fetch all leads with complete data (including grounding fields)
         const leadsResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
           range: getSheetRange(this.leadsSheet, 'A2:AH'),
@@ -1172,15 +1177,13 @@ export class SheetsService {
 
         const leadRows = leadsResponse.data.values || [];
 
-        // Create a map of leadUUID to lead data (company name and row number)
-        const leadMap = new Map<string, { companyName: string; rowNumber: number }>();
+        // Create a map of leadUUID to full LeadRow object
+        const leadMap = new Map<string, LeadRow>();
         leadRows.forEach((row, index) => {
           const leadUUID = row[26]; // Column AA = leadUUID
           if (leadUUID) {
-            leadMap.set(leadUUID, {
-              companyName: row[4] || 'Unknown', // Column E = company
-              rowNumber: index + 2, // Row 2 = first data row
-            });
+            const rowNumber = index + 2; // Row 2 = first data row
+            leadMap.set(leadUUID, rowToLead(row, rowNumber));
           }
         });
 
@@ -1198,21 +1201,61 @@ export class SheetsService {
           name,
         }));
 
-        // Map and join history with lead data
+        // Map and join history with full lead data
         let entries = historyRows.map((row) => {
           const leadUUID = row[0] || '';
           const leadData = leadMap.get(leadUUID);
+
+          // Default lead if leadUUID from Status_History doesn't match any lead in Leads sheet (orphaned history entry)
+          const defaultLead: LeadRow = {
+            rowNumber: 0,
+            version: 1,
+            date: '',
+            customerName: '',
+            email: '',
+            phone: '',
+            company: DEFAULT_COMPANY_NAME,
+            industryAI: '',
+            website: null,
+            capital: null,
+            status: 'new',
+            salesOwnerId: null,
+            salesOwnerName: null,
+            campaignId: '',
+            campaignName: '',
+            emailSubject: '',
+            source: '',
+            leadId: '',
+            eventId: '',
+            clickedAt: '',
+            talkingPoint: null,
+            closedAt: null,
+            lostAt: null,
+            unreachableAt: null,
+            leadSource: null,
+            jobTitle: null,
+            city: null,
+            leadUUID: leadUUID,
+            createdAt: null,
+            updatedAt: null,
+            contactedAt: null,
+            juristicId: null,
+            dbdSector: null,
+            province: null,
+            fullAddress: null,
+          };
 
           return {
             id: `${leadUUID}_${row[4] || ''}`, // leadUUID + timestamp as unique ID
             leadUUID,
             rowNumber: leadData?.rowNumber || 0,
-            companyName: leadData?.companyName || 'Unknown',
+            companyName: leadData?.company || 'Unknown',
             status: row[1] as LeadStatus,
             changedById: row[2] || '',
             changedByName: row[3] || '',
             timestamp: row[4] || '',
             notes: row[5] || null,
+            lead: leadData || defaultLead,
           };
         });
 

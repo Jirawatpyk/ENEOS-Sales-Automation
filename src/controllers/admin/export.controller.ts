@@ -43,7 +43,7 @@ export async function exportData(
 
     // ดึงข้อมูลตาม type
     const allLeads = await getAllLeads();
-    let dataToExport: any[] = [];
+    let dataToExport: Record<string, string | number>[] = [];
 
     // Apply filters
     let filteredLeads = allLeads;

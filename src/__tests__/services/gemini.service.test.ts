@@ -104,8 +104,8 @@ describe('GeminiService', () => {
 
       const result = await service.analyzeCompany('example.com', 'Example Corp');
 
-      expect(result.industry).toBe('ไม่ระบุ');
-      expect(result.companyType).toBe('ไม่ระบุ');
+      expect(result.industry).toBe('Unknown');
+      expect(result.talkingPoint).toBeDefined();
     });
 
     it('should return graceful fallback on API error', async () => {
@@ -114,7 +114,7 @@ describe('GeminiService', () => {
       const result = await service.analyzeCompany('example.com', 'Test Company');
 
       // Should return fallback with company name in talking point
-      expect(result.industry).toBe('ไม่ระบุ');
+      expect(result.industry).toBe('Unknown');
       expect(result.talkingPoint).toContain('Test Company');
     });
 
@@ -123,7 +123,6 @@ describe('GeminiService', () => {
 
       // Verify the result has all required fields
       expect(result).toHaveProperty('industry');
-      expect(result).toHaveProperty('companyType');
       expect(result).toHaveProperty('talkingPoint');
       expect(result).toHaveProperty('website');
       expect(result).toHaveProperty('registeredCapital');

@@ -6,7 +6,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../utils/logger.js';
 import { parseDateFromSheets, extractDateKey } from '../../utils/date-formatter.js';
-import { AdminApiResponse } from '../../types/admin.types.js';
+import {
+  AdminApiResponse,
+  CampaignItem,
+  CampaignsResponse,
+  CampaignDetailResponse,
+} from '../../types/admin.types.js';
 import { LeadRow } from '../../types/index.js';
 import { EXPORT } from '../../constants/admin.constants.js';
 import {
@@ -70,7 +75,7 @@ export async function getCampaigns(
     });
 
     // สร้าง campaign items
-    const campaigns: any[] = Array.from(campaignMap.entries()).map(([id, campaignLeads]) => {
+    const campaigns: CampaignItem[] = Array.from(campaignMap.entries()).map(([id, campaignLeads]) => {
       const totalLeads = campaignLeads.length;
       const claimed = campaignLeads.filter((l) => l.salesOwnerId).length;
       const contacted = campaignLeads.filter((l) => l.status === 'contacted').length;
@@ -199,7 +204,7 @@ export async function getCampaigns(
         conversionRate: c.stats.conversionRate,
       }));
 
-    const response: AdminApiResponse<any> = {
+    const response: AdminApiResponse<CampaignsResponse> = {
       success: true,
       data: {
         campaigns,
@@ -357,7 +362,7 @@ export async function getCampaignDetail(
         date: lead.date,
       }));
 
-    const response: AdminApiResponse<any> = {
+    const response: AdminApiResponse<CampaignDetailResponse> = {
       success: true,
       data: {
         campaign,

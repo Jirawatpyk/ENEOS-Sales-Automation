@@ -49,6 +49,7 @@ const envSchema = z.object({
   ENABLE_AI_ENRICHMENT: z.string().default('true').transform((v) => v === 'true'),
   ENABLE_DEDUPLICATION: z.string().default('true').transform((v) => v === 'true'),
   ENABLE_LINE_NOTIFICATIONS: z.string().default('true').transform((v) => v === 'true'),
+  ENABLE_GOOGLE_SEARCH_GROUNDING: z.string().default('true').transform((v) => v === 'true'),
 
   // Development Security Options (use with caution!)
   SKIP_LINE_SIGNATURE_VERIFICATION: z.string().default('false').transform((v) => v === 'true'),
@@ -164,6 +165,7 @@ export const config = {
     aiEnrichment: env.ENABLE_AI_ENRICHMENT,
     deduplication: env.ENABLE_DEDUPLICATION,
     lineNotifications: env.ENABLE_LINE_NOTIFICATIONS,
+    googleSearchGrounding: env.ENABLE_GOOGLE_SEARCH_GROUNDING,
   },
 
   // Development/Testing Options

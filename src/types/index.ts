@@ -39,6 +39,11 @@ export interface Lead {
   updatedAt: string | null;
   // Contacted timestamp (when sales claimed the lead)
   contactedAt: string | null;
+  // Google Search Grounding fields (added 2026-01-26)
+  juristicId: string | null;
+  dbdSector: string | null;
+  province: string | null;
+  fullAddress: string | null;
 }
 
 export type LeadStatus =
@@ -180,12 +185,16 @@ export interface LineUserProfile {
 // ===========================================
 
 export interface CompanyAnalysis {
-  industry: string;
-  companyType: string;
+  industry: string; // Generic category (e.g., "Food & Beverage", "Manufacturing")
   talkingPoint: string;
   website: string | null;
   registeredCapital: string | null;
   keywords: string[];
+  // New fields from Google Search grounding
+  juristicId: string | null; // เลขทะเบียนนิติบุคคล
+  dbdSector: string | null; // DBD Sector code (e.g., F&B-M, MFG-A)
+  province: string | null; // จังหวัด (e.g., กรุงเทพมหานคร, เชียงใหม่)
+  fullAddress: string | null; // ที่อยู่เต็มของบริษัท (optional)
 }
 
 export interface GeminiAnalysisRequest {

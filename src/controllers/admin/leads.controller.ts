@@ -380,6 +380,11 @@ export async function getLeadById(
       talkingPoint: lead.talkingPoint || '',
       history,
       metrics,
+      // Google Search Grounding fields (2026-01-26)
+      juristicId: lead.juristicId ?? null,
+      dbdSector: lead.dbdSector ?? null,
+      province: lead.province ?? null,
+      fullAddress: lead.fullAddress ?? null,
     };
 
     const response: AdminApiResponse<LeadDetailResponse> = {

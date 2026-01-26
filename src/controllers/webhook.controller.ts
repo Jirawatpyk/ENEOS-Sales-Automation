@@ -94,12 +94,16 @@ export async function handleBrevoWebhook(
     // Step 4: AI Enrichment (analyze company)
     const domain = extractDomain(payload.email);
     let aiAnalysis = {
-      industry: 'ไม่ระบุ',
-      companyType: 'ไม่ระบุ',
+      industry: 'Unknown',
       talkingPoint: 'ENEOS มีน้ำมันหล่อลื่นคุณภาพสูงจากญี่ปุ่น',
       website: null as string | null,
       registeredCapital: null as string | null,
       keywords: ['B2B'],
+      // Google Search Grounding fields (defaults)
+      juristicId: null as string | null,
+      dbdSector: null as string | null,
+      province: null as string | null,
+      fullAddress: null as string | null,
     };
 
     if (config.features.aiEnrichment) {
@@ -146,6 +150,11 @@ export async function handleBrevoWebhook(
       leadSource: payload.leadSource || null,
       jobTitle: payload.jobTitle || null,
       city: payload.city || null,
+      // Google Search Grounding fields (added 2026-01-26)
+      juristicId: aiAnalysis.juristicId || null,
+      dbdSector: aiAnalysis.dbdSector || null,
+      province: aiAnalysis.province || null,
+      fullAddress: aiAnalysis.fullAddress || null,
     };
 
     const rowNumber = await sheetsService.addLead(lead);

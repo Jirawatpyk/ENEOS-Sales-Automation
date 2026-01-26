@@ -116,7 +116,7 @@ describe('Flex Message Templates', () => {
 
     it('should handle missing AI analysis fields', () => {
       const minimalAnalysis = {
-        industry: 'ไม่ระบุ',
+        industry: 'Unknown',
         talkingPoint: 'Default talking point',
       };
       const result = createLeadFlexMessage(mockLead, minimalAnalysis);

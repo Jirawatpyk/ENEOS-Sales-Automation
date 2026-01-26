@@ -77,6 +77,16 @@ function rowToLead(row: string[], rowNumber: number): LeadRow {
   // Parse version - default เป็น 1 ถ้าไม่มีหรือ parse ไม่ได้
   const version = parseInt(row[22] || '1', 10) || 1;
 
+  // Warn if grounding columns might be missing (row should have 34 columns A-AH)
+  if (row.length < 34 && row.length > 29) {
+    logger.warn('Google Sheets row has fewer columns than expected', {
+      rowNumber,
+      expectedColumns: 34,
+      actualColumns: row.length,
+      missingGroundingFields: true,
+    });
+  }
+
   return {
     rowNumber,
     version,
@@ -112,6 +122,11 @@ function rowToLead(row: string[], rowNumber: number): LeadRow {
     updatedAt: row[28] || null,
     // Contacted timestamp (column AD)
     contactedAt: row[29] || null,
+    // Google Search Grounding fields (columns AE, AF, AG, AH) - Added 2026-01-26
+    juristicId: typeof row[30] === 'string' && row[30] ? row[30] : null,
+    dbdSector: typeof row[31] === 'string' && row[31] ? row[31] : null,
+    province: typeof row[32] === 'string' && row[32] ? row[32] : null,
+    fullAddress: typeof row[33] === 'string' && row[33] ? row[33] : null,
   };
 }
 
@@ -150,6 +165,11 @@ function leadToRow(lead: Partial<Lead>, version: number = 1): string[] {
     lead.updatedAt || '',
     // Contacted timestamp (column AD)
     lead.contactedAt || '',
+    // Google Search Grounding fields (columns AE, AF, AG, AH) - Added 2026-01-26
+    lead.juristicId || '',
+    lead.dbdSector || '',
+    lead.province || '',
+    lead.fullAddress || '',
   ];
 }
 
@@ -199,7 +219,7 @@ export class SheetsService {
 
         const response = await sheets.spreadsheets.values.append({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A:AD'),
+          range: getSheetRange(this.leadsSheet, 'A:AH'),
           valueInputOption: 'RAW',
           insertDataOption: 'INSERT_ROWS',
           requestBody: {
@@ -207,7 +227,7 @@ export class SheetsService {
           },
         });
 
-        // Extract row number from updatedRange (e.g., "Leads!A42:AD42")
+        // Extract row number from updatedRange (e.g., "Leads!A42:AH42")
         const updatedRange = response.data.updates?.updatedRange || '';
         const match = updatedRange.match(/!A(\d+):/);
         const rowNumber = match ? parseInt(match[1], 10) : 0;
@@ -505,10 +525,10 @@ export class SheetsService {
 
     return circuitBreaker.execute(async () => {
       return withRetry(async () => {
-        // Get all leads with their leadUUID column (column AA = index 26)
+        // Get all leads with their leadUUID column (column AA = index 26) and grounding fields (AE-AH)
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A2:AD'),
+          range: getSheetRange(this.leadsSheet, 'A2:AH'),
         });
 
         const rows = response.data.values || [];
@@ -621,7 +641,7 @@ export class SheetsService {
       return withRetry(async () => {
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A2:AD'), // Skip header row, includes contactedAt column
+          range: getSheetRange(this.leadsSheet, 'A2:AH'), // Skip header row, includes grounding fields (AE-AH)
         });
 
         const rows = response.data.values || [];
@@ -1144,10 +1164,10 @@ export class SheetsService {
 
         const historyRows = historyResponse.data.values || [];
 
-        // Fetch all leads to join with company name
+        // Fetch all leads to join with company name and grounding fields
         const leadsResponse = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
-          range: getSheetRange(this.leadsSheet, 'A2:AA'),
+          range: getSheetRange(this.leadsSheet, 'A2:AH'),
         });
 
         const leadRows = leadsResponse.data.values || [];

@@ -40,36 +40,49 @@ const safetySettings = [
 // Prompts
 // ===========================================
 
-const SYSTEM_PROMPT = `You are a B2B sales assistant.
+const SYSTEM_PROMPT = `You are a B2B sales intelligence analyst for Thailand market.
 
 Required fields:
-- industry
-- company_type
+- industry (generic business category in English, e.g., "Food & Beverage", "Manufacturing", "Construction")
 - one_talking_point
 - registered_capital_thb
 - website
 - keywords
+- juristic_id (เลขทะเบียนนิติบุคคล 13 หลัก)
+- dbd_sector (DBD Sector code เช่น F&B-M, MFG-A)
+- province (จังหวัด เช่น กรุงเทพมหานคร, เชียงใหม่, ชลบุรี)
+- full_address (ที่อยู่เต็มของบริษัท)
 
 Rules:
-- Return valid JSON only.
-- No markdown. No explanation.
-- If uncertain, use "unknown".
+- Search for REAL official data from reliable sources (dbd.go.th, company website)
+- Return valid JSON only. No markdown. No explanation.
+- If data found from official sources, use it. Otherwise use "Unknown".
 - keywords: max 1 items only`;
 
 const createAnalysisPrompt = (domain: string, companyName: string): string => {
-  return `Analyze this company:
+  return `Search for official information about this Thai company:
 
-company_name: ${companyName || 'Unknown'}
-email_domain: ${domain || 'Unknown'}
+Company Name: ${companyName || 'Unknown'}
+Email Domain: ${domain || 'Unknown'}
 
-Return JSON only with this schema:
+SEARCH INSTRUCTIONS:
+1. Search Google for: "${companyName} ทะเบียนนิติบุคคล site:dbd.go.th" OR "${companyName} registered capital"
+2. Find official website if available
+3. Look for DBD sector classification
+4. Extract juristic ID (13-digit number starting with 01xxxxx)
+5. Find registered address and province (จังหวัด)
+
+Return JSON with this exact schema (use "Unknown" or null if data not found):
 {
-  "industry": "",
-  "company_type": "",
-  "one_talking_point": "",
-  "website": "",
-  "registered_capital_thb": "Amount in Thai Baht (e.g. 5,000,000 บาท). If strictly not found, return 'ไม่ระบุ'",
-  "keywords": [""]
+  "industry": "Generic category in English (e.g., Food & Beverage, Manufacturing, Construction, Trading)",
+  "one_talking_point": "ประโยคเดียวสำหรับเซลล์ที่น่าสนใจ (ภาษาไทย)",
+  "website": "https://example.com or null",
+  "registered_capital_thb": "จำนวนเงินบาท (เช่น 796,362,800 บาท) หรือ 'ไม่ระบุ'",
+  "keywords": ["keyword1"],
+  "juristic_id": "เลขทะเบียน 13 หลัก or null",
+  "dbd_sector": "รหัส sector เช่น F&B-M or null",
+  "province": "จังหวัด เช่น กรุงเทพมหานคร or null",
+  "full_address": "ที่อยู่เต็มของบริษัท or null"
 }`;
 };
 
@@ -78,12 +91,15 @@ Return JSON only with this schema:
 // ===========================================
 
 const DEFAULT_ANALYSIS: CompanyAnalysis = {
-  industry: 'ไม่ระบุ',
-  companyType: 'ไม่ระบุ',
+  industry: 'Unknown',
   talkingPoint: 'ENEOS มีน้ำมันหล่อลื่นคุณภาพสูงจากญี่ปุ่น เหมาะกับทุกประเภทอุตสาหกรรม',
   website: null,
   registeredCapital: null,
   keywords: ['B2B', 'industrial'],
+  juristicId: null,
+  dbdSector: null,
+  province: null,
+  fullAddress: null,
 };
 
 // ===========================================
@@ -92,8 +108,10 @@ const DEFAULT_ANALYSIS: CompanyAnalysis = {
 
 export class GeminiService {
   private model: GenerativeModel;
+  private modelWithGrounding: GenerativeModel;
 
   constructor() {
+    // Standard model for quick analysis
     this.model = genAI.getGenerativeModel({
       model: config.gemini.model,
       safetySettings,
@@ -104,10 +122,28 @@ export class GeminiService {
         maxOutputTokens: 1024,
       },
     });
+
+    // Model with Google Search grounding for deep analysis
+    this.modelWithGrounding = genAI.getGenerativeModel({
+      model: config.gemini.model,
+      safetySettings,
+      generationConfig: {
+        temperature: 0.3, // Lower temp for structured output
+        topP: 0.9,
+        topK: 40,
+        maxOutputTokens: 2048, // Increased for complete JSON response
+      },
+      tools: [
+        {
+          google_search: {}, // Google Search grounding tool (v1beta API)
+        } as any, // Beta API workaround - SDK type definition incomplete
+      ],
+    });
   }
 
   /**
    * Analyze company information for sales intelligence
+   * Uses smart grounding strategy: try quick analysis first, then grounding if needed
    */
   async analyzeCompany(domain: string, companyName: string): Promise<CompanyAnalysis> {
     if (!config.features.aiEnrichment) {
@@ -121,35 +157,15 @@ export class GeminiService {
       return await circuitBreaker.execute(async () => {
         return withRetry(
           async () => {
-            const prompt = createAnalysisPrompt(domain, companyName);
+            // Smart strategy: Use grounding directly if enabled
+            if (config.features.googleSearchGrounding) {
+              logger.info('Using Google Search grounding for accurate data');
+              return await this.analyzeWithGrounding(domain, companyName);
+            }
 
-            const chat = this.model.startChat({
-              history: [
-                {
-                  role: 'user',
-                  parts: [{ text: SYSTEM_PROMPT }],
-                },
-                {
-                  role: 'model',
-                  parts: [{ text: 'เข้าใจครับ พร้อมวิเคราะห์ข้อมูลบริษัทในรูปแบบ JSON' }],
-                },
-              ],
-            });
-
-            const result = await chat.sendMessage(prompt);
-            const responseText = result.response.text();
-
-            logger.debug('Raw AI response', { responseText });
-
-            // Parse JSON from response
-            const analysis = this.parseResponse(responseText);
-
-            logger.info('Company analysis completed', {
-              domain,
-              industry: analysis.industry,
-            });
-
-            return analysis;
+            // Fallback: Quick analysis without grounding
+            logger.info('Using standard analysis (grounding disabled)');
+            return await this.analyzeQuick(domain, companyName);
           },
           {
             maxAttempts: 2,
@@ -174,17 +190,109 @@ export class GeminiService {
   }
 
   /**
+   * Quick analysis without Google Search grounding
+   */
+  private async analyzeQuick(domain: string, companyName: string): Promise<CompanyAnalysis> {
+    const prompt = createAnalysisPrompt(domain, companyName);
+
+    const chat = this.model.startChat({
+      history: [
+        {
+          role: 'user',
+          parts: [{ text: SYSTEM_PROMPT }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'เข้าใจครับ พร้อมวิเคราะห์ข้อมูลบริษัทในรูปแบบ JSON' }],
+        },
+      ],
+    });
+
+    const result = await chat.sendMessage(prompt);
+    const responseText = result.response.text();
+
+    logger.debug('Raw AI response (quick)', { responseText });
+
+    const analysis = this.parseResponse(responseText);
+
+    logger.info('Quick analysis completed', {
+      domain,
+      industry: analysis.industry,
+      hasCapital: analysis.registeredCapital !== 'ไม่ระบุ',
+    });
+
+    return analysis;
+  }
+
+  /**
+   * Deep analysis with Google Search grounding
+   */
+  private async analyzeWithGrounding(domain: string, companyName: string): Promise<CompanyAnalysis> {
+    const prompt = createAnalysisPrompt(domain, companyName);
+
+    const chat = this.modelWithGrounding.startChat({
+      history: [
+        {
+          role: 'user',
+          parts: [{ text: SYSTEM_PROMPT }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'เข้าใจครับ พร้อมค้นหาข้อมูลอย่างเป็นทางการและวิเคราะห์ในรูปแบบ JSON' }],
+        },
+      ],
+    });
+
+    const result = await chat.sendMessage(prompt);
+    const response = result.response;
+    const responseText = response.text();
+
+    // Log grounding metadata if available
+    const candidate = response.candidates?.[0];
+    if (candidate?.groundingMetadata) {
+      logger.info('Grounding metadata', {
+        webSearchQueries: candidate.groundingMetadata.webSearchQueries || [],
+        groundingSupport: candidate.groundingMetadata.groundingSupport?.length || 0,
+      });
+    }
+
+    logger.debug('Raw AI response (grounding)', { responseText });
+
+    const analysis = this.parseResponse(responseText);
+
+    logger.info('Grounding analysis completed', {
+      domain,
+      industry: analysis.industry,
+      hasCapital: analysis.registeredCapital !== 'ไม่ระบุ',
+      hasJuristicId: !!analysis.juristicId,
+      hasSector: !!analysis.dbdSector,
+    });
+
+    return analysis;
+  }
+
+  /**
    * Parse AI response to CompanyAnalysis object
    */
   private parseResponse(responseText: string): CompanyAnalysis {
     try {
       // Extract JSON from response (handle markdown code blocks)
-      let jsonStr = responseText;
+      let jsonStr = responseText.trim();
 
-      // Remove markdown code blocks if present
-      const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      // Remove markdown code blocks if present (multiple patterns)
+      // Pattern 1: ```json ... ``` or ``` ... ```
+      const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (jsonMatch) {
-        jsonStr = jsonMatch[1];
+        jsonStr = jsonMatch[1].trim();
+      }
+
+      // Pattern 2: Remove leading/trailing backticks
+      jsonStr = jsonStr.replace(/^`+|`+$/g, '');
+
+      // Pattern 3: Extract first {...} block
+      const objectMatch = jsonStr.match(/(\{[\s\S]*\})/);
+      if (objectMatch) {
+        jsonStr = objectMatch[1];
       }
 
       // Clean up the JSON string
@@ -195,7 +303,6 @@ export class GeminiService {
       // Validate and transform to expected format
       return {
         industry: parsed.industry || DEFAULT_ANALYSIS.industry,
-        companyType: parsed.company_type || parsed.companyType || DEFAULT_ANALYSIS.companyType,
         talkingPoint:
           parsed.one_talking_point ||
           parsed.talkingPoint ||
@@ -205,6 +312,11 @@ export class GeminiService {
         registeredCapital:
           parsed.registered_capital_thb || parsed.registeredCapital || parsed.registered_capital || null,
         keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 1) : DEFAULT_ANALYSIS.keywords,
+        // New fields from grounding
+        juristicId: parsed.juristic_id || parsed.juristicId || null,
+        dbdSector: parsed.dbd_sector || parsed.dbdSector || null,
+        province: parsed.province || null,
+        fullAddress: parsed.full_address || parsed.fullAddress || null,
       };
     } catch (parseError) {
       logger.warn('Failed to parse AI response, using default', {

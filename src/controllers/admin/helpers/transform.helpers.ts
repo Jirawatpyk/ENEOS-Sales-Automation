@@ -62,6 +62,11 @@ export function leadRowToLeadItem(lead: LeadRow): LeadItem {
     leadSource: lead.leadSource || null,
     jobTitle: lead.jobTitle || null,
     city: lead.city || null,
+    // Google Search Grounding fields (2026-01-26)
+    juristicId: lead.juristicId ?? null,
+    dbdSector: lead.dbdSector ?? null,
+    province: lead.province ?? null,
+    fullAddress: lead.fullAddress ?? null,
   };
 }
 

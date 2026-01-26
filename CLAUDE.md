@@ -43,6 +43,62 @@ npm run health           # Check health endpoint (requires jq)
 curl http://localhost:3000/health
 ```
 
+## Development Flow (BMAD) - MANDATORY
+
+ทุกครั้งที่พัฒนา feature หรือ fix bug ต้องทำตาม flow นี้:
+
+```
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│  Amelia (Dev) ──→ Rex (Code Review) ──→ PASS? ─────→ Done
+│                         │                    │
+│                        FAIL                  │
+│                         │                    │
+│                         ▼                    │
+│                   Amelia (Fix) ──────────────┘
+│                   (loop until PASS)
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+### Agents
+
+| Agent | Command | Role |
+|-------|---------|------|
+| **Amelia** (Dev) | `/bmad:bmm:agents:dev` | Implement story, fix issues |
+| **Rex** (Code-Reviewer) | `/bmad:bmm:agents:code-reviewer` | Adversarial code review |
+
+### Rules
+
+1. **ห้าม Dev review code ตัวเอง** - Amelia implement แล้วต้องให้ Rex review
+2. **Loop จนกว่า Rex PASS** - ถ้า Rex พบ issues ต้อง fix แล้ว review อีกรอบ
+3. **ใช้ Full Review [RV]** - ตรวจครบทั้ง Code + Tests + Acceptance Criteria
+4. **No Human Review Required** - Rex เป็น quality gate สุดท้าย (Lead skip ได้)
+
+> **Note:** ใช้ [AR] Adversarial Review สำหรับ security-sensitive code (auth, payment)
+
+### Rex Review Verdicts
+
+| Verdict | Action |
+|---------|--------|
+| ✅ **APPROVED** | Done - merge/deploy ได้ |
+| ⚠️ **CHANGES_REQUESTED** | Amelia fix แล้ว Rex review อีกรอบ |
+| ❌ **BLOCKED** | มี Critical issue ต้องแก้ก่อน |
+
+### Quick Start
+
+```bash
+# 1. Implement story
+/bmad:bmm:agents:dev
+# เลือก [DS] Dev Story
+
+# 2. Code review (after implementation done)
+/bmad:bmm:agents:code-reviewer
+# เลือก [RV] Full Review (หรือ [AR] สำหรับ security code)
+
+# 3. If issues found → fix → review again (loop)
+```
+
 ## Architecture
 
 ### Data Flow (2 Main Scenarios)
@@ -119,9 +175,10 @@ src/
 ระบบต้องการ 4 Sheets หลัก:
 
 1. **Leads** (Main database)
-   - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version, Lead_Source, Job_Title, City, Lead_UUID, Created_At, Updated_At, Contacted_At
+   - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version, Lead_Source, Job_Title, City, Lead_UUID, Created_At, Updated_At, Contacted_At, Juristic_ID, DBD_Sector, Province, Full_Address
    - **UUID Migration Notes:** Lead_UUID (unique identifier for Supabase migration), Created_At/Updated_At (ISO 8601 timestamps)
    - **Metrics Notes:** Contacted_At = timestamp when sales claimed the lead (used for Response Time and Closing Time metrics)
+   - **Google Search Grounding Fields (2026-01-26):** Juristic_ID (Col AE), DBD_Sector (Col AF), Province (Col AG), Full_Address (Col AH) - Added at end to preserve existing data. Capital (Col H) also from grounding.
 
 2. **Deduplication_Log** (Prevent duplicates)
    - Columns: Key, Email, Campaign_ID, Processed_At
@@ -323,6 +380,7 @@ if (config.features.aiEnrichment) {
 |----------|-------------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture with Mermaid diagrams |
 | [docs/api-reference.md](docs/api-reference.md) | API endpoints reference |
+| [docs/api/api-contract.md](docs/api/api-contract.md) | **API Contract** - Shared frontend/backend param specs (Epic 4 Action Item) |
 | [docs/data-flow.md](docs/data-flow.md) | Data flow and sequence diagrams |
 | [docs/services.md](docs/services.md) | Services layer documentation |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Deployment instructions |

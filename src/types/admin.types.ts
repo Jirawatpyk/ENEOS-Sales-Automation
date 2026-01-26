@@ -222,6 +222,15 @@ export interface LeadItem {
   leadSource: string | null;      // Lead source categorization
   jobTitle: string | null;        // Contact's job title
   city: string | null;            // Contact's city
+  // Google Search Grounding fields (2026-01-26)
+  /** Juristic ID - เลขทะเบียนนิติบุคคล 13 หลัก from DBD registration */
+  juristicId: string | null;
+  /** DBD Sector code (e.g., "F&B-M", "MFG-A") - Official business sector classification */
+  dbdSector: string | null;
+  /** Province - จังหวัด (e.g., "กรุงเทพมหานคร", "เชียงใหม่") from DBD official data */
+  province: string | null;
+  /** Full company address - ที่อยู่เต็มของบริษัท from DBD registration */
+  fullAddress: string | null;
 }
 
 /**
@@ -256,6 +265,15 @@ export interface LeadDetailResponse {
   talkingPoint: string;
   history: StatusHistoryItem[];
   metrics: LeadMetrics;
+  // Google Search Grounding fields (2026-01-26)
+  /** Juristic ID - เลขทะเบียนนิติบุคคล 13 หลัก from DBD registration */
+  juristicId: string | null;
+  /** DBD Sector code (e.g., "F&B-M", "MFG-A") - Official business sector classification */
+  dbdSector: string | null;
+  /** Province - จังหวัด from DBD official data */
+  province: string | null;
+  /** Full company address - ที่อยู่เต็มของบริษัท from DBD registration */
+  fullAddress: string | null;
 }
 
 /**

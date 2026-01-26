@@ -736,21 +736,40 @@ describe('Admin Controller', () => {
     });
 
     it('should filter by status', async () => {
-      const req = createMockRequest({ query: { status: 'claimed' } });
+      const req = createMockRequest({ query: { status: 'contacted' } });
       const res = createMockResponse();
       const next = createMockNext();
 
       mockGetAllLeads.mockResolvedValue([
         createSampleLead({ status: 'new' }),
-        createSampleLead({ rowNumber: 3, status: 'claimed', salesOwnerId: 'sales-001' }),
-        createSampleLead({ rowNumber: 4, status: 'claimed', salesOwnerId: 'sales-002' }),
+        createSampleLead({ rowNumber: 3, status: 'contacted', salesOwnerId: 'sales-001', contactedAt: getCurrentDateISO() }),
+        createSampleLead({ rowNumber: 4, status: 'contacted', salesOwnerId: 'sales-002', contactedAt: getCurrentDateISO() }),
       ]);
 
       await getLeads(req, res, next);
 
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.data.data).toHaveLength(2);
-      expect(response.data.data.every((l: { status: string }) => l.status === 'claimed')).toBe(true);
+      expect(response.data.data.every((l: { status: string }) => l.status === 'contacted')).toBe(true);
+    });
+
+    it('should filter by status=claimed (leads with salesOwnerId)', async () => {
+      const req = createMockRequest({ query: { status: 'claimed' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({ rowNumber: 2, status: 'new', salesOwnerId: null }), // unclaimed
+        createSampleLead({ rowNumber: 3, status: 'contacted', salesOwnerId: 'sales-001', contactedAt: getCurrentDateISO() }), // claimed
+        createSampleLead({ rowNumber: 4, status: 'closed', salesOwnerId: 'sales-002', closedAt: getCurrentDateISO() }), // claimed
+        createSampleLead({ rowNumber: 5, status: 'new', salesOwnerId: null }), // unclaimed
+      ]);
+
+      await getLeads(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.data).toHaveLength(2); // Only leads with salesOwnerId
+      expect(response.data.data.every((l: { salesOwnerId: string | null }) => l.salesOwnerId !== null)).toBe(true);
     });
 
     it('should filter by owner', async () => {

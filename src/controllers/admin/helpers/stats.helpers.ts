@@ -8,13 +8,23 @@ import { LeadRow } from '../../../types/index.js';
 
 /**
  * นับจำนวน leads ตาม status (O(n) single pass)
+ *
+ * Note: "claimed" หมายถึง leads ที่มี salesOwnerId (ไม่ว่า status จะเป็นอะไร)
+ * ตามเอกสาร: claimed = COUNT WHERE Sales_Owner_ID IS NOT NULL
  */
 export function countByStatus(leads: LeadRow[]): StatusDistribution {
   return leads.reduce(
     (acc, lead) => {
+      // นับตาม status ปกติ
       if (lead.status in acc) {
         acc[lead.status as keyof StatusDistribution]++;
       }
+
+      // นับ claimed = leads ที่มี salesOwnerId (ไม่ว่า status จะเป็นอะไร)
+      if (lead.salesOwnerId) {
+        acc.claimed++;
+      }
+
       return acc;
     },
     {

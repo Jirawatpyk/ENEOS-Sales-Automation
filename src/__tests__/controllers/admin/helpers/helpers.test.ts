@@ -269,15 +269,35 @@ describe('Admin Controller Helpers', () => {
       expect(result.new).toBe(2);
       expect(result.contacted).toBe(1);
       expect(result.closed).toBe(1);
-      expect(result.claimed).toBe(0);
+      expect(result.claimed).toBe(0); // ไม่มี lead ไหนมี salesOwnerId
       expect(result.lost).toBe(0);
       expect(result.unreachable).toBe(0);
+    });
+
+    it('should count claimed as leads with salesOwnerId (regardless of status)', () => {
+      const leads = [
+        createMockLead({ status: 'new', salesOwnerId: null }), // unclaimed
+        createMockLead({ status: 'new', salesOwnerId: 'U123' }), // claimed
+        createMockLead({ status: 'contacted', salesOwnerId: 'U456' }), // claimed + contacted
+        createMockLead({ status: 'closed', salesOwnerId: 'U789' }), // claimed + closed
+        createMockLead({ status: 'lost', salesOwnerId: 'U999' }), // claimed + lost
+      ];
+
+      const result = countByStatus(leads);
+      // นับ status
+      expect(result.new).toBe(2);
+      expect(result.contacted).toBe(1);
+      expect(result.closed).toBe(1);
+      expect(result.lost).toBe(1);
+      // นับ claimed = leads ที่มี salesOwnerId (4 leads)
+      expect(result.claimed).toBe(4);
     });
 
     it('should return zeros for empty array', () => {
       const result = countByStatus([]);
       expect(result.new).toBe(0);
       expect(result.contacted).toBe(0);
+      expect(result.claimed).toBe(0);
     });
   });
 

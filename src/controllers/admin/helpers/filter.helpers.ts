@@ -24,10 +24,22 @@ export function filterByPeriod(leads: LeadRow[], period: PeriodInfo): LeadRow[] 
 
 /**
  * กรอง leads ตาม status (รองรับ comma-separated values)
+ *
+ * Note: "claimed" เป็น special status สำหรับ filter - หมายถึง leads ที่มี salesOwnerId
+ * (ไม่ใช่ค่า status จริงใน database)
  */
 export function filterByStatus(leads: LeadRow[], status: string): LeadRow[] {
   const statuses = status.split(',').map((s) => s.trim().toLowerCase());
-  return leads.filter((lead) => statuses.includes(lead.status));
+
+  return leads.filter((lead) => {
+    // Special case: "claimed" = leads ที่มี salesOwnerId (ไม่ว่า status จะเป็นอะไร)
+    if (statuses.includes('claimed') && lead.salesOwnerId) {
+      return true;
+    }
+
+    // ตรวจสอบ status ปกติ
+    return statuses.includes(lead.status);
+  });
 }
 
 /**

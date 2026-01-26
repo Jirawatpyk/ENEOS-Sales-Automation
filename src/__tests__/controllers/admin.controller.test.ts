@@ -186,18 +186,19 @@ describe('Admin Controller', () => {
       const next = createMockNext();
 
       mockGetAllLeads.mockResolvedValue([
-        createSampleLead({ status: 'new' }),
-        createSampleLead({ rowNumber: 3, status: 'new' }),
-        createSampleLead({ rowNumber: 4, status: 'claimed', salesOwnerId: 'sales-001' }),
-        createSampleLead({ rowNumber: 5, status: 'closed', salesOwnerId: 'sales-001', closedAt: getCurrentDateISO() }),
+        createSampleLead({ status: 'new' }), // unclaimed
+        createSampleLead({ rowNumber: 3, status: 'new' }), // unclaimed
+        createSampleLead({ rowNumber: 4, status: 'contacted', salesOwnerId: 'sales-001', contactedAt: getCurrentDateISO() }), // claimed + contacted
+        createSampleLead({ rowNumber: 5, status: 'closed', salesOwnerId: 'sales-001', closedAt: getCurrentDateISO() }), // claimed + closed
       ]);
 
       await getDashboard(req, res, next);
 
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.data.statusDistribution.new).toBe(2);
-      expect(response.data.statusDistribution.claimed).toBe(1);
+      expect(response.data.statusDistribution.contacted).toBe(1);
       expect(response.data.statusDistribution.closed).toBe(1);
+      expect(response.data.statusDistribution.claimed).toBe(2); // 2 leads มี salesOwnerId
     });
 
     it('should sort topSales by closed count descending', async () => {
@@ -843,6 +844,43 @@ describe('Admin Controller', () => {
       expect(response.data.filters.available).toHaveProperty('owners');
       expect(response.data.filters.available).toHaveProperty('campaigns');
     });
+
+    it('should include grounding fields in lead list (2026-01-26)', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({
+          rowNumber: 2,
+          juristicId: '0105563079446',
+          dbdSector: 'F&B-M',
+          province: 'กรุงเทพมหานคร',
+          fullAddress: '123/45 ถนนสุขุมวิท',
+        }),
+        createSampleLead({
+          rowNumber: 3,
+          // Legacy lead without grounding fields
+        }),
+      ]);
+
+      await getLeads(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.data).toHaveLength(2);
+
+      // First lead has grounding fields
+      expect(response.data.data[0]).toHaveProperty('juristicId', '0105563079446');
+      expect(response.data.data[0]).toHaveProperty('dbdSector', 'F&B-M');
+      expect(response.data.data[0]).toHaveProperty('province', 'กรุงเทพมหานคร');
+      expect(response.data.data[0]).toHaveProperty('fullAddress', '123/45 ถนนสุขุมวิท');
+
+      // Second lead has null grounding fields
+      expect(response.data.data[1]).toHaveProperty('juristicId', null);
+      expect(response.data.data[1]).toHaveProperty('dbdSector', null);
+      expect(response.data.data[1]).toHaveProperty('province', null);
+      expect(response.data.data[1]).toHaveProperty('fullAddress', null);
+    });
   });
 
   // ===========================================
@@ -1018,6 +1056,52 @@ describe('Admin Controller', () => {
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       // Invalid timestamp ordering: contactedAt > closedAt should return 0
       expect(response.data.metrics.closingTime).toBe(0);
+    });
+
+    it('should return grounding fields when present (2026-01-26)', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        juristicId: '0105563079446',
+        dbdSector: 'F&B-M',
+        province: 'กรุงเทพมหานคร',
+        fullAddress: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110',
+      });
+      mockGetRow.mockResolvedValue(lead);
+
+      await getLeadById(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+      // Verify all grounding fields are returned
+      expect(response.data.juristicId).toBe('0105563079446');
+      expect(response.data.dbdSector).toBe('F&B-M');
+      expect(response.data.province).toBe('กรุงเทพมหานคร');
+      expect(response.data.fullAddress).toBe('123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110');
+    });
+
+    it('should return null for grounding fields when not present', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // Legacy lead without grounding fields
+      const lead = createSampleLead({ rowNumber: 5 });
+      mockGetRow.mockResolvedValue(lead);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+      // Grounding fields should be null for legacy leads
+      expect(response.data.juristicId).toBeNull();
+      expect(response.data.dbdSector).toBeNull();
+      expect(response.data.province).toBeNull();
+      expect(response.data.fullAddress).toBeNull();
     });
   });
 

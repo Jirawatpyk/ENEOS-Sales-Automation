@@ -28,7 +28,7 @@ so that **I can share lead information with colleagues, prepare meeting material
    - Given I export selected leads to Excel
    - When the file is generated
    - Then it contains a header row with column names
-   - And includes all selected lead data: Company, Contact Name, Email, Phone, Status, Sales Owner, Campaign, Created Date, Industry
+   - And includes all selected lead data in this order: Company, DBD Sector, Industry, Juristic ID, Capital, Location, Contact Name, Phone, Email, Job Title, Website, Lead Source, Status, Sales Owner, Campaign, Created Date
    - And file name follows pattern: `leads_export_{date}.xlsx`
    - And data is formatted in a readable table layout
 
@@ -36,7 +36,7 @@ so that **I can share lead information with colleagues, prepare meeting material
    - Given I export selected leads to CSV
    - When the file is generated
    - Then it contains a header row with column names
-   - And includes same data as Excel export
+   - And includes same data as Excel export (Company, DBD Sector, Industry, Juristic ID, Capital, Location, Contact Name, Phone, Email, Job Title, Website, Lead Source, Status, Sales Owner, Campaign, Created Date)
    - And file name follows pattern: `leads_export_{date}.csv`
    - And uses UTF-8 encoding with BOM for Excel compatibility
 
@@ -87,7 +87,7 @@ so that **I can share lead information with colleagues, prepare meeting material
   - [x] 1.1 Create `src/lib/export-leads.ts`
   - [x] 1.2 Implement `exportLeadsToExcel(leads)` using XLSX library
   - [x] 1.3 Implement `exportLeadsToCSV(leads)` with UTF-8 BOM
-  - [x] 1.4 Define export columns (Company, Contact, Email, etc.)
+  - [x] 1.4 Define export columns (Company, DBD Sector, Industry, Juristic ID, Capital, Location, Contact Name, Phone, Email, Job Title, Website, Lead Source, Status, Sales Owner, Campaign, Created Date)
   - [x] 1.5 Format dates and phone numbers in export
   - [x] 1.6 Generate filename with current date
 
@@ -143,6 +143,15 @@ so that **I can share lead information with colleagues, prepare meeting material
   - [x] 8.3 Connect toast notifications
   - [x] 8.4 Add barrel exports to components/leads/index.ts
 
+- [x] **Task 9: Add Grounding Fields to Export** (Enhancement - 2026-01-26) ✅ COMPLETED
+  - [x] 9.1 Update LEAD_EXPORT_COLUMNS to include: DBD Sector, Juristic ID, Location (province)
+  - [x] 9.2 Reorder export columns:
+    - Company → DBD Sector → Industry → Juristic ID → Capital → Location → Contact Name → Phone → Email → Job Title → Website → Lead Source → Status → Sales Owner → Campaign → Created Date
+  - [x] 9.3 Update formatLeadForExport to include new fields with "-" fallback
+  - [x] 9.4 Update column widths array in exportLeadsToExcel (16 columns)
+  - [x] 9.5 Update export tests to verify new columns (123/123 tests passing)
+  - [x] 9.6 Update Story AC3 and AC4 documentation
+
 ## Dev Notes
 
 ### Lead Export Utilities
@@ -157,33 +166,49 @@ import type { Lead, LeadStatus } from '@/types/lead';
 
 /**
  * Export columns configuration
+ * Updated 2026-01-26: Added grounding fields (DBD Sector, Juristic ID, Location) and reordered
  */
 export const LEAD_EXPORT_COLUMNS = [
   { key: 'company', header: 'Company' },
+  { key: 'dbdSector', header: 'DBD Sector' },
+  { key: 'industryAI', header: 'Industry' },
+  { key: 'juristicId', header: 'Juristic ID' },
+  { key: 'capital', header: 'Capital' },
+  { key: 'province', header: 'Location' }, // or fullAddress
   { key: 'customerName', header: 'Contact Name' },
-  { key: 'email', header: 'Email' },
   { key: 'phone', header: 'Phone' },
+  { key: 'email', header: 'Email' },
+  { key: 'jobTitle', header: 'Job Title' },
+  { key: 'website', header: 'Website' },
+  { key: 'leadSource', header: 'Lead Source' },
   { key: 'status', header: 'Status' },
   { key: 'salesOwnerName', header: 'Sales Owner' },
   { key: 'campaignName', header: 'Campaign' },
   { key: 'createdAt', header: 'Created Date' },
-  { key: 'industryAI', header: 'Industry' },
 ] as const;
 
 /**
  * Format lead data for export
+ * Updated 2026-01-26: Added grounding fields and new columns
  */
 function formatLeadForExport(lead: Lead): Record<string, string> {
   return {
     company: lead.company,
+    dbdSector: lead.dbdSector || '-',
+    industryAI: lead.industryAI || '-',
+    juristicId: lead.juristicId || '-',
+    capital: lead.capital || '-',
+    province: lead.province || '-', // or fullAddress
     customerName: lead.customerName,
-    email: lead.email,
     phone: formatThaiPhone(lead.phone),
+    email: lead.email,
+    jobTitle: lead.jobTitle || '-',
+    website: lead.website || '-',
+    leadSource: lead.leadSource || '-',
     status: LEAD_STATUS_LABELS[lead.status as LeadStatus] || lead.status,
     salesOwnerName: lead.salesOwnerName || 'Unassigned',
     campaignName: lead.campaignName,
     createdAt: formatLeadDate(lead.createdAt),
-    industryAI: lead.industryAI || '-',
   };
 }
 
@@ -207,17 +232,24 @@ export function exportLeadsToExcel(leads: Lead[]): void {
   // Create worksheet from array of arrays
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
-  // Set column widths
+  // Set column widths (Updated 2026-01-26 with new columns)
   ws['!cols'] = [
     { wch: 25 }, // Company
+    { wch: 12 }, // DBD Sector
+    { wch: 20 }, // Industry
+    { wch: 15 }, // Juristic ID
+    { wch: 15 }, // Capital
+    { wch: 20 }, // Location
     { wch: 20 }, // Contact Name
-    { wch: 30 }, // Email
     { wch: 15 }, // Phone
+    { wch: 30 }, // Email
+    { wch: 18 }, // Job Title
+    { wch: 30 }, // Website
+    { wch: 15 }, // Lead Source
     { wch: 12 }, // Status
     { wch: 18 }, // Sales Owner
     { wch: 25 }, // Campaign
     { wch: 15 }, // Created Date
-    { wch: 20 }, // Industry
   ];
 
   // Add worksheet to workbook
@@ -823,6 +855,7 @@ This story is intentionally lightweight to deliver quick value.
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-01-26 | Enhancement: Added Task 9 - Add grounding fields (DBD Sector, Juristic ID, Location) to export and reorder columns. Updated AC3, AC4, code examples. | Claude Sonnet 4.5 |
 | 2026-01-17 | Story created by SM Agent | Claude |
 | 2026-01-17 | Code Review: Fixed 5 issues (confirmation dialog, export all, selectedCount) | Claude |
 | 2026-01-18 | Implementation complete - Tasks 1-5, 7-8 done. Task 6 (Export All) deferred to Epic 6 | Claude Dev Agent |

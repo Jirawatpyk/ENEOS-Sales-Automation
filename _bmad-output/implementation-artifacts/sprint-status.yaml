@@ -166,6 +166,7 @@ development_status:
   7-2-theme-toggle: done  # Code review passed, all fixes applied 2026-01-19
   7-3-notification-settings: done  # Code review passed, all fixes applied 2026-01-19
   7-4-admin-user-management: done  # Code review passed 2026-01-20
+  7-4b-manual-member-registration: in-progress  # Extension of 7-4: Add members manually + link LINE accounts (Manual linking - Option 2)
   7-5-system-health: done  # Code review passed + Auth bug fix applied 2026-01-20
   7-6-audit-logs: backlog
   7-7-activity-log-page: done  # Code review passed 2026-01-20 - Full activity log page with Status_History data

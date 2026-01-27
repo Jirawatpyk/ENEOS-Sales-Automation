@@ -2,7 +2,7 @@
 
 > **Purpose:** Shared API contract document to prevent frontend/backend parameter mismatches.
 > **Created:** Epic 4 Retrospective Action Item #1
-> **Last Updated:** 2026-01-19
+> **Last Updated:** 2026-01-27 (Bugfix: Content-Disposition header format)
 
 ## Quick Reference: Parameter Mapping
 
@@ -367,6 +367,120 @@ Get campaign list with statistics.
 | `endDate` | string | Conditional | - | ISO 8601 | Required if period=custom |
 | `sortBy` | string | No | `closed` | enum: leads, closed, conversionRate | Sort column |
 | `sortOrder` | string | No | `desc` | enum: asc, desc | Sort direction |
+
+---
+
+### 7. GET /api/admin/export
+
+Export lead data to file (Excel, CSV, or PDF).
+
+**Updated:** Story 0-15 (2026-01-26) - Added grounding fields and claimed filter support
+
+#### Query Parameters
+
+| Parameter | Type | Required | Default | Validation | Description |
+|-----------|------|----------|---------|------------|-------------|
+| `type` | string | No | `leads` | enum: leads, all | Data type to export |
+| `format` | string | No | `xlsx` | enum: xlsx, csv, pdf | Export file format |
+| `startDate` | string | No | - | ISO 8601 (YYYY-MM-DD) | Filter from date |
+| `endDate` | string | No | - | ISO 8601 (YYYY-MM-DD) | Filter to date |
+| `status` | string | No | - | enum: new, claimed, contacted, closed, lost, unreachable | Filter by status |
+| `owner` | string | No | - | LINE User ID | Filter by sales owner |
+| `campaign` | string | No | - | Campaign ID | Filter by campaign |
+
+#### Response Formats
+
+**Excel (.xlsx):**
+- Content-Type: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+- Includes 23 columns with formatted headers and auto-width
+- Max rows: 10,000 (configurable)
+
+**CSV (.csv):**
+- Content-Type: `text/csv; charset=utf-8`
+- UTF-8 encoding with BOM for Excel compatibility
+- Same 23 columns as Excel
+- Max rows: 10,000
+
+**PDF (.pdf):**
+- Content-Type: `application/pdf`
+- Preview limited to 100 rows
+- Includes key fields: Company, DBD Sector, Juristic ID, Contact Name, Status, Sales Owner
+- **Thai Font Support:** Uses TH Sarabun New font for proper Thai character rendering
+- Fallback to default font if Thai font unavailable
+
+#### Export Columns (23 total)
+
+Columns exported in this order:
+
+1. Row
+2. Company
+3. DBD Sector _(Story 0-15)_
+4. Industry
+5. Juristic ID _(Story 0-15)_
+6. Capital
+7. Location _(Story 0-15 - `province || city`)_
+8. Full Address _(Story 0-15)_
+9. Contact Name
+10. Phone
+11. Email
+12. Job Title _(Story 0-15)_
+13. Website
+14. Lead Source _(Story 0-15)_
+15. Status
+16. Sales Owner
+17. Campaign
+18. Source
+19. Talking Point
+20. Created Date
+21. Clicked At
+22. Contacted At _(Story 0-15)_
+23. Closed At
+
+#### Claimed Filter Behavior
+
+`status=claimed` is a special filter that returns leads with `salesOwnerId !== null` regardless of their actual status value.
+
+**Example:**
+```http
+GET /api/admin/export?status=claimed&format=xlsx
+# Returns: All leads with assigned sales owner (claimed leads)
+```
+
+#### Example Requests
+
+**Export all leads to Excel:**
+```http
+GET /api/admin/export?type=leads&format=xlsx
+```
+
+**Export claimed leads from January 2026:**
+```http
+GET /api/admin/export?status=claimed&startDate=2026-01-01&endDate=2026-01-31&format=xlsx
+```
+
+**Export contacted leads to CSV:**
+```http
+GET /api/admin/export?status=contacted&format=csv
+```
+
+**Export closed leads to PDF:**
+```http
+GET /api/admin/export?status=closed&format=pdf
+```
+
+#### Response Headers
+
+```
+Content-Type: [format-specific MIME type]
+Content-Disposition: attachment; filename=leads_export_2026-01-26.[xlsx|csv|pdf]
+```
+
+**Note:** Filename does not use quotes (RFC 2616 format). This prevents browser download issues where extra characters appear after the file extension.
+
+#### Error Responses
+
+- **400**: Validation error (invalid parameters)
+- **500**: Server error (export failed)
 
 ---
 

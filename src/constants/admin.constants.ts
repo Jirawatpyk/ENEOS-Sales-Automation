@@ -88,8 +88,8 @@ export const EXPORT = {
   MAX_FILE_SIZE: 50 * 1024 * 1024,
   /** ค่าเฉลี่ยการขายต่อ deal (บาท) สำหรับคำนวณ estimatedRevenue */
   AVERAGE_DEAL_SIZE: 75000,
-  /** จำนวน row สูงสุดที่แสดงใน PDF preview */
-  PDF_MAX_PREVIEW_ROWS: 50,
+  /** จำนวน row สูงสุดที่แสดงใน PDF preview (Story 0-15 AC3) */
+  PDF_MAX_PREVIEW_ROWS: 100,
 } as const;
 
 export const EXPORT_TYPES = ['leads', 'sales', 'campaigns', 'all'] as const;

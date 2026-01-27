@@ -110,6 +110,17 @@ const createSampleLead = (overrides: Partial<LeadRow> = {}): LeadRow => ({
   closedAt: null,
   lostAt: null,
   unreachableAt: null,
+  leadSource: null,
+  jobTitle: null,
+  city: null,
+  leadUUID: null,
+  createdAt: null,
+  updatedAt: null,
+  contactedAt: null,
+  juristicId: null,
+  dbdSector: null,
+  province: null,
+  fullAddress: null,
   version: 1,
   ...overrides,
 });
@@ -153,7 +164,7 @@ describe('Admin Controller - Export', () => {
       );
       expect(res.setHeader).toHaveBeenCalledWith(
         'Content-Disposition',
-        expect.stringContaining('leads_export_')
+        expect.stringMatching(/^attachment; filename=leads_export_\d{4}-\d{2}-\d{2}\.xlsx$/)
       );
       expect(res.send).toHaveBeenCalled();
     });
@@ -310,9 +321,10 @@ describe('Admin Controller - Export', () => {
       );
       expect(res.setHeader).toHaveBeenCalledWith(
         'Content-Disposition',
-        expect.stringContaining('leads_export_')
+        expect.stringMatching(/^attachment; filename=leads_export_\d{4}-\d{2}-\d{2}\.csv$/)
       );
-      expect(res.send).toHaveBeenCalledWith('mock-csv-data');
+      // Story 0-15: UTF-8 BOM added to CSV export
+      expect(res.send).toHaveBeenCalledWith('\uFEFF' + 'mock-csv-data');
     });
   });
 
@@ -346,7 +358,7 @@ describe('Admin Controller - Export', () => {
       );
       expect(res.setHeader).toHaveBeenCalledWith(
         'Content-Disposition',
-        expect.stringContaining('leads_export_')
+        expect.stringMatching(/^attachment; filename=leads_export_\d{4}-\d{2}-\d{2}\.pdf$/)
       );
       expect(mockPdfDoc.pipe).toHaveBeenCalledWith(res);
       expect(mockPdfDoc.end).toHaveBeenCalled();
@@ -478,6 +490,305 @@ describe('Admin Controller - Export', () => {
 
       // Should not throw validation error and should succeed
       expect(res.send).toHaveBeenCalled();
+    });
+  });
+
+  // ===========================================
+  // Story 0-15: New Export Column Tests
+  // ===========================================
+
+  describe('Story 0-15: Export with Grounding Fields', () => {
+    it('should export all 23 columns in correct order', async () => {
+      const { default: ExcelJS } = await import('exceljs');
+
+      const mockLeads: LeadRow[] = [
+        createSampleLead({
+          rowNumber: 2,
+          company: 'AJINOMOTO CO., (THAILAND) LTD.',
+          dbdSector: 'F&B-M',
+          juristicId: '0105536049046',
+          province: 'กรุงเทพมหานคร',
+          fullAddress: '123 ถนนพระราม 9',
+          leadSource: 'Google Ads',
+          jobTitle: 'Purchasing Manager',
+          city: 'Bangkok',
+          contactedAt: getDateISO(),
+        }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue(mockLeads);
+
+      const req = createMockRequest({ query: { type: 'leads', format: 'xlsx' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await exportData(req, res, next);
+
+      expect(res.send).toHaveBeenCalled();
+      const buffer = (res.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+      // Parse Excel buffer and verify columns
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.getWorksheet('Leads');
+
+      const headers = worksheet!.getRow(1).values as (string | undefined)[];
+      expect(headers).toEqual([
+        undefined, // Excel 1-indexed
+        'Row',
+        'Company',
+        'DBD Sector',
+        'Industry',
+        'Juristic ID',
+        'Capital',
+        'Location',
+        'Full Address',
+        'Contact Name',
+        'Phone',
+        'Email',
+        'Job Title',
+        'Website',
+        'Lead Source',
+        'Status',
+        'Sales Owner',
+        'Campaign',
+        'Source',
+        'Talking Point',
+        'Created Date',
+        'Clicked At',
+        'Contacted At',
+        'Closed At',
+      ]);
+
+      const dataRow = worksheet!.getRow(2).values as (string | number | null | undefined)[];
+      expect(dataRow[3]).toBe('F&B-M'); // DBD Sector column
+      expect(dataRow[5]).toBe('0105536049046'); // Juristic ID column
+      expect(dataRow[7]).toBe('กรุงเทพมหานคร'); // Location (province prioritized)
+    });
+
+    it('should handle null grounding fields with empty strings', async () => {
+      const { default: ExcelJS } = await import('exceljs');
+
+      const mockLeads: LeadRow[] = [
+        createSampleLead({
+          rowNumber: 2,
+          company: 'Test Company',
+          dbdSector: null, // Explicitly null
+          juristicId: null,
+          province: null,
+          fullAddress: null,
+          leadSource: null,
+          jobTitle: null,
+          city: null,
+        }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue(mockLeads);
+
+      const req = createMockRequest({ query: { type: 'leads', format: 'xlsx' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await exportData(req, res, next);
+
+      expect(res.send).toHaveBeenCalled();
+      const buffer = (res.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.getWorksheet('Leads');
+
+      const dataRow = worksheet!.getRow(2).values as (string | number | null | undefined)[];
+      expect(dataRow[3]).toBe(''); // DBD Sector should be empty string, not null
+      expect(dataRow[5]).toBe(''); // Juristic ID should be empty string
+      expect(dataRow[7]).toBe(''); // Location should be empty string
+      expect(dataRow[8]).toBe(''); // Full Address should be empty string
+      expect(dataRow[12]).toBe(''); // Job Title should be empty string
+      expect(dataRow[14]).toBe(''); // Lead Source should be empty string
+    });
+
+    it('should prioritize province over city in Location column', async () => {
+      const { default: ExcelJS } = await import('exceljs');
+
+      const testCases = [
+        {
+          name: 'Both province and city',
+          province: 'กรุงเทพมหานคร',
+          city: 'Bangkok',
+          expected: 'กรุงเทพมหานคร', // Province wins
+        },
+        {
+          name: 'Only city',
+          province: null,
+          city: 'Bangkok',
+          expected: 'Bangkok',
+        },
+        {
+          name: 'Only province',
+          province: 'เชียงใหม่',
+          city: null,
+          expected: 'เชียงใหม่',
+        },
+        {
+          name: 'Neither',
+          province: null,
+          city: null,
+          expected: '',
+        },
+      ];
+
+      for (const testCase of testCases) {
+        const mockLeads: LeadRow[] = [
+          createSampleLead({
+            rowNumber: 2,
+            province: testCase.province,
+            city: testCase.city,
+          }),
+        ];
+
+        mockGetAllLeads.mockResolvedValue(mockLeads);
+
+        const req = createMockRequest({ query: { type: 'leads', format: 'xlsx' } });
+        const res = createMockResponse();
+        const next = createMockNext();
+
+        await exportData(req, res, next);
+
+        const buffer = (res.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+        const worksheet = workbook.getWorksheet('Leads');
+
+        const dataRow = worksheet!.getRow(2).values as (string | number | null | undefined)[];
+        expect(dataRow[7]).toBe(testCase.expected);
+      }
+    });
+
+    it('should filter by status=claimed', async () => {
+      const mockLeads: LeadRow[] = [
+        createSampleLead({ rowNumber: 2, status: 'new', salesOwnerId: null }),
+        createSampleLead({ rowNumber: 3, status: 'contacted', salesOwnerId: 'sales-001' }),
+        createSampleLead({ rowNumber: 4, status: 'closed', salesOwnerId: 'sales-002' }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue(mockLeads);
+
+      const req = createMockRequest({ query: { type: 'leads', format: 'xlsx', status: 'claimed' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await exportData(req, res, next);
+
+      expect(res.send).toHaveBeenCalled();
+
+      // Verify filterByStatus was called correctly via checking exported data count
+      const { default: ExcelJS } = await import('exceljs');
+      const buffer = (res.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.getWorksheet('Leads');
+
+      // Should have 2 claimed leads (row 3 and 4) + header row
+      expect(worksheet!.rowCount).toBe(3); // Header + 2 data rows
+    });
+
+    it('should filter by status=contacted (test alternative status)', async () => {
+      const mockLeads: LeadRow[] = [
+        createSampleLead({ rowNumber: 2, status: 'new', salesOwnerId: null }),
+        createSampleLead({ rowNumber: 3, status: 'contacted', salesOwnerId: 'sales-001' }),
+        createSampleLead({ rowNumber: 4, status: 'contacted', salesOwnerId: null }),
+        createSampleLead({ rowNumber: 5, status: 'closed', salesOwnerId: 'sales-002' }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue(mockLeads);
+
+      const req = createMockRequest({ query: { type: 'leads', format: 'xlsx', status: 'contacted' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await exportData(req, res, next);
+
+      expect(res.send).toHaveBeenCalled();
+
+      const { default: ExcelJS } = await import('exceljs');
+      const buffer = (res.send as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+      const worksheet = workbook.getWorksheet('Leads');
+
+      // Should have rows 3, 4 (contacted) + header
+      expect(worksheet!.rowCount).toBe(3); // Header + 2 data rows
+    });
+
+    it('should include new fields in CSV export', async () => {
+      const { parse } = await import('json2csv');
+
+      const mockLeads: LeadRow[] = [
+        createSampleLead({
+          rowNumber: 2,
+          dbdSector: 'F&B-M',
+          juristicId: '0105536049046',
+          leadSource: 'Google Ads',
+        }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue(mockLeads);
+
+      const req = createMockRequest({ query: { type: 'leads', format: 'csv' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await exportData(req, res, next);
+
+      expect(res.send).toHaveBeenCalled();
+
+      // Verify parse was called with data containing new fields
+      expect(parse).toHaveBeenCalled();
+      const parseArgs = (parse as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+      // Check first row has new column keys
+      expect(parseArgs[0]).toHaveProperty('DBD Sector');
+      expect(parseArgs[0]).toHaveProperty('Juristic ID');
+      expect(parseArgs[0]).toHaveProperty('Location');
+      expect(parseArgs[0]).toHaveProperty('Full Address');
+      expect(parseArgs[0]).toHaveProperty('Job Title');
+      expect(parseArgs[0]).toHaveProperty('Lead Source');
+      expect(parseArgs[0]).toHaveProperty('Contacted At');
+    });
+
+    it('should include new fields in PDF export', async () => {
+      const mockLeads: LeadRow[] = [
+        createSampleLead({
+          rowNumber: 2,
+          company: 'AJINOMOTO',
+          dbdSector: 'F&B-M',
+          juristicId: '0105536049046',
+          customerName: 'John Doe',
+          salesOwnerName: 'Sales Person',
+        }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue(mockLeads);
+
+      const req = createMockRequest({ query: { type: 'leads', format: 'pdf' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await exportData(req, res, next);
+
+      expect(mockPdfDoc.text).toHaveBeenCalled();
+
+      // Find the call that contains the lead data
+      const textCalls = (mockPdfDoc.text as ReturnType<typeof vi.fn>).mock.calls;
+      const leadDataCall = textCalls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('AJINOMOTO')
+      );
+
+      expect(leadDataCall).toBeDefined();
+      expect(leadDataCall![0]).toContain('DBD Sector: F&B-M');
+      expect(leadDataCall![0]).toContain('Juristic ID: 0105536049046');
+      expect(leadDataCall![0]).toContain('John Doe');
+      expect(leadDataCall![0]).toContain('Sales Person');
     });
   });
 });

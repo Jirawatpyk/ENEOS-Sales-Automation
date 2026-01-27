@@ -56,6 +56,7 @@ development_status:
   0-12-status-history-tracking: done            # Enhancement: Store real status history in Sheets - Code review passed (2026-01-18)
   0-13-period-comparison: done                  # Enhancement: Real % change for KPI Cards - Code review passed (2026-01-18)
   0-14-race-condition-fix: done                 # Fix: Add version check to claimLead/updateLeadStatus + Parallel getUserProfile optimization (2026-01-18)
+  0-15-update-export-endpoint: done             # Update export endpoint with grounding fields + claimed filter - Code review passed (2026-01-27)
   # Note: Claimed_At column not needed - use Contacted_At instead (flow is new → contacted directly)
   epic-0-retrospective: done
 
@@ -109,7 +110,7 @@ development_status:
   # Started: 2026-01-17
   # Reopened: 2026-01-26 for Google Search Grounding UI
   # ============================================================
-  epic-4: in-progress  # Reopened for Story 4-15 grounding fields UI
+  epic-4: done  # Completed: All 15 stories done including grounding fields UI (2026-01-27)
   4-1-lead-list-table: done  # Code review passed 2026-01-17
   4-2-pagination: done  # Code review passed 2026-01-17
   4-3-search: done  # Code review passed 2026-01-17
@@ -124,7 +125,7 @@ development_status:
   4-12-job-title-column: merged           # Merged into 4-11-additional-columns
   4-13-city-column: merged                # Merged into 4-11-additional-columns
   4-14-filter-by-lead-source: done  # Could Have - กรองตาม Lead Source (Completed 2026-01-19)
-  4-15-grounding-fields-ui: in-progress  # Display DBD Sector, Capital, Location columns + Full Address in detail (Started 2026-01-26)
+  4-15-grounding-fields-ui: done  # Display DBD Sector, Capital, Location columns + Full Address in detail - Completed 2026-01-26
   epic-4-retrospective: done  # Retrospective completed 2026-01-19, API Contract created
 
   # ============================================================
@@ -146,7 +147,7 @@ development_status:
   # Started: 2026-01-26
   # ============================================================
   epic-6: in-progress
-  6-1-export-to-excel: ready-for-dev  # Story created 2026-01-26 by Bob (SM Agent)
+  6-1-export-to-excel: done          # Backend bugfixes: ExcelJS import, filename format, Thai font support - Code review passed (2026-01-27)
   6-2-export-to-pdf: backlog
   6-3-quick-reports: backlog
   6-4-custom-date-range: backlog

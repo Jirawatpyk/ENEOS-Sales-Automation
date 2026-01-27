@@ -5,23 +5,18 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { webhookLogger as logger } from '../utils/logger.js';
-import { sheetsService } from '../services/sheets.service.js';
-import { geminiService } from '../services/gemini.service.js';
-import { lineService } from '../services/line.service.js';
 import { deduplicationService } from '../services/deduplication.service.js';
 import { addFailedBrevoWebhook } from '../services/dead-letter-queue.service.js';
+import { processLeadAsync } from '../services/background-processor.service.js';
+import { processingStatusService } from '../services/processing-status.service.js';
 import { validateBrevoWebhook, isClickEvent } from '../validators/brevo.validator.js';
-import { extractDomain } from '../utils/email-parser.js';
-import { formatPhone } from '../utils/phone-formatter.js';
 import { formatDateForSheets } from '../utils/date-formatter.js';
-import { Lead, LeadRow, DuplicateLeadError } from '../types/index.js';
+import { DuplicateLeadError } from '../types/index.js';
 import { config } from '../config/index.js';
+import { randomUUID } from 'crypto';
 import {
   leadsProcessed,
   duplicateLeadsTotal,
-  aiAnalysisDuration,
-  aiAnalysisTotal,
-  lineNotificationTotal,
 } from '../utils/metrics.js';
 
 // ===========================================
@@ -91,130 +86,31 @@ export async function handleBrevoWebhook(
       throw error;
     }
 
-    // Step 4: AI Enrichment (analyze company)
-    const domain = extractDomain(payload.email);
-    let aiAnalysis = {
-      industry: 'Unknown',
-      talkingPoint: 'ENEOS มีน้ำมันหล่อลื่นคุณภาพสูงจากญี่ปุ่น',
-      website: null as string | null,
-      registeredCapital: null as string | null,
-      keywords: ['B2B'],
-      // Google Search Grounding fields (defaults)
-      juristicId: null as string | null,
-      dbdSector: null as string | null,
-      province: null as string | null,
-      fullAddress: null as string | null,
-    };
+    // Step 4: Generate correlation ID for tracking
+    const correlationId = randomUUID();
 
-    if (config.features.aiEnrichment) {
-      const aiStartTime = Date.now();
-      try {
-        aiAnalysis = await geminiService.analyzeCompany(domain, payload.company);
-        aiAnalysisDuration.observe((Date.now() - aiStartTime) / 1000);
-        aiAnalysisTotal.inc({ status: 'success' });
-        logger.info('AI analysis completed', {
-          email: payload.email,
-          industry: aiAnalysis.industry,
-        });
-      } catch (aiError) {
-        aiAnalysisDuration.observe((Date.now() - aiStartTime) / 1000);
-        aiAnalysisTotal.inc({ status: 'error' });
-        logger.error('AI analysis failed, using defaults', {
-          error: aiError instanceof Error ? aiError.message : 'Unknown error',
-        });
-        // Continue with default values
-      }
-    }
+    // Create initial processing status
+    processingStatusService.create(correlationId, payload.email, payload.company);
 
-    // Step 5: Save to Google Sheets
-    const lead: Partial<Lead> = {
-      date: formatDateForSheets(),
-      customerName: `${payload.firstname} ${payload.lastname}`.trim() || 'ไม่ระบุ',
-      email: payload.email,
-      phone: formatPhone(payload.phone),
-      company: payload.company || 'ไม่ระบุ',
-      industryAI: aiAnalysis.industry,
-      // Use Brevo website if provided, otherwise use AI-guessed website
-      website: payload.website || aiAnalysis.website,
-      capital: aiAnalysis.registeredCapital,
-      status: 'new',
-      campaignId: payload.campaignId,
-      campaignName: payload.campaignName,
-      emailSubject: payload.subject,
-      source: 'Brevo',
-      leadId: payload.contactId,
-      eventId: payload.eventId,
-      clickedAt: payload.clickedAt,
-      talkingPoint: aiAnalysis.talkingPoint,
-      // New fields from Brevo Contact Attributes
-      leadSource: payload.leadSource || null,
-      jobTitle: payload.jobTitle || null,
-      city: payload.city || null,
-      // Google Search Grounding fields (added 2026-01-26)
-      juristicId: aiAnalysis.juristicId || null,
-      dbdSector: aiAnalysis.dbdSector || null,
-      province: aiAnalysis.province || null,
-      fullAddress: aiAnalysis.fullAddress || null,
-    };
-
-    const rowNumber = await sheetsService.addLead(lead);
-    leadsProcessed.inc({ status: 'new', source: 'brevo' });
-
-    logger.info('Lead saved to Google Sheets', {
-      rowNumber,
-      email: payload.email,
-    });
-
-    // Create LeadRow object for LINE notification
-    const leadRow: LeadRow = {
-      ...lead as Lead,
-      rowNumber,
-      version: 1, // New lead starts with version 1
-    };
-
-    // Step 6: Send LINE notification
-    if (config.features.lineNotifications) {
-      try {
-        await lineService.pushLeadNotification(leadRow, {
-          industry: aiAnalysis.industry,
-          talkingPoint: aiAnalysis.talkingPoint,
-          website: aiAnalysis.website,
-          registeredCapital: aiAnalysis.registeredCapital,
-        });
-        lineNotificationTotal.inc({ status: 'success', type: 'push' });
-
-        logger.info('LINE notification sent', {
-          rowNumber,
-          company: lead.company,
-        });
-      } catch (lineError) {
-        lineNotificationTotal.inc({ status: 'error', type: 'push' });
-        // Log but don't fail the request
-        logger.error('Failed to send LINE notification', {
-          error: lineError instanceof Error ? lineError.message : 'Unknown error',
-          rowNumber,
-        });
-      }
-    }
-
-    // Success response
+    // Step 5: Respond immediately (non-blocking)
     const duration = Date.now() - startTime;
-    logger.info('Webhook processed successfully', {
-      rowNumber,
+    logger.info('Webhook received - processing in background', {
+      correlationId,
       duration,
       email: payload.email,
+      company: payload.company,
     });
 
     res.status(200).json({
       success: true,
-      message: 'Lead processed successfully',
-      data: {
-        rowNumber,
-        email: payload.email,
-        company: lead.company,
-        industry: aiAnalysis.industry,
-      },
+      message: 'Lead received and processing',
+      processing: 'background',
+      correlationId,
     });
+
+    // Step 6: Process lead in background (fire-and-forget)
+    processLeadAsync(payload, correlationId);
+    leadsProcessed.inc({ status: 'new', source: 'brevo' });
   } catch (error) {
     // Add to Dead Letter Queue for later retry
     const dlqId = addFailedBrevoWebhook(

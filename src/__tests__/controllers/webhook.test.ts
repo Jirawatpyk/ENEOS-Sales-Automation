@@ -13,27 +13,24 @@ import { mockCompanyAnalysis } from '../mocks/gemini.mock.js';
 import { mockLeadRow } from '../mocks/google-sheets.mock.js';
 
 // Mock all services
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
-    addLead: vi.fn().mockResolvedValue(42),
-  },
-}));
-
-vi.mock('../../services/gemini.service.js', () => ({
-  geminiService: {
-    analyzeCompany: vi.fn(),
-  },
-}));
-
-vi.mock('../../services/line.service.js', () => ({
-  lineService: {
-    pushLeadNotification: vi.fn().mockResolvedValue(undefined),
-  },
-}));
-
 vi.mock('../../services/deduplication.service.js', () => ({
   deduplicationService: {
     checkOrThrow: vi.fn(),
+  },
+}));
+
+vi.mock('../../services/background-processor.service.js', () => ({
+  processLeadAsync: vi.fn(),
+}));
+
+vi.mock('../../services/processing-status.service.js', () => ({
+  processingStatusService: {
+    create: vi.fn(),
+    startProcessing: vi.fn(),
+    complete: vi.fn(),
+    fail: vi.fn(),
+    get: vi.fn(),
+    getAll: vi.fn(),
   },
 }));
 
@@ -80,10 +77,9 @@ vi.mock('../../services/dead-letter-queue.service.js', () => ({
 describe('Webhook Controller', () => {
   let handleBrevoWebhook: typeof import('../../controllers/webhook.controller.js').handleBrevoWebhook;
   let verifyWebhook: typeof import('../../controllers/webhook.controller.js').verifyWebhook;
-  let sheetsService: typeof import('../../services/sheets.service.js').sheetsService;
-  let geminiService: typeof import('../../services/gemini.service.js').geminiService;
-  let lineService: typeof import('../../services/line.service.js').lineService;
   let deduplicationService: typeof import('../../services/deduplication.service.js').deduplicationService;
+  let processLeadAsync: typeof import('../../services/background-processor.service.js').processLeadAsync;
+  let processingStatusService: typeof import('../../services/processing-status.service.js').processingStatusService;
 
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
@@ -94,21 +90,20 @@ describe('Webhook Controller', () => {
 
     // Import modules
     const webhookController = await import('../../controllers/webhook.controller.js');
-    const sheetsModule = await import('../../services/sheets.service.js');
-    const geminiModule = await import('../../services/gemini.service.js');
-    const lineModule = await import('../../services/line.service.js');
     const dedupModule = await import('../../services/deduplication.service.js');
+    const bgProcessorModule = await import('../../services/background-processor.service.js');
+    const statusModule = await import('../../services/processing-status.service.js');
 
     handleBrevoWebhook = webhookController.handleBrevoWebhook;
     verifyWebhook = webhookController.verifyWebhook;
-    sheetsService = sheetsModule.sheetsService;
-    geminiService = geminiModule.geminiService;
-    lineService = lineModule.lineService;
     deduplicationService = dedupModule.deduplicationService;
+    processLeadAsync = bgProcessorModule.processLeadAsync;
+    processingStatusService = statusModule.processingStatusService;
 
     // Setup mocks
-    vi.mocked(geminiService.analyzeCompany).mockResolvedValue(mockCompanyAnalysis);
     vi.mocked(deduplicationService.checkOrThrow).mockResolvedValue(undefined);
+    vi.mocked(processLeadAsync).mockReturnValue(undefined);
+    vi.mocked(processingStatusService.create).mockReturnValue(undefined);
 
     // Setup request/response mocks
     mockRes = {
@@ -129,14 +124,15 @@ describe('Webhook Controller', () => {
       );
 
       expect(deduplicationService.checkOrThrow).toHaveBeenCalled();
-      expect(geminiService.analyzeCompany).toHaveBeenCalled();
-      expect(sheetsService.addLead).toHaveBeenCalled();
-      expect(lineService.pushLeadNotification).toHaveBeenCalled();
+      expect(processingStatusService.create).toHaveBeenCalled();
+      expect(processLeadAsync).toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          message: 'Lead processed successfully',
+          message: 'Lead received and processing',
+          processing: 'background',
+          correlationId: expect.any(String),
         })
       );
     });
@@ -151,7 +147,7 @@ describe('Webhook Controller', () => {
       );
 
       expect(deduplicationService.checkOrThrow).not.toHaveBeenCalled();
-      expect(sheetsService.addLead).not.toHaveBeenCalled();
+      expect(processLeadAsync).not.toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -202,37 +198,6 @@ describe('Webhook Controller', () => {
       );
     });
 
-    it('should continue processing even if AI fails', async () => {
-      vi.mocked(geminiService.analyzeCompany).mockRejectedValue(new Error('AI error'));
-
-      mockReq = { body: mockBrevoClickPayload };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      // Should still add lead and send notification
-      expect(sheetsService.addLead).toHaveBeenCalled();
-      expect(mockRes.status).toHaveBeenCalledWith(200);
-    });
-
-    it('should continue processing even if LINE notification fails', async () => {
-      vi.mocked(lineService.pushLeadNotification).mockRejectedValue(
-        new Error('LINE error')
-      );
-
-      mockReq = { body: mockBrevoClickPayload };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(mockRes.status).toHaveBeenCalledWith(200);
-    });
   });
 
   describe('verifyWebhook', () => {
@@ -264,9 +229,10 @@ describe('Webhook Controller', () => {
   });
 
   describe('handleBrevoWebhook - error handling', () => {
-    it('should add to DLQ when sheets service throws error', async () => {
+    it('should add to DLQ when validation or deduplication throws error', async () => {
       const { addFailedBrevoWebhook } = await import('../../services/dead-letter-queue.service.js');
-      vi.mocked(sheetsService.addLead).mockRejectedValueOnce(new Error('Sheets API error'));
+      const genericError = new Error('Database connection failed');
+      vi.mocked(deduplicationService.checkOrThrow).mockRejectedValueOnce(genericError);
 
       mockReq = { body: mockBrevoClickPayload, requestId: 'req-test-123' };
 
@@ -284,11 +250,12 @@ describe('Webhook Controller', () => {
       expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
     });
 
-    it('should re-throw non-DuplicateLeadError from deduplication', async () => {
-      const genericError = new Error('Database connection failed');
-      vi.mocked(deduplicationService.checkOrThrow).mockRejectedValue(genericError);
+  });
 
-      mockReq = { body: mockBrevoClickPayload, requestId: 'req-456' };
+  describe('handleBrevoWebhook - feature flags', () => {
+    it('should queue background processing regardless of feature flags', async () => {
+      // Feature flags are checked in background processor, not webhook controller
+      mockReq = { body: mockBrevoClickPayload };
 
       await handleBrevoWebhook(
         mockReq as Request,
@@ -296,87 +263,9 @@ describe('Webhook Controller', () => {
         mockNext
       );
 
-      expect(mockNext).toHaveBeenCalledWith(genericError);
-    });
-  });
-
-  describe('handleBrevoWebhook - feature flags', () => {
-    it('should skip AI enrichment when disabled', async () => {
-      // Reset module to change config
-      vi.doMock('../../config/index.js', () => ({
-        config: {
-          features: {
-            aiEnrichment: false,
-            deduplication: true,
-            lineNotifications: true,
-          },
-          isProd: false,
-        },
-      }));
-
-      // Re-import controller with new config
-      vi.resetModules();
-      const { handleBrevoWebhook: handler } = await import('../../controllers/webhook.controller.js');
-      const geminiModule = await import('../../services/gemini.service.js');
-
-      mockReq = { body: mockBrevoClickPayload };
-
-      await handler(mockReq as Request, mockRes as Response, mockNext);
-
-      // AI should not be called when disabled
-      expect(geminiModule.geminiService.analyzeCompany).not.toHaveBeenCalled();
+      // Webhook should always queue background processing
+      expect(processLeadAsync).toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
-
-      // Restore original mock
-      vi.doMock('../../config/index.js', () => ({
-        config: {
-          features: {
-            aiEnrichment: true,
-            deduplication: true,
-            lineNotifications: true,
-          },
-          isProd: false,
-        },
-      }));
-    });
-
-    it('should skip LINE notification when disabled', async () => {
-      // Reset module to change config
-      vi.doMock('../../config/index.js', () => ({
-        config: {
-          features: {
-            aiEnrichment: true,
-            deduplication: true,
-            lineNotifications: false,
-          },
-          isProd: false,
-        },
-      }));
-
-      // Re-import controller with new config
-      vi.resetModules();
-      const { handleBrevoWebhook: handler } = await import('../../controllers/webhook.controller.js');
-      const lineModule = await import('../../services/line.service.js');
-
-      mockReq = { body: mockBrevoClickPayload };
-
-      await handler(mockReq as Request, mockRes as Response, mockNext);
-
-      // LINE should not be called when disabled
-      expect(lineModule.lineService.pushLeadNotification).not.toHaveBeenCalled();
-      expect(mockRes.status).toHaveBeenCalledWith(200);
-
-      // Restore original mock
-      vi.doMock('../../config/index.js', () => ({
-        config: {
-          features: {
-            aiEnrichment: true,
-            deduplication: true,
-            lineNotifications: true,
-          },
-          isProd: false,
-        },
-      }));
     });
   });
 
@@ -393,18 +282,13 @@ describe('Webhook Controller', () => {
         mockNext
       );
 
-      // Should still process as click event
-      expect(sheetsService.addLead).toHaveBeenCalled();
+      // Should still process as click event and queue background processing
+      expect(processLeadAsync).toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
     });
 
-    it('should use Brevo website if provided over AI guess', async () => {
-      const payloadWithWebsite = {
-        ...mockBrevoClickPayload,
-        website: 'https://brevo-provided.com',
-      };
-
-      mockReq = { body: payloadWithWebsite };
+    it('should pass payload to background processor', async () => {
+      mockReq = { body: mockBrevoClickPayload };
 
       await handleBrevoWebhook(
         mockReq as Request,
@@ -412,83 +296,19 @@ describe('Webhook Controller', () => {
         mockNext
       );
 
-      expect(sheetsService.addLead).toHaveBeenCalledWith(
-        expect.objectContaining({
-          website: 'https://brevo-provided.com',
-        })
-      );
-    });
+      // Background processor should receive normalized payload and correlationId
+      expect(processLeadAsync).toHaveBeenCalled();
+      const callArgs = vi.mocked(processLeadAsync).mock.calls[0];
 
-    it('should format phone number correctly', async () => {
-      const payloadWithPhone = {
-        ...mockBrevoClickPayload,
-        phone: '081-234-5678',
-      };
+      // Check first argument is normalized payload with required fields
+      expect(callArgs[0]).toHaveProperty('email', mockBrevoClickPayload.email);
+      expect(callArgs[0]).toHaveProperty('company', 'SCG'); // Normalized from COMPANY
+      expect(callArgs[0]).toHaveProperty('campaignId');
+      expect(callArgs[0]).toHaveProperty('firstname');
+      expect(callArgs[0]).toHaveProperty('lastname');
 
-      mockReq = { body: payloadWithPhone };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(sheetsService.addLead).toHaveBeenCalledWith(
-        expect.objectContaining({
-          phone: expect.any(String),
-        })
-      );
-    });
-
-    it('should include new Brevo contact attributes', async () => {
-      const payloadWithAttributes = {
-        ...mockBrevoClickPayload,
-        LEAD_SOURCE: 'Facebook Ads',
-        JOB_TITLE: 'CEO',
-        CITY: 'Bangkok',
-      };
-
-      mockReq = { body: payloadWithAttributes };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(sheetsService.addLead).toHaveBeenCalledWith(
-        expect.objectContaining({
-          leadSource: expect.any(String),
-        })
-      );
-    });
-
-    it('should handle missing optional fields gracefully', async () => {
-      const minimalPayload = {
-        event: 'click',
-        email: 'minimal@test.com',
-        campaign_id: 123,
-        campaign_name: 'Test',
-        'message-id': 'msg-123',
-        date: '2026-01-19',
-      };
-
-      mockReq = { body: minimalPayload };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(sheetsService.addLead).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: 'minimal@test.com',
-          customerName: expect.any(String),
-          company: expect.any(String),
-        })
-      );
-      expect(mockRes.status).toHaveBeenCalledWith(200);
+      // Check second argument is correlationId (UUID string)
+      expect(callArgs[1]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     });
   });
 
@@ -503,8 +323,8 @@ describe('Webhook Controller', () => {
       );
 
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      // Lead should be processed successfully
-      expect(sheetsService.addLead).toHaveBeenCalled();
+      // Lead should be queued for background processing
+      expect(processLeadAsync).toHaveBeenCalled();
     });
 
     it('should increment duplicateLeadsTotal when duplicate detected', async () => {
@@ -525,103 +345,6 @@ describe('Webhook Controller', () => {
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'Duplicate lead - already processed',
-        })
-      );
-    });
-
-    it('should track AI analysis duration and status', async () => {
-      mockReq = { body: mockBrevoClickPayload };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(geminiService.analyzeCompany).toHaveBeenCalled();
-      expect(mockRes.status).toHaveBeenCalledWith(200);
-    });
-  });
-
-  describe('handleBrevoWebhook - lead creation', () => {
-    it('should create lead with correct structure', async () => {
-      mockReq = { body: mockBrevoClickPayload };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(sheetsService.addLead).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: mockBrevoClickPayload.email,
-          status: 'new',
-          source: 'Brevo',
-        })
-      );
-    });
-
-    it('should use default customer name when not provided', async () => {
-      const payloadNoName = {
-        ...mockBrevoClickPayload,
-        firstname: undefined,
-        lastname: undefined,
-      };
-      delete (payloadNoName as Record<string, unknown>).firstname;
-      delete (payloadNoName as Record<string, unknown>).lastname;
-
-      mockReq = { body: payloadNoName };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(sheetsService.addLead).toHaveBeenCalledWith(
-        expect.objectContaining({
-          customerName: expect.any(String),
-        })
-      );
-    });
-
-    it('should use default company when not provided', async () => {
-      const payloadNoCompany = { ...mockBrevoClickPayload };
-      delete (payloadNoCompany as Record<string, unknown>).company;
-
-      mockReq = { body: payloadNoCompany };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(sheetsService.addLead).toHaveBeenCalledWith(
-        expect.objectContaining({
-          company: expect.any(String),
-        })
-      );
-    });
-
-    it('should return lead data in response', async () => {
-      vi.mocked(sheetsService.addLead).mockResolvedValueOnce(42);
-      mockReq = { body: mockBrevoClickPayload };
-
-      await handleBrevoWebhook(
-        mockReq as Request,
-        mockRes as Response,
-        mockNext
-      );
-
-      expect(mockRes.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            rowNumber: 42,
-            email: mockBrevoClickPayload.email,
-            industry: mockCompanyAnalysis.industry,
-          }),
         })
       );
     });

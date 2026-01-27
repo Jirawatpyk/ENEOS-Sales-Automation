@@ -195,6 +195,15 @@ export interface CompanyAnalysis {
   dbdSector: string | null; // DBD Sector code (e.g., F&B-M, MFG-A)
   province: string | null; // จังหวัด (e.g., กรุงเทพมหานคร, เชียงใหม่)
   fullAddress: string | null; // ที่อยู่เต็มของบริษัท (optional)
+  // Confidence scoring (Advanced Feature)
+  confidence?: number; // 0-100 score indicating classification confidence
+  confidenceFactors?: {
+    hasRealDomain: boolean; // Domain exists and is valid
+    hasDBDData: boolean; // Found official DBD registration
+    keywordMatch: boolean; // Matched keyword override rules
+    geminiConfident: boolean; // Gemini returned valid DBD sector code
+    dataCompleteness: number; // 0-100% of fields populated
+  };
 }
 
 export interface GeminiAnalysisRequest {

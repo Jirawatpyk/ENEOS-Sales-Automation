@@ -27,6 +27,7 @@ import {
 import webhookRoutes from './routes/webhook.routes.js';
 import lineRoutes from './routes/line.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import statusRoutes from './routes/status.routes.js';
 import { sheetsService } from './services/sheets.service.js';
 import { geminiService } from './services/gemini.service.js';
 import { lineService } from './services/line.service.js';
@@ -303,6 +304,9 @@ app.use('/webhook/line', lineRoutes);
 
 // Admin Dashboard API routes
 app.use('/api/admin', adminRoutes);
+
+// Status API routes
+app.use('/api/leads/status', statusRoutes);
 
 // Stats endpoint (development only)
 if (config.isDev) {

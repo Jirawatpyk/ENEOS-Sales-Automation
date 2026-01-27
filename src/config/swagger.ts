@@ -53,6 +53,10 @@ Enterprise-grade Sales Automation System for ENEOS Thailand.
         description: 'Webhook endpoints for Brevo and LINE',
       },
       {
+        name: 'Status',
+        description: 'Background processing status tracking',
+      },
+      {
         name: 'DLQ',
         description: 'Dead Letter Queue management',
       },
@@ -208,6 +212,159 @@ Receives postback events from LINE OA when sales team interacts with lead cards.
           responses: {
             200: {
               description: 'Webhook acknowledged',
+            },
+          },
+        },
+      },
+      '/api/leads/status/{correlationId}': {
+        get: {
+          tags: ['Status'],
+          summary: 'Check lead processing status by correlation ID',
+          description: `
+Check the background processing status of a lead using the correlation ID returned from webhook response.
+
+**Status Values:**
+- \`pending\` - Lead is queued for processing
+- \`processing\` - Currently being processed (AI analysis, Sheets write)
+- \`completed\` - Successfully processed and saved
+- \`failed\` - Processing failed with error message
+
+**Use Case:**
+Frontend can poll this endpoint after receiving 200 OK from webhook to check when processing completes.
+          `,
+          parameters: [
+            {
+              name: 'correlationId',
+              in: 'path',
+              required: true,
+              schema: {
+                type: 'string',
+                format: 'uuid',
+                example: '550e8400-e29b-41d4-a716-446655440000',
+              },
+              description: 'UUID correlation ID returned from webhook response',
+            },
+          ],
+          responses: {
+            200: {
+              description: 'Processing status found',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: {
+                        type: 'boolean',
+                        example: true,
+                      },
+                      data: {
+                        $ref: '#/components/schemas/ProcessingStatus',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            400: {
+              description: 'Invalid UUID format',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: {
+                        type: 'boolean',
+                        example: false,
+                      },
+                      error: {
+                        type: 'string',
+                        example: 'Invalid correlation ID format',
+                      },
+                      message: {
+                        type: 'string',
+                        example: 'Correlation ID must be a valid UUID',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            404: {
+              description: 'Status not found (expired or never existed)',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: {
+                        type: 'boolean',
+                        example: false,
+                      },
+                      error: {
+                        type: 'string',
+                        example: 'Status not found',
+                      },
+                      message: {
+                        type: 'string',
+                        example: 'No processing status found for this correlation ID',
+                      },
+                      correlationId: {
+                        type: 'string',
+                        example: '550e8400-e29b-41d4-a716-446655440000',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/leads/status': {
+        get: {
+          tags: ['Status'],
+          summary: 'Get all processing statuses (Admin only)',
+          description: `
+Returns all current processing statuses in memory. Requires admin authentication.
+
+**TTL:** Statuses auto-expire after 1 hour (3600000ms).
+
+**Admin Only:** This endpoint requires authentication via adminAuthMiddleware.
+          `,
+          security: [
+            {
+              AdminAuth: [],
+            },
+          ],
+          responses: {
+            200: {
+              description: 'List of all processing statuses',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: {
+                        type: 'boolean',
+                        example: true,
+                      },
+                      count: {
+                        type: 'integer',
+                        example: 5,
+                      },
+                      data: {
+                        type: 'array',
+                        items: {
+                          $ref: '#/components/schemas/ProcessingStatus',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            401: {
+              description: 'Unauthorized - Admin authentication required',
             },
           },
         },
@@ -444,6 +601,84 @@ Plus default Node.js metrics (CPU, memory, event loop, etc.)
               },
             },
           },
+        },
+        ProcessingStatus: {
+          type: 'object',
+          required: ['correlationId', 'email', 'company', 'status', 'startedAt'],
+          properties: {
+            correlationId: {
+              type: 'string',
+              format: 'uuid',
+              example: '550e8400-e29b-41d4-a716-446655440000',
+              description: 'Unique identifier for tracking this processing job',
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              example: 'customer@company.com',
+              description: 'Lead email address',
+            },
+            company: {
+              type: 'string',
+              example: 'SCG',
+              description: 'Company name',
+            },
+            status: {
+              type: 'string',
+              enum: ['pending', 'processing', 'completed', 'failed'],
+              example: 'completed',
+              description: 'Current processing status',
+            },
+            startedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2024-01-15T10:30:00.000Z',
+              description: 'When processing started (ISO 8601)',
+            },
+            completedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2024-01-15T10:30:15.500Z',
+              description: 'When processing finished (ISO 8601)',
+            },
+            rowNumber: {
+              type: 'integer',
+              example: 42,
+              description: 'Google Sheets row number where lead was saved',
+            },
+            industry: {
+              type: 'string',
+              example: 'Manufacturing',
+              description: 'AI-detected industry from Gemini analysis',
+            },
+            confidence: {
+              type: 'number',
+              format: 'float',
+              minimum: 0,
+              maximum: 1,
+              example: 0.95,
+              description: 'AI confidence score (0-1)',
+            },
+            error: {
+              type: 'string',
+              example: 'Gemini API timeout',
+              description: 'Error message if status is failed',
+            },
+            duration: {
+              type: 'number',
+              format: 'float',
+              example: 15.5,
+              description: 'Processing duration in seconds',
+            },
+          },
+        },
+      },
+      securitySchemes: {
+        AdminAuth: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'Authorization',
+          description: 'Admin authentication token (configured via ADMIN_API_KEY env var)',
         },
       },
     },

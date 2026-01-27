@@ -222,6 +222,11 @@ export interface SheetConfig {
   salesTeamSheetName: string;
 }
 
+/**
+ * Legacy SalesTeamMember interface (pre-7-4b)
+ * Used by methods that always filter for rows WITH lineUserId (getSalesTeamMember, getSalesTeamAll).
+ * For Story 7-4b manual members (lineUserId can be null), use SalesTeamMemberFull instead.
+ */
 export interface SalesTeamMember {
   lineUserId: string;
   name: string;
@@ -237,7 +242,7 @@ export interface SalesTeamMember {
  * Used by Team Management API (Story 7-4)
  */
 export interface SalesTeamMemberFull {
-  lineUserId: string;
+  lineUserId: string | null; // Story 7-4b: Can be null for manually added members
   name: string;
   email: string | null;
   phone: string | null;

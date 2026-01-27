@@ -312,6 +312,13 @@ export async function createSalesTeamMember(
     });
   } catch (error) {
     logger.error('createSalesTeamMember failed', { error, body: req.body });
+
+    // Map service error names to proper HTTP status codes (AC#6)
+    if (error instanceof Error && error.name === 'DUPLICATE_EMAIL') {
+      res.status(409).json({ success: false, error: error.message });
+      return;
+    }
+
     next(error);
   }
 }
@@ -401,6 +408,19 @@ export async function linkLINEAccount(
     logger.info('linkLINEAccount completed', { email, targetLineUserId });
   } catch (error) {
     logger.error('linkLINEAccount failed', { error, email: req.params.email });
+
+    // Map service error names to proper HTTP status codes (AC#11, AC#15)
+    if (error instanceof Error) {
+      if (error.name === 'ALREADY_LINKED') {
+        res.status(409).json({ success: false, error: error.message });
+        return;
+      }
+      if (error.name === 'LINE_ACCOUNT_NOT_FOUND') {
+        res.status(404).json({ success: false, error: error.message });
+        return;
+      }
+    }
+
     next(error);
   }
 }

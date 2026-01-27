@@ -14,6 +14,7 @@ const { mockSheets } = vi.hoisted(() => ({
         append: vi.fn(),
         get: vi.fn(),
         update: vi.fn(),
+        clear: vi.fn(),
       },
       get: vi.fn(),
     },
@@ -1466,6 +1467,165 @@ describe('SheetsService', () => {
 
       expect(result.healthy).toBe(false);
       expect(result.latency).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  // ===========================================
+  // Sales Team - linkLINEAccount (Story 7-4b)
+  // ===========================================
+
+  describe('linkLINEAccount', () => {
+    const salesTeamRows = [
+      // Row 0 (sheet row 2): LINE-only account (no email)
+      ['Uline123', 'LINE User', '', '', 'sales', '2026-01-20T10:00:00Z', 'active'],
+      // Row 1 (sheet row 3): Dashboard member (no LINE ID)
+      ['', 'Dashboard User', 'dash@eneos.co.th', '0812345678', 'sales', '2026-01-21T10:00:00Z', 'active'],
+    ];
+
+    it('should link LINE account and clear LINE-only row (Step 6 - duplicate key fix)', async () => {
+      // First call: getAllSalesTeamMembers reads all rows
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: salesTeamRows },
+      });
+      // Second call: linkLINEAccount reads rows for row index lookup (Step 5)
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: salesTeamRows },
+      });
+      // Third call: Step 6 fresh re-read to mitigate race condition
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: salesTeamRows },
+      });
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+      mockSheets.spreadsheets.values.clear.mockResolvedValue({});
+
+      const result = await service.linkLINEAccount('dash@eneos.co.th', 'Uline123');
+
+      // Verify: Dashboard member's LINE_User_ID updated
+      expect(mockSheets.spreadsheets.values.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          range: expect.stringContaining('A3:A3'), // Row 3 = dashboard member
+          requestBody: { values: [['Uline123']] },
+        })
+      );
+
+      // Verify: Fresh re-read performed (3 get calls total)
+      expect(mockSheets.spreadsheets.values.get).toHaveBeenCalledTimes(3);
+
+      // Verify: LINE-only row cleared (Step 6 - duplicate key fix)
+      expect(mockSheets.spreadsheets.values.clear).toHaveBeenCalledWith(
+        expect.objectContaining({
+          range: expect.stringContaining('A2:G2'), // Row 2 = LINE-only account
+        })
+      );
+
+      // Verify: Result has linked lineUserId
+      expect(result).not.toBeNull();
+      expect(result?.lineUserId).toBe('Uline123');
+      expect(result?.email).toBe('dash@eneos.co.th');
+    });
+
+    it('should clear LINE-only row when linking a different LINE account', async () => {
+      // Scenario: Multiple rows exist, LINE-only account (Uline789) should be cleared after linking
+      const rowsWithLinkedOnly = [
+        // Row 0: LINE account with email (already linked)
+        ['Uline456', 'Linked User', 'linked@eneos.co.th', '', 'sales', '2026-01-20T10:00:00Z', 'active'],
+        // Row 1: Dashboard member (no LINE)
+        ['', 'New User', 'new@eneos.co.th', '', 'sales', '2026-01-21T10:00:00Z', 'active'],
+        // Row 2: LINE-only account (to be linked)
+        ['Uline789', 'LINE Only', '', '', 'sales', '2026-01-22T10:00:00Z', 'active'],
+      ];
+
+      // Call 1: getAllSalesTeamMembers
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: rowsWithLinkedOnly },
+      });
+      // Call 2: Row index lookup (Step 5)
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: rowsWithLinkedOnly },
+      });
+      // Call 3: Fresh re-read (Step 6 race condition mitigation)
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: rowsWithLinkedOnly },
+      });
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+      mockSheets.spreadsheets.values.clear.mockResolvedValue({});
+
+      const result = await service.linkLINEAccount('new@eneos.co.th', 'Uline789');
+
+      // Should update the dashboard member row
+      expect(mockSheets.spreadsheets.values.update).toHaveBeenCalled();
+      // Should clear the LINE-only row
+      expect(mockSheets.spreadsheets.values.clear).toHaveBeenCalled();
+      expect(result?.lineUserId).toBe('Uline789');
+    });
+
+    it('should skip clear when LINE-only row already cleared by another admin (race condition)', async () => {
+      // Call 1: getAllSalesTeamMembers — sees LINE-only row
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: salesTeamRows },
+      });
+      // Call 2: Row index lookup (Step 5)
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: salesTeamRows },
+      });
+      // Call 3: Fresh re-read — LINE-only row already cleared by another admin
+      const rowsAfterConcurrentClear = [
+        // Row 0 is now empty (cleared by other admin)
+        ['', '', '', '', '', '', ''],
+        // Row 1: Dashboard member (unchanged)
+        ['', 'Dashboard User', 'dash@eneos.co.th', '0812345678', 'sales', '2026-01-21T10:00:00Z', 'active'],
+      ];
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: rowsAfterConcurrentClear },
+      });
+      mockSheets.spreadsheets.values.update.mockResolvedValue({});
+
+      const result = await service.linkLINEAccount('dash@eneos.co.th', 'Uline123');
+
+      // Should NOT call clear — row already gone
+      expect(mockSheets.spreadsheets.values.clear).not.toHaveBeenCalled();
+      // Linking still succeeds
+      expect(result).not.toBeNull();
+      expect(result?.lineUserId).toBe('Uline123');
+    });
+
+    it('should return null when dashboard member not found', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: salesTeamRows },
+      });
+
+      const result = await service.linkLINEAccount('notfound@eneos.co.th', 'Uline123');
+
+      expect(result).toBeNull();
+      expect(mockSheets.spreadsheets.values.update).not.toHaveBeenCalled();
+      expect(mockSheets.spreadsheets.values.clear).not.toHaveBeenCalled();
+    });
+
+    it('should throw LINE_ACCOUNT_NOT_FOUND when LINE account does not exist', async () => {
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: salesTeamRows },
+      });
+
+      await expect(
+        service.linkLINEAccount('dash@eneos.co.th', 'Unonexistent')
+      ).rejects.toThrow('LINE account not found');
+    });
+
+    it('should throw ALREADY_LINKED when LINE account is linked to another member', async () => {
+      const rowsWithLinked = [
+        // LINE account already linked to a dashboard member (has email)
+        ['Ualready', 'Already Linked', 'existing@eneos.co.th', '', 'sales', '2026-01-20T10:00:00Z', 'active'],
+        // Dashboard member wanting to link
+        ['', 'New Member', 'new@eneos.co.th', '', 'sales', '2026-01-21T10:00:00Z', 'active'],
+      ];
+
+      mockSheets.spreadsheets.values.get.mockResolvedValueOnce({
+        data: { values: rowsWithLinked },
+      });
+
+      await expect(
+        service.linkLINEAccount('new@eneos.co.th', 'Ualready')
+      ).rejects.toThrow('LINE account already linked');
     });
   });
 });

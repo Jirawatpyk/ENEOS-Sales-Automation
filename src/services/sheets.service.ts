@@ -865,9 +865,9 @@ export class SheetsService {
         const rows = response.data.values || [];
 
         let members: SalesTeamMemberFull[] = rows
-          .filter((row) => row[0]) // Ensure LINE User ID exists
+          .filter((row) => row[1] || row[2]) // At least name or email must exist (Story 7-4b: support null lineUserId)
           .map((row) => ({
-            lineUserId: row[0],
+            lineUserId: row[0] || null, // Story 7-4b: Can be null for manually added members
             name: row[1] || '',
             email: row[2] || null,
             phone: row[3] || null,
@@ -997,6 +997,283 @@ export class SheetsService {
           createdAt: updatedRow[5],
           status: updatedRow[6] as 'active' | 'inactive',
         };
+      });
+    });
+  }
+
+  /**
+   * Create a new sales team member manually (Story 7-4b)
+   * Member starts with lineUserId = null (will be linked later)
+   *
+   * @param data Member data (name, email, phone, role)
+   * @returns Created member
+   * @throws Error if email already exists
+   */
+  async createSalesTeamMember(data: {
+    name: string;
+    email: string;
+    phone?: string;
+    role: 'admin' | 'sales';
+  }): Promise<SalesTeamMemberFull> {
+    logger.info('Creating sales team member', { email: data.email, role: data.role });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        // 1. Check for duplicate email
+        const existingMembers = await this.getAllSalesTeamMembers({ status: 'all' });
+        const duplicate = existingMembers.find(
+          (m) => m.email && m.email.toLowerCase() === data.email.toLowerCase()
+        );
+
+        if (duplicate) {
+          logger.error('Duplicate email detected', { email: data.email });
+          const error = new Error('Email already exists');
+          error.name = 'DUPLICATE_EMAIL';
+          throw error;
+        }
+
+        // 2. Prepare new row
+        const createdAt = new Date().toISOString();
+        const newRow = [
+          '', // lineUserId - empty/null, will be linked later
+          data.name,
+          data.email,
+          data.phone || '',
+          data.role,
+          createdAt,
+          'active', // status
+        ];
+
+        // 3. Append to Sales_Team sheet
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, 'A:G'),
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [newRow],
+          },
+        });
+
+        logger.info('Sales team member created', { email: data.email, createdAt });
+
+        // 4. Return created member
+        return {
+          lineUserId: null, // Not linked yet
+          name: data.name,
+          email: data.email,
+          phone: data.phone || null,
+          role: data.role,
+          createdAt,
+          status: 'active',
+        };
+      });
+    });
+  }
+
+  /**
+   * Get unlinked LINE accounts (Story 7-4b)
+   * Returns LINE accounts that exist but are not linked to any Dashboard member
+   *
+   * Logic:
+   * 1. Get all LINE accounts (rows with lineUserId not null)
+   * 2. Get all Dashboard members (rows with email not null)
+   * 3. Return LINE accounts whose lineUserId doesn't appear in any Dashboard member
+   *
+   * @returns Array of unlinked LINE accounts
+   */
+  async getUnlinkedLINEAccounts(): Promise<
+    Array<{ lineUserId: string; name: string; createdAt: string }>
+  > {
+    logger.info('Getting unlinked LINE accounts');
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        // Get all members (both LINE accounts and Dashboard members)
+        const allMembers = await this.getAllSalesTeamMembers({ status: 'all' });
+
+        // Step 1: Get all LINE accounts (lineUserId not null)
+        const lineAccounts = allMembers.filter((m) => m.lineUserId !== null);
+
+        // Step 2: Get all Dashboard members (email not null)
+        const dashboardMembers = allMembers.filter((m) => m.email !== null);
+
+        // Step 3: Filter LINE accounts that don't appear in Dashboard members
+        const unlinkedAccounts = lineAccounts.filter((lineAccount) => {
+          // Check if this LINE account's lineUserId is linked to any Dashboard member
+          const isLinked = dashboardMembers.some(
+            (dashboardMember) => dashboardMember.lineUserId === lineAccount.lineUserId
+          );
+          return !isLinked; // Keep if NOT linked
+        });
+
+        logger.info('Unlinked LINE accounts retrieved', { count: unlinkedAccounts.length });
+
+        return unlinkedAccounts.map((account) => ({
+          lineUserId: account.lineUserId!,
+          name: account.name,
+          createdAt: account.createdAt,
+        }));
+      });
+    });
+  }
+
+  /**
+   * Link a LINE account to a Dashboard member (Story 7-4b)
+   *
+   * WARNING: Race condition exists - concurrent linking requests for same LINE account
+   * may both pass validation. Recommend adding app-level locking or Sheets conditional update.
+   *
+   * @param dashboardMemberEmail Dashboard member's email (identifier)
+   * @param targetLineUserId LINE User ID to link
+   * @returns Updated member or null if not found
+   * @throws Error if LINE account already linked or not found
+   */
+  async linkLINEAccount(
+    dashboardMemberEmail: string,
+    targetLineUserId: string
+  ): Promise<SalesTeamMemberFull | null> {
+    logger.info('Linking LINE account', { dashboardMemberEmail, targetLineUserId });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        // 1. Get all members
+        const allMembers = await this.getAllSalesTeamMembers({ status: 'all' });
+
+        // 2. Find Dashboard member by email (has email, lineUserId = null)
+        const dashboardMember = allMembers.find(
+          (m) =>
+            m.email &&
+            m.email.toLowerCase() === dashboardMemberEmail.toLowerCase() &&
+            m.lineUserId === null
+        );
+
+        if (!dashboardMember) {
+          logger.warn('Dashboard member not found or already linked', { dashboardMemberEmail });
+          return null;
+        }
+
+        // 3. Validate target LINE account exists
+        const lineAccount = allMembers.find((m) => m.lineUserId === targetLineUserId);
+
+        if (!lineAccount) {
+          logger.error('LINE account not found', { targetLineUserId });
+          const error = new Error(`LINE account not found: ${targetLineUserId}`);
+          error.name = 'LINE_ACCOUNT_NOT_FOUND';
+          throw error;
+        }
+
+        // 4. Check if target LINE account is already linked to a Dashboard member
+        const alreadyLinked = allMembers.find(
+          (m) => m.lineUserId === targetLineUserId && m.email !== null
+        );
+
+        if (alreadyLinked) {
+          logger.error('LINE account already linked', {
+            targetLineUserId,
+            linkedTo: alreadyLinked.name,
+          });
+          const error = new Error(`LINE account already linked to ${alreadyLinked.name}`);
+          error.name = 'ALREADY_LINKED';
+          throw error;
+        }
+
+        // 5. Update Dashboard member's LINE_User_ID
+        // Find row index in sheet by email
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, 'A2:G'),
+        });
+
+        const rows = response.data.values || [];
+        const rowIndex = rows.findIndex(
+          (row) => row[2] && row[2].toLowerCase() === dashboardMemberEmail.toLowerCase()
+        ); // Column C = Email
+
+        if (rowIndex === -1) {
+          logger.error('Dashboard member not found in sheet', { dashboardMemberEmail });
+          return null;
+        }
+
+        const actualRow = rowIndex + 2; // Sheet row number (header = 1, data starts at 2)
+
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, `A${actualRow}:A${actualRow}`), // Column A = LINE_User_ID
+          valueInputOption: 'RAW',
+          requestBody: {
+            values: [[targetLineUserId]],
+          },
+        });
+
+        // 6. Delete the LINE-only row (to avoid duplicate lineUserId)
+        // Re-read fresh data to mitigate race condition where another admin
+        // may have already linked/cleared this row between Step 1 and now
+        const freshResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: getSheetRange(this.salesTeamSheet, 'A2:G'),
+        });
+
+        const freshRows = freshResponse.data.values || [];
+        const lineAccountRowIndex = freshRows.findIndex(
+          (row) => row[0] === targetLineUserId && (!row[2] || row[2] === '')
+        ); // Column A = LINE_User_ID, Column C = Email
+
+        if (lineAccountRowIndex !== -1) {
+          const lineAccountRow = lineAccountRowIndex + 2; // Sheet row number
+
+          // Clear the LINE-only row to prevent duplicate lineUserId
+          await sheets.spreadsheets.values.clear({
+            spreadsheetId: this.spreadsheetId,
+            range: getSheetRange(this.salesTeamSheet, `A${lineAccountRow}:G${lineAccountRow}`),
+          });
+
+          logger.info('LINE-only account row cleared after linking', {
+            lineAccountRow,
+            targetLineUserId,
+          });
+        } else {
+          logger.info('LINE-only row not found or already cleared (possible concurrent link)', {
+            targetLineUserId,
+          });
+        }
+
+        logger.info('LINE account linked successfully', {
+          dashboardMemberEmail,
+          targetLineUserId,
+          actualRow,
+        });
+
+        return {
+          ...dashboardMember,
+          lineUserId: targetLineUserId,
+        };
+      });
+    });
+  }
+
+  /**
+   * Get Dashboard members without LINE accounts (Story 7-4b)
+   * Used for reverse linking modal (AC14)
+   *
+   * @returns Array of Dashboard members with null lineUserId
+   */
+  async getUnlinkedDashboardMembers(): Promise<SalesTeamMemberFull[]> {
+    logger.info('Getting unlinked Dashboard members');
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        const allMembers = await this.getAllSalesTeamMembers({ status: 'all' });
+
+        // Filter: Dashboard members (email not null) without LINE account (lineUserId null)
+        const unlinkedDashboardMembers = allMembers.filter(
+          (m) => m.email !== null && m.lineUserId === null
+        );
+
+        logger.info('Unlinked Dashboard members retrieved', {
+          count: unlinkedDashboardMembers.length,
+        });
+
+        return unlinkedDashboardMembers;
       });
     });
   }

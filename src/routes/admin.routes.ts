@@ -26,6 +26,13 @@ import {
   getActivityLog,
 } from '../controllers/admin.controller.js';
 import {
+  // Team Management (Story 7-4b)
+  createSalesTeamMember,
+  getUnlinkedLINEAccounts,
+  getUnlinkedDashboardMembers,
+  linkLINEAccount,
+} from '../controllers/admin/team-management.controller.js';
+import {
   adminAuthMiddleware,
   requireViewer,
   requireAdmin,
@@ -183,6 +190,75 @@ router.get('/sales-team', requireViewer, asyncHandler(getSalesTeam));
  * Access: admin only (AC#10: Viewers cannot access team management)
  */
 router.get('/sales-team/list', requireAdmin, asyncHandler(getSalesTeamList));
+
+// ===========================================
+// Team Management Endpoints (Story 7-4b)
+// Manual member registration and LINE account linking
+// IMPORTANT: Static routes MUST be defined BEFORE dynamic :lineUserId routes
+// ===========================================
+
+/**
+ * POST /api/admin/sales-team
+ * Create new sales team member manually (before LINE interaction)
+ *
+ * Body (all required except phone):
+ * - name: string (min 2 chars)
+ * - email: string (must be @eneos.co.th)
+ * - phone: string (optional, Thai format 0[689]XXXXXXXX)
+ * - role: 'admin' | 'sales'
+ *
+ * Response:
+ * - data: SalesTeamMemberFull (with lineUserId = null)
+ *
+ * Access: admin only (Story 7-4b AC#1-7)
+ */
+router.post('/sales-team', requireAdmin, asyncHandler(createSalesTeamMember));
+
+/**
+ * GET /api/admin/sales-team/unlinked-line-accounts
+ * Get LINE accounts that exist but are not linked to any Dashboard member
+ *
+ * Response:
+ * - data: Array<{ lineUserId, name, createdAt }>
+ * - total: number
+ *
+ * Access: admin only (Story 7-4b AC#9, #10, #13)
+ */
+router.get('/sales-team/unlinked-line-accounts', requireAdmin, asyncHandler(getUnlinkedLINEAccounts));
+
+/**
+ * GET /api/admin/sales-team/unlinked-dashboard-members
+ * Get Dashboard members without LINE accounts (for reverse linking)
+ *
+ * Response:
+ * - data: Array<SalesTeamMemberFull> (with lineUserId = null)
+ * - total: number
+ *
+ * Access: admin only (Story 7-4b AC#14)
+ */
+router.get('/sales-team/unlinked-dashboard-members', requireAdmin, asyncHandler(getUnlinkedDashboardMembers));
+
+/**
+ * PATCH /api/admin/sales-team/email/:email/link
+ * Link a LINE account to a Dashboard member
+ *
+ * Params:
+ * - email: Dashboard member's email (identifier)
+ *
+ * Body:
+ * - targetLineUserId: string (LINE User ID to link)
+ *
+ * Response:
+ * - data: SalesTeamMemberFull (updated with linked lineUserId)
+ *
+ * Access: admin only (Story 7-4b AC#11, #12, #15)
+ */
+router.patch('/sales-team/email/:email/link', requireAdmin, asyncHandler(linkLINEAccount));
+
+// ===========================================
+// Dynamic :lineUserId routes (Story 7-4)
+// MUST be AFTER static routes to avoid catching them
+// ===========================================
 
 /**
  * GET /api/admin/sales-team/:lineUserId

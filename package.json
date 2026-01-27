@@ -19,7 +19,9 @@
     "test:load": "k6 run tests/load/health.js && k6 run tests/load/api-admin.js",
     "test:load:health": "k6 run tests/load/health.js",
     "test:load:api": "k6 run tests/load/api-admin.js",
-    "test:load:webhook": "k6 run tests/load/webhook-brevo.js"
+    "test:load:webhook": "k6 run tests/load/webhook-brevo.js",
+    "benchmark": "npm run build && node dist/scripts/benchmark-background-processing.js",
+    "benchmark:dev": "tsx scripts/benchmark-background-processing.ts"
   },
   "keywords": [
     "sales-automation",

@@ -209,10 +209,10 @@ const VALID_SECTOR_PREFIXES = new Set([
  * @internal - Exported for testing purposes
  */
 export function isValidSectorCode(code: string | null): boolean {
-  if (!code) return false;
+  if (!code) {return false;}
 
   // Exact match in recommended list
-  if (VALID_DBD_SECTOR_CODES.has(code)) return true;
+  if (VALID_DBD_SECTOR_CODES.has(code)) {return true;}
 
   // Partial match: valid prefix + dash + suffix (e.g., MFG-CM, TRANS-XYZ)
   const parts = code.split('-');
@@ -534,13 +534,13 @@ export class GeminiService {
       let parsed;
       try {
         parsed = JSON.parse(jsonStr);
-      } catch (firstError) {
+      } catch (_firstError) {
         // If parse fails, try to fix common issues
         try {
           // Fix 1: Unterminated strings by ensuring proper closing quotes
           const fixedJson = jsonStr.replace(/("[^"]*?)(\n|$)/g, '$1"$2');
           parsed = JSON.parse(fixedJson);
-        } catch (secondError) {
+        } catch (_secondError) {
           // Fix 2: Truncated JSON - try to complete it
           let recoveredJson = jsonStr;
 
@@ -716,15 +716,15 @@ export class GeminiService {
     const dataCompleteness = Math.round((populatedFields / fields.length) * 100);
 
     // Apply confidence deductions
-    if (!hasRealDomain) score -= 30; // No valid domain
-    if (!hasDBDData) score -= 20; // No official DBD data
-    if (!geminiConfident) score -= 15; // Gemini uncertain
-    if (dataCompleteness < 50) score -= 10; // Incomplete data
-    if (parsed.industry === 'Unknown') score -= 15; // Unknown industry
+    if (!hasRealDomain) {score -= 30;} // No valid domain
+    if (!hasDBDData) {score -= 20;} // No official DBD data
+    if (!geminiConfident) {score -= 15;} // Gemini uncertain
+    if (dataCompleteness < 50) {score -= 10;} // Incomplete data
+    if (parsed.industry === 'Unknown') {score -= 15;} // Unknown industry
 
     // Apply confidence bonuses
-    if (keywordMatch) score += 10; // Keyword match bonus
-    if (dataCompleteness >= 80) score += 5; // Data rich bonus
+    if (keywordMatch) {score += 10;} // Keyword match bonus
+    if (dataCompleteness >= 80) {score += 5;} // Data rich bonus
 
     // Clamp score to 0-100 range
     score = Math.max(0, Math.min(100, score));

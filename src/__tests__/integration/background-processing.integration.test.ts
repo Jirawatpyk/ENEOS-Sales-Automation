@@ -237,7 +237,7 @@ describe('Background Processing Integration Tests', () => {
 
         statuses.push(response.body.data.status);
 
-        if (response.body.data.status === 'completed') break;
+        if (response.body.data.status === 'completed') {break;}
         await new Promise(resolve => setTimeout(resolve, 20));
       }
 

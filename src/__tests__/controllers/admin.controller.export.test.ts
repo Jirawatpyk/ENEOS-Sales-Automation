@@ -41,6 +41,20 @@ const mockPdfDoc = {
   moveDown: vi.fn().mockReturnThis(),
   addPage: vi.fn().mockReturnThis(),
   end: vi.fn(),
+  // Table drawing methods
+  fillColor: vi.fn().mockReturnThis(),
+  rect: vi.fn().mockReturnThis(),
+  fill: vi.fn().mockReturnThis(),
+  strokeColor: vi.fn().mockReturnThis(),
+  lineWidth: vi.fn().mockReturnThis(),
+  stroke: vi.fn().mockReturnThis(),
+  moveTo: vi.fn().mockReturnThis(),
+  lineTo: vi.fn().mockReturnThis(),
+  // Clipping methods
+  save: vi.fn().mockReturnThis(),
+  restore: vi.fn().mockReturnThis(),
+  clip: vi.fn().mockReturnThis(),
+  y: 100, // Mock current Y position
 };
 
 vi.mock('pdfkit', () => ({
@@ -778,17 +792,17 @@ describe('Admin Controller - Export', () => {
 
       expect(mockPdfDoc.text).toHaveBeenCalled();
 
-      // Find the call that contains the lead data
+      // Get all text calls and join them to check all content
       const textCalls = (mockPdfDoc.text as ReturnType<typeof vi.fn>).mock.calls;
-      const leadDataCall = textCalls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('AJINOMOTO')
-      );
+      const allText = textCalls.map(call => call[0]).join('\n');
 
-      expect(leadDataCall).toBeDefined();
-      expect(leadDataCall![0]).toContain('DBD Sector: F&B-M');
-      expect(leadDataCall![0]).toContain('Juristic ID: 0105536049046');
-      expect(leadDataCall![0]).toContain('John Doe');
-      expect(leadDataCall![0]).toContain('Sales Person');
+      // Verify table headers and data are present
+      expect(allText).toContain('Company'); // Table header
+      expect(allText).toContain('Juristic ID'); // Table header
+      expect(allText).toContain('AJINOMOTO'); // Data value
+      expect(allText).toContain('0105536049046'); // Data value (without label in table format)
+      expect(allText).toContain('John Doe'); // Data value
+      expect(allText).toContain('Sales Person'); // Data value
     });
   });
 });

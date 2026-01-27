@@ -5,7 +5,7 @@
   "main": "dist/app.js",
   "scripts": {
     "dev": "tsx watch src/app.ts",
-    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');const dest='dist/assets/fonts';fs.mkdirSync(dest,{recursive:true});fs.copyFileSync('src/assets/fonts/THSarabunNew.ttf',path.join(dest,'THSarabunNew.ttf'))\"",
+    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');const dest='dist/assets/fonts';fs.mkdirSync(dest,{recursive:true});fs.copyFileSync('src/assets/fonts/NotoSansThai-Regular.ttf',path.join(dest,'NotoSansThai-Regular.ttf'))\"",
     "start": "node dist/app.js",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",

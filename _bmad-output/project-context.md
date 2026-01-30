@@ -33,7 +33,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 **External Integrations:**
 - LINE Bot SDK 9.4.0 - Signature verification MANDATORY
 - Google Gemini AI 0.21.0 - Fallback to defaults on API failure
-- Brevo Webhooks - Email campaign triggers
+- Brevo Webhooks:
+  - `/webhook/brevo` - Automation (no event field) → Create Lead
+  - `/webhook/brevo/campaign` - Campaigns (has event field) → Track Stats
 
 **Testing (Version-Specific Patterns):**
 - Vitest 2.1.2 - Use `vi.hoisted()` for mock hoisting (NOT Jest patterns)
@@ -61,7 +63,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Prefer `interface` for object shapes, `type` for unions/aliases
 
 ### Logger Usage (Domain-Specific)
-- Use domain-specific loggers: `sheetsLogger`, `webhookLogger`
+- Use domain-specific loggers: `sheetsLogger`, `webhookLogger`, `campaignLogger`
 - NOT generic `logger` unless truly general
 
 ### Config Access (MANDATORY)
@@ -233,7 +235,7 @@ describe('ServiceName', () => {
 
 ### Coverage Requirements
 - Minimum: 75% overall (CI enforced)
-- Current: 301+ tests passing
+- Current: 1200+ tests passing
 - Exclude: `types/`, `*.d.ts`, test files
 - No `.skip` in main branch
 
@@ -343,7 +345,7 @@ if (config.features.aiEnrichment) { }
 ### Pre-Commit Checklist
 1. `npm run typecheck` - No type errors
 2. `npm run lint` - No lint errors
-3. `npm test` - All 301+ tests pass
+3. `npm test` - All 1200+ tests pass
 4. Coverage ≥75%
 
 ### Environment Variables
@@ -424,7 +426,7 @@ import { withRetry } from '../utils/retry.js';
 - Track failure patterns
 
 ### Quality Gates (PR Requirements)
-- All 301+ tests pass
+- All 1200+ tests pass
 - Coverage ≥75% (no drops)
 - `npm run typecheck` passes
 - `npm run lint` passes
@@ -459,5 +461,5 @@ When external services fail, use these defaults:
 
 ---
 
-*Last Updated: 2026-01-12*
+*Last Updated: 2026-01-30*
 

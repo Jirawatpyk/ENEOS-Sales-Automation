@@ -1,5 +1,5 @@
 # Sprint Status - ENEOS Admin Dashboard
-# generated: 2026-01-17
+# generated: 2026-01-31
 # project: eneos-sales-automation
 # project_key: eneos-admin-dashboard
 # tracking_system: file-system
@@ -29,7 +29,7 @@
 # - SM typically creates next story ONLY after previous one is 'done'
 # - Dev moves story to 'review', then runs code-review workflow
 
-generated: "2026-01-17"
+generated: "2026-01-31"
 project: "eneos-sales-automation"
 project_key: "eneos-admin-dashboard"
 tracking_system: "file-system"
@@ -138,13 +138,13 @@ development_status:
   5-1-campaign-webhook-backend: done  # POST /webhook/brevo/campaign + Sheets storage - Code review APPROVED (2026-01-30)
   5-2-campaign-stats-api: done                 # GET /api/admin/campaigns/stats + /campaigns/:id/events - Code review APPROVED (2026-01-30)
   # Frontend Features
-  5-3-campaign-summary-cards: in-progress       # F-05.F1: Total Campaigns, Delivered, Opened, Clicked - Started 2026-01-30
-  5-4-campaign-table: backlog                  # F-05.F2: Campaign list with metrics
-  5-5-open-click-rates: backlog                # F-05.F3: Open Rate & Click Rate display
-  5-6-campaign-performance-chart: backlog      # F-05.F4: Bar chart comparison
-  5-7-campaign-detail-modal: backlog           # F-05.F5: Event log per campaign
-  5-8-campaign-date-filter: backlog            # F-05.F6: Date range filter
-  5-9-campaign-export: backlog                 # F-05.F7: Export campaign data
+  5-3-campaign-summary-cards: done              # F-05.F1: Total Campaigns, Delivered, Opened, Clicked - Code review APPROVED (2026-01-31)
+  5-4-campaign-table: done                      # F-05.F2: Campaign list with metrics - Code review APPROVED, E2E tests added (2026-01-31)
+  5-5-open-click-rates: done                      # F-05.F3: Open Rate & Click Rate display - Code review APPROVED + TEA guardrail tests (2026-01-31)
+  5-6-campaign-performance-chart: review # F-05.F4: Bar chart comparison - Implementation complete 2026-01-31
+  5-7-campaign-detail-sheet: ready-for-dev      # F-05.F5: Event log per campaign - Story updated Modal→Sheet 2026-01-31
+  5-8-campaign-date-filter: ready-for-dev      # F-05.F6: Date range filter - Story created 2026-01-31
+  5-9-campaign-export: ready-for-dev           # F-05.F7: Export campaign data - Story created 2026-01-31
   epic-5-retrospective: optional
 
   # ============================================================
@@ -215,24 +215,34 @@ development_status:
 #   - 3-8 Export Individual: ✅ done (2026-01-17) - Code review passed
 #   - Retrospective: ✅ done (2026-01-17)
 #
-# Completed Epics: 4 (EPIC-00, EPIC-01, EPIC-02, EPIC-03)
-# Completed Stories: 38 (10 + 5 + 8 + 8 + 6 + 1)  # +6 from Epic-4 (4-1 to 4-6)
-# Remaining Stories: 26
+# EPIC-04 Status: ✅ COMPLETED (14/14 stories done + retrospective)
+#   - All stories completed 2026-01-27 (including grounding fields UI)
 #
-# CURRENT: Epic-4 Lead Management (10 stories)
-#   - 4-1 Lead List Table: ✅ done (code review passed 2026-01-17)
-#   - 4-2 Pagination: ✅ done (code review passed 2026-01-17)
-#   - 4-3 Search: ✅ done (code review passed 2026-01-17)
-#   - 4-4 Filter by Status: ✅ done (code review passed 2026-01-17)
-#   - 4-5 Filter by Owner: ✅ done (code review passed 2026-01-17)
-#   - 4-6 Filter by Date: ✅ done (code review passed 2026-01-17)
+# EPIC-05 Status: 🚧 IN PROGRESS (6/9 done, 3 ready-for-dev)
+#   - Backend: 5-1, 5-2 done
+#   - Frontend: 5-3, 5-4, 5-5 done, 5-6 review, 5-7, 5-8, 5-9 ready-for-dev
+#
+# Completed Epics: 5 (EPIC-00, EPIC-01, EPIC-02, EPIC-03, EPIC-04)
+# Completed Stories: 53 (15 + 5 + 9 + 8 + 14 + 2)  # E0:15, E1:5, E2:9, E3:8, E4:14, E5:2
+# In Progress: Epic-5 (2 done, 1 review, 1 ready-for-dev, 5 backlog)
+#
+# CURRENT: Epic-5 Campaign Analytics (9 stories)
+#   - 5-1 Campaign Webhook Backend: ✅ done (2026-01-30)
+#   - 5-2 Campaign Stats API: ✅ done (2026-01-30)
+#   - 5-3 Campaign Summary Cards: ✅ done (2026-01-31)
+#   - 5-4 Campaign Table: ✅ done (2026-01-31) - Code review APPROVED
+#   - 5-5 Open/Click Rates: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (172 tests)
+#   - 5-6 Campaign Performance Chart: 📋 ready-for-dev (story created 2026-01-31)
+#   - 5-7 Campaign Detail Sheet: 📋 ready-for-dev (story updated Modal→Sheet 2026-01-31)
+#   - 5-8 Campaign Date Filter: 📋 ready-for-dev (story created 2026-01-31)
+#   - 5-9 Campaign Export: 📋 ready-for-dev (story created 2026-01-31)
 #
 # RECOMMENDED MVP (Phase 1):
 # - EPIC-01: Authentication (5 stories) - ✅ COMPLETED
 # - EPIC-02: Dashboard Overview (8 stories) - ✅ COMPLETED
 # - EPIC-03: Sales Performance (8 stories) - ✅ COMPLETED
-# - EPIC-04: Lead Management - Basic (6 stories) - backlog
-# Total MVP Stories: ~27 stories (29 done)
+# - EPIC-04: Lead Management (14 stories) - ✅ COMPLETED
+# Total MVP Stories: ~27 stories (53 done)
 #
 # ALL BACKEND APIs READY:
 # - /api/admin/dashboard ✅
@@ -243,6 +253,10 @@ development_status:
 # - /api/admin/campaigns/:id ✅
 # - /api/admin/export ✅
 # - /api/admin/activity-log ✅ (added 2026-01-20)
+# - /api/admin/campaigns/stats ✅ (added 2026-01-30)
+# - /api/admin/campaigns/:id/stats ✅ (added 2026-01-30)
+# - /api/admin/campaigns/:id/events ✅ (added 2026-01-30)
+# - /webhook/brevo/campaign ✅ (added 2026-01-30)
 #
 # ============================================================
 # CRITICAL ISSUES (Process Improvements Needed)

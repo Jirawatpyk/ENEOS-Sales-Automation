@@ -104,8 +104,9 @@ describe('Background Processing Integration Tests', () => {
   let webhookRoutes: any;
   let statusRoutes: any;
 
+  // Note: Brevo Automation ไม่ส่ง event field มา
   const mockBrevoPayload = {
-    event: 'click',
+    // NO event field - simulates Brevo Automation webhook
     email: 'integration@test.com',
     FIRSTNAME: 'Integration',
     LASTNAME: 'Test',

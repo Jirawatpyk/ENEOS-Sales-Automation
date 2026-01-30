@@ -9,7 +9,7 @@ import { deduplicationService } from '../services/deduplication.service.js';
 import { addFailedBrevoWebhook } from '../services/dead-letter-queue.service.js';
 import { processLeadAsync } from '../services/background-processor.service.js';
 import { processingStatusService } from '../services/processing-status.service.js';
-import { validateBrevoWebhook, isClickEvent } from '../validators/brevo.validator.js';
+import { validateBrevoWebhook } from '../validators/brevo.validator.js';
 import { formatDateForSheets } from '../utils/date-formatter.js';
 import { DuplicateLeadError } from '../types/index.js';
 import { config } from '../config/index.js';
@@ -55,14 +55,17 @@ export async function handleBrevoWebhook(
 
     const payload = validation.data;
 
-    // Step 2: Check if this is a click event (hot lead)
-    // Use validated event (defaults to 'click' if not provided by Brevo Automation)
-    const eventType = req.body.event || 'click';
-    if (!isClickEvent(eventType)) {
-      logger.info('Ignoring non-click event', { event: eventType });
+    // Step 2: Check if this is from Brevo Automation (no event field)
+    // Brevo Automation: ไม่ส่ง event field → Process Lead
+    // Brevo Campaign: ส่ง event field (delivered/opened/click) → ใช้ /webhook/brevo/campaign แทน
+    if (req.body.event) {
+      logger.info('Skipping - request has event field (not from Automation)', {
+        event: req.body.event,
+        email: req.body.email,
+      });
       res.status(200).json({
         success: true,
-        message: `Event '${eventType}' acknowledged but not processed`,
+        message: 'Acknowledged',
       });
       return;
     }

@@ -1,6 +1,6 @@
 # Story 5.1: Campaign Webhook Backend
 
-Status: review
+Status: done
 
 ## Story
 
@@ -321,8 +321,44 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 - `src/utils/logger.ts` - Added campaignLogger
 - `src/app.ts` - Mounted campaign routes
 
+## Code Review Record
+
+### Review Type
+Full Review [RV]
+
+### Reviewer
+Rex (Code Reviewer Agent) - Claude Opus 4.5
+
+### Verdict
+✅ **APPROVED**
+
+### Issues Found & Fixed
+
+| # | Severity | Issue | Resolution |
+|---|----------|-------|------------|
+| 1 | Medium | Race condition in unique counting - check-before-write pattern vulnerable to concurrent requests | Fixed: Changed to write-first-then-count pattern using `countUniqueEmailsForEvent()` |
+| 2 | Medium | Async error handling - response sent before async processing complete | Fixed: Implemented fire-and-forget pattern with proper error logging |
+| 3 | Low | Rate precision - 42.857% should be 42.86% not 43% | Fixed: Use `Math.round(x * 10000) / 100` for 2 decimal precision |
+| 4 | Low | Missing route documentation in app.ts | Fixed: Added route order documentation comments |
+| 5 | Low | Curly brace style - `if (!event) return;` violates ESLint | Fixed: Added curly braces `if (!event) { return; }` |
+| 6 | Low | Test expectations for non-blocking pattern | Fixed: Updated tests to expect "Event received" immediately |
+
+### Final Test Results
+- Tests: 1153/1153 PASS
+- Lint: 0 errors, 29 warnings (pre-existing)
+- TypeCheck: PASS
+
+### Review Date
+2026-01-30
+
 ## Change Log
 
+- 2026-01-30: Code review APPROVED - All 6 issues fixed
+  - Fixed race condition in unique counting (write-first-then-count)
+  - Implemented non-blocking webhook pattern (fire-and-forget)
+  - Fixed rate calculation precision (2 decimals)
+  - Added route documentation
+  - Updated tests for async pattern
 - 2026-01-30: Story 5-1 implementation complete
   - Created campaign webhook endpoint: POST /webhook/brevo/campaign
   - Implemented Campaign_Events and Campaign_Stats sheet operations

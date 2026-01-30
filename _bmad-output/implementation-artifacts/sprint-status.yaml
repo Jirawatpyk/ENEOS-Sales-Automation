@@ -129,17 +129,22 @@ development_status:
   epic-4-retrospective: done  # Retrospective completed 2026-01-19, API Contract created
 
   # ============================================================
-  # EPIC-05: Campaign Analytics
+  # EPIC-05: Campaign Analytics (Email Metrics)
+  # Updated: 2026-01-30 - New structure with Backend webhook first
+  # Data Source: Brevo Campaign Events webhook (NOT from Leads sheet)
   # ============================================================
-  epic-5: backlog
-  5-1-campaign-summary-cards: backlog
-  5-2-campaign-table: backlog
-  5-3-conversion-by-campaign: backlog
-  5-4-leads-by-campaign-pie: backlog
-  5-5-campaign-comparison: backlog
-  5-6-revenue-estimation: backlog
-  5-7-campaign-detail: backlog
-  5-8-period-comparison: backlog
+  epic-5: in-progress
+  # Backend Features (Prerequisite)
+  5-1-campaign-webhook-backend: done  # POST /webhook/brevo/campaign + Sheets storage - Code review APPROVED (2026-01-30)
+  5-2-campaign-stats-api: done                 # GET /api/admin/campaigns/stats + /campaigns/:id/events - Code review APPROVED (2026-01-30)
+  # Frontend Features
+  5-3-campaign-summary-cards: backlog          # F-05.F1: Total Campaigns, Delivered, Opened, Clicked
+  5-4-campaign-table: backlog                  # F-05.F2: Campaign list with metrics
+  5-5-open-click-rates: backlog                # F-05.F3: Open Rate & Click Rate display
+  5-6-campaign-performance-chart: backlog      # F-05.F4: Bar chart comparison
+  5-7-campaign-detail-modal: backlog           # F-05.F5: Event log per campaign
+  5-8-campaign-date-filter: backlog            # F-05.F6: Date range filter
+  5-9-campaign-export: backlog                 # F-05.F7: Export campaign data
   epic-5-retrospective: optional
 
   # ============================================================

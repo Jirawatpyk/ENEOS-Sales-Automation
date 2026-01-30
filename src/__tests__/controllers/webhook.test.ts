@@ -137,7 +137,7 @@ describe('Webhook Controller', () => {
       );
     });
 
-    it('should ignore non-click events', async () => {
+    it('should ignore requests with event field (campaign event)', async () => {
       mockReq = { body: mockBrevoOpenPayload };
 
       await handleBrevoWebhook(
@@ -149,12 +149,29 @@ describe('Webhook Controller', () => {
       expect(deduplicationService.checkOrThrow).not.toHaveBeenCalled();
       expect(processLeadAsync).not.toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
-      expect(mockRes.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          message: expect.stringContaining('acknowledged but not processed'),
-        })
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Acknowledged',
+      });
+    });
+
+    it('should ignore click events with event field (campaign event)', async () => {
+      // Brevo Campaign sends click event with event field
+      mockReq = { body: { ...mockBrevoClickPayload, event: 'click' } };
+
+      await handleBrevoWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
       );
+
+      expect(deduplicationService.checkOrThrow).not.toHaveBeenCalled();
+      expect(processLeadAsync).not.toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Acknowledged',
+      });
     });
 
     it('should return 400 for invalid payload', async () => {

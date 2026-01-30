@@ -91,40 +91,35 @@ Kubernetes liveness probe.
 
 ### POST /webhook/brevo
 
-Receives webhook events from Brevo email campaigns.
+Receives webhook from **Brevo Automation** (Workflow trigger). Creates new leads.
+
+> **Note:** Brevo Automation ไม่ส่ง `event` field มา ถ้ามี `event` field จะถูก ignore (ใช้ `/webhook/brevo/campaign` แทน)
 
 **Headers**
 | Header | Required | Description |
 |--------|----------|-------------|
 | Content-Type | Yes | `application/json` |
 
-**Request Body**
+**Request Body** (from Brevo Automation)
 ```json
 {
-  "event": "click",
   "email": "customer@company.com",
   "FIRSTNAME": "John",
   "LASTNAME": "Doe",
   "PHONE": "0812345678",
   "COMPANY": "ACME Corporation",
-  "campaign_id": 12345,
-  "campaign_name": "ENEOS Premium Oil 2024",
+  "workflow_id": 12345,
   "subject": "Special Offer for Your Business",
   "message-id": "abc-123-xyz",
   "date": "2026-01-11T12:00:00.000Z"
 }
 ```
 
-**Supported Events**
-| Event | Action |
-|-------|--------|
-| `click` | Process as new lead |
-| `opened` | Acknowledge only |
-| `delivered` | Acknowledge only |
-| `hard_bounce` | Acknowledge only |
-| `soft_bounce` | Acknowledge only |
-| `spam` | Acknowledge only |
-| `unsubscribed` | Acknowledge only |
+**Behavior**
+| Condition | Action |
+|-----------|--------|
+| No `event` field | Process as new lead |
+| Has `event` field | Acknowledge only (return 200, no processing) |
 
 **Response - Success**
 ```json
@@ -148,6 +143,14 @@ Receives webhook events from Brevo email campaigns.
 }
 ```
 
+**Response - Has Event Field**
+```json
+{
+  "success": true,
+  "message": "Acknowledged"
+}
+```
+
 **Response - Error**
 ```json
 {
@@ -156,6 +159,85 @@ Receives webhook events from Brevo email campaigns.
   "details": "email: Required"
 }
 ```
+
+---
+
+### POST /webhook/brevo/campaign
+
+Receives webhook from **Brevo Campaigns** (Email metrics). Stores events for analytics.
+
+> **Note:** แยกจาก Lead webhook เพื่อป้องกัน duplicate LINE notifications
+
+**Headers**
+| Header | Required | Description |
+|--------|----------|-------------|
+| Content-Type | Yes | `application/json` |
+
+**Request Body** (from Brevo Campaign)
+```json
+{
+  "event": "click",
+  "email": "customer@company.com",
+  "camp_id": 123,
+  "campaign name": "ENEOS Q1 2024",
+  "id": 456,
+  "URL": "https://example.com/link",
+  "date_event": "2026-01-30 10:00:00",
+  "date_sent": "2026-01-30 09:00:00",
+  "tag": "promo",
+  "segment_ids": [1, 2]
+}
+```
+
+**Required Fields**
+| Field | Type | Description |
+|-------|------|-------------|
+| `camp_id` | number | Campaign ID |
+| `email` | string | Recipient email |
+| `event` | string | Event type |
+| `id` | number | Event ID (unique) |
+
+**Supported Events**
+| Event | Action |
+|-------|--------|
+| `delivered` | Increment delivered count |
+| `opened` | Increment opened count + track unique |
+| `click` | Increment clicked count + track unique + store URL |
+| `hard_bounce` | Acknowledge only (prepared for future) |
+| `soft_bounce` | Acknowledge only (prepared for future) |
+| `unsubscribe` | Acknowledge only (prepared for future) |
+| `spam` | Acknowledge only (prepared for future) |
+
+**Response - Success**
+```json
+{
+  "success": true,
+  "message": "Event received",
+  "eventId": 456,
+  "campaignId": 123
+}
+```
+
+**Response - Disabled Event**
+```json
+{
+  "success": true,
+  "message": "Event 'hard_bounce' acknowledged but not enabled for processing"
+}
+```
+
+**Response - Error**
+```json
+{
+  "success": false,
+  "error": "Invalid payload",
+  "details": "camp_id: Required"
+}
+```
+
+**Google Sheets**
+- Events stored in `Campaign_Events` sheet
+- Aggregates updated in `Campaign_Stats` sheet
 
 ---
 

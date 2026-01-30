@@ -25,6 +25,12 @@ import {
   // Activity Log (Story 7-7)
   getActivityLog,
 } from '../controllers/admin.controller.js';
+// Campaign Stats (Story 5-2)
+import {
+  getCampaignStats,
+  getCampaignById,
+  getCampaignEvents,
+} from '../controllers/admin/campaign-stats.controller.js';
 import {
   // Team Management (Story 7-4b)
   createSalesTeamMember,
@@ -353,6 +359,59 @@ router.get('/sales-performance/trend', requireViewer, asyncHandler(getSalesPerfo
 // ===========================================
 // Campaign Endpoints
 // ===========================================
+
+// Story 5-2: Campaign Email Metrics Endpoints (from Brevo Campaign Events)
+// IMPORTANT: These routes MUST be defined BEFORE the parameterized routes to avoid conflicts
+
+/**
+ * GET /api/admin/campaigns/stats
+ * Get all campaign email metrics with pagination, search, and filtering (Story 5-2 AC#1)
+ *
+ * Query params:
+ * - page: number (default: 1)
+ * - limit: number (default: 20, max: 100)
+ * - search: string - Search by Campaign_Name (case-insensitive)
+ * - dateFrom: ISO date - Filter by First_Event >= dateFrom
+ * - dateTo: ISO date - Filter by First_Event <= dateTo
+ * - sortBy: Last_Updated | First_Event | Campaign_Name | Delivered | Opened | Clicked | Open_Rate | Click_Rate
+ * - sortOrder: asc | desc (default: desc)
+ *
+ * Access: viewer, admin
+ */
+router.get('/campaigns/stats', requireViewer, asyncHandler(getCampaignStats));
+
+/**
+ * GET /api/admin/campaigns/:id/stats
+ * Get single campaign email metrics by Campaign_ID (Story 5-2 AC#2)
+ *
+ * Params:
+ * - id: Campaign_ID (from Brevo camp_id)
+ *
+ * Returns 404 if campaign not found
+ *
+ * Access: viewer, admin
+ */
+router.get('/campaigns/:id/stats', requireViewer, asyncHandler(getCampaignById));
+
+/**
+ * GET /api/admin/campaigns/:id/events
+ * Get campaign event log with pagination and filtering (Story 5-2 AC#3)
+ *
+ * Params:
+ * - id: Campaign_ID
+ *
+ * Query params:
+ * - page: number (default: 1)
+ * - limit: number (default: 50, max: 100)
+ * - event: delivered | opened | click - Filter by event type
+ * - dateFrom: ISO date - Filter by Event_At >= dateFrom
+ * - dateTo: ISO date - Filter by Event_At <= dateTo
+ *
+ * Access: viewer, admin
+ */
+router.get('/campaigns/:id/events', requireViewer, asyncHandler(getCampaignEvents));
+
+// Legacy: Campaign analytics based on Leads data (existing feature)
 
 /**
  * GET /api/admin/campaigns

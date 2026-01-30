@@ -9,9 +9,16 @@ import { campaignLogger as logger } from '../utils/logger.js';
 import { withRetry, CircuitBreaker } from '../utils/retry.js';
 import { formatISOTimestamp } from '../utils/date-formatter.js';
 import type { NormalizedCampaignEvent } from '../validators/campaign-event.validator.js';
+import type {
+  CampaignStatsItem,
+  CampaignEventItem,
+  PaginationMeta,
+  CampaignStatsSortBy,
+} from '../types/admin.types.js';
 import {
   CAMPAIGN_EVENTS,
   CAMPAIGN_STATS_COLUMNS,
+  CAMPAIGN_EVENTS_COLUMNS,
   createDefaultStatsRow,
 } from '../constants/campaign.constants.js';
 
@@ -680,6 +687,323 @@ export class CampaignStatsService {
       row[CAMPAIGN_STATS_COLUMNS.OPEN_RATE] = 0;
       row[CAMPAIGN_STATS_COLUMNS.CLICK_RATE] = 0;
     }
+  }
+
+  // ===========================================
+  // READ Operations (Story 5-2)
+  // ===========================================
+
+  /**
+   * Get all campaign stats with pagination, search, date range filtering, and sorting
+   * Implements AC1: GET /api/admin/campaigns/stats
+   */
+  async getAllCampaignStats(options: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    sortBy?: CampaignStatsSortBy;
+    sortOrder?: 'asc' | 'desc';
+  } = {}): Promise<{
+    data: CampaignStatsItem[];
+    pagination: PaginationMeta;
+  }> {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      dateFrom,
+      dateTo,
+      sortBy = 'Last_Updated',
+      sortOrder = 'desc',
+    } = options;
+
+    logger.debug('Getting all campaign stats', { page, limit, search, sortBy, sortOrder });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        // Read all campaign stats from sheet
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: this.getSheetRange(this.statsSheet, 'A:O'),
+        });
+
+        const values = response.data.values || [];
+        if (values.length <= 1) {
+          // Only header or empty
+          return {
+            data: [],
+            pagination: this.createPaginationMeta(0, page, limit),
+          };
+        }
+
+        // Parse rows (skip header at index 0)
+        let campaigns: CampaignStatsItem[] = [];
+        for (let i = 1; i < values.length; i++) {
+          const row = values[i];
+          if (!row || !row[0]) continue;
+
+          const item = this.rowToCampaignStatsItem(row);
+          campaigns.push(item);
+        }
+
+        // Apply search filter (case-insensitive partial match on campaign name)
+        if (search) {
+          const searchLower = search.toLowerCase();
+          campaigns = campaigns.filter((c) =>
+            c.campaignName.toLowerCase().includes(searchLower)
+          );
+        }
+
+        // Apply date range filter (on firstEvent)
+        if (dateFrom) {
+          const fromDate = new Date(dateFrom).getTime();
+          campaigns = campaigns.filter((c) => {
+            const eventDate = new Date(c.firstEvent).getTime();
+            return eventDate >= fromDate;
+          });
+        }
+
+        if (dateTo) {
+          const toDate = new Date(dateTo).getTime();
+          campaigns = campaigns.filter((c) => {
+            const eventDate = new Date(c.firstEvent).getTime();
+            return eventDate <= toDate;
+          });
+        }
+
+        // Apply sorting
+        campaigns = this.sortCampaignStats(campaigns, sortBy, sortOrder);
+
+        // Apply pagination
+        const total = campaigns.length;
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedData = campaigns.slice(startIndex, endIndex);
+
+        logger.info('Campaign stats retrieved', { total, returned: paginatedData.length });
+
+        return {
+          data: paginatedData,
+          pagination: this.createPaginationMeta(total, page, limit),
+        };
+      });
+    });
+  }
+
+  /**
+   * Get single campaign stats by Campaign_ID
+   * Implements AC2: GET /api/admin/campaigns/:id/stats
+   */
+  async getCampaignStatsById(campaignId: number): Promise<CampaignStatsItem | null> {
+    logger.debug('Getting campaign stats by ID', { campaignId });
+
+    const existing = await this.getCampaignStats(campaignId);
+
+    if (!existing) {
+      return null;
+    }
+
+    return this.rowToCampaignStatsItem(existing.row);
+  }
+
+  /**
+   * Get campaign events with pagination and filtering
+   * Implements AC3: GET /api/admin/campaigns/:id/events
+   */
+  async getCampaignEvents(
+    campaignId: number,
+    options: {
+      page?: number;
+      limit?: number;
+      event?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    } = {}
+  ): Promise<{
+    data: CampaignEventItem[];
+    pagination: PaginationMeta;
+  }> {
+    const {
+      page = 1,
+      limit = 50,
+      event: eventFilter,
+      dateFrom,
+      dateTo,
+    } = options;
+
+    logger.debug('Getting campaign events', { campaignId, page, limit, eventFilter });
+
+    return circuitBreaker.execute(async () => {
+      return withRetry(async () => {
+        // Read all events from sheet
+        const response = await sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: this.getSheetRange(this.eventsSheet, 'A:K'),
+        });
+
+        const values = response.data.values || [];
+        if (values.length <= 1) {
+          return {
+            data: [],
+            pagination: this.createPaginationMeta(0, page, limit),
+          };
+        }
+
+        // Filter and parse rows
+        let events: CampaignEventItem[] = [];
+        for (let i = 1; i < values.length; i++) {
+          const row = values[i];
+          if (!row || !row[0]) continue;
+
+          // Filter by campaign ID
+          const rowCampaignId = Number(row[CAMPAIGN_EVENTS_COLUMNS.CAMPAIGN_ID]);
+          if (rowCampaignId !== campaignId) continue;
+
+          const item = this.rowToCampaignEventItem(row);
+
+          // Apply event type filter
+          if (eventFilter && item.event !== eventFilter) continue;
+
+          // Apply date range filter
+          if (dateFrom) {
+            const fromDate = new Date(dateFrom).getTime();
+            const eventDate = new Date(item.eventAt).getTime();
+            if (eventDate < fromDate) continue;
+          }
+
+          if (dateTo) {
+            const toDate = new Date(dateTo).getTime();
+            const eventDate = new Date(item.eventAt).getTime();
+            if (eventDate > toDate) continue;
+          }
+
+          events.push(item);
+        }
+
+        // Sort by eventAt descending (newest first)
+        events.sort((a, b) =>
+          new Date(b.eventAt).getTime() - new Date(a.eventAt).getTime()
+        );
+
+        // Apply pagination
+        const total = events.length;
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedData = events.slice(startIndex, endIndex);
+
+        logger.info('Campaign events retrieved', { campaignId, total, returned: paginatedData.length });
+
+        return {
+          data: paginatedData,
+          pagination: this.createPaginationMeta(total, page, limit),
+        };
+      });
+    });
+  }
+
+  // ===========================================
+  // Row Conversion Helpers (Story 5-2)
+  // ===========================================
+
+  /**
+   * Convert sheet row to CampaignStatsItem
+   */
+  private rowToCampaignStatsItem(row: (string | number)[]): CampaignStatsItem {
+    return {
+      campaignId: Number(row[CAMPAIGN_STATS_COLUMNS.CAMPAIGN_ID] || 0),
+      campaignName: String(row[CAMPAIGN_STATS_COLUMNS.CAMPAIGN_NAME] || ''),
+      delivered: Number(row[CAMPAIGN_STATS_COLUMNS.DELIVERED] || 0),
+      opened: Number(row[CAMPAIGN_STATS_COLUMNS.OPENED] || 0),
+      clicked: Number(row[CAMPAIGN_STATS_COLUMNS.CLICKED] || 0),
+      uniqueOpens: Number(row[CAMPAIGN_STATS_COLUMNS.UNIQUE_OPENS] || 0),
+      uniqueClicks: Number(row[CAMPAIGN_STATS_COLUMNS.UNIQUE_CLICKS] || 0),
+      openRate: Number(row[CAMPAIGN_STATS_COLUMNS.OPEN_RATE] || 0),
+      clickRate: Number(row[CAMPAIGN_STATS_COLUMNS.CLICK_RATE] || 0),
+      hardBounce: Number(row[CAMPAIGN_STATS_COLUMNS.HARD_BOUNCE] || 0),
+      softBounce: Number(row[CAMPAIGN_STATS_COLUMNS.SOFT_BOUNCE] || 0),
+      unsubscribe: Number(row[CAMPAIGN_STATS_COLUMNS.UNSUBSCRIBE] || 0),
+      spam: Number(row[CAMPAIGN_STATS_COLUMNS.SPAM] || 0),
+      firstEvent: String(row[CAMPAIGN_STATS_COLUMNS.FIRST_EVENT] || ''),
+      lastUpdated: String(row[CAMPAIGN_STATS_COLUMNS.LAST_UPDATED] || ''),
+    };
+  }
+
+  /**
+   * Convert sheet row to CampaignEventItem
+   */
+  private rowToCampaignEventItem(row: (string | number)[]): CampaignEventItem {
+    return {
+      eventId: Number(row[CAMPAIGN_EVENTS_COLUMNS.EVENT_ID] || 0),
+      email: String(row[CAMPAIGN_EVENTS_COLUMNS.EMAIL] || ''),
+      event: String(row[CAMPAIGN_EVENTS_COLUMNS.EVENT] || ''),
+      eventAt: String(row[CAMPAIGN_EVENTS_COLUMNS.EVENT_AT] || ''),
+      url: row[CAMPAIGN_EVENTS_COLUMNS.URL]
+        ? String(row[CAMPAIGN_EVENTS_COLUMNS.URL])
+        : null,
+    };
+  }
+
+  /**
+   * Sort campaign stats by specified field and order
+   */
+  private sortCampaignStats(
+    campaigns: CampaignStatsItem[],
+    sortBy: CampaignStatsSortBy,
+    sortOrder: 'asc' | 'desc'
+  ): CampaignStatsItem[] {
+    const multiplier = sortOrder === 'asc' ? 1 : -1;
+
+    return campaigns.sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case 'Last_Updated':
+          comparison = new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime();
+          break;
+        case 'First_Event':
+          comparison = new Date(a.firstEvent).getTime() - new Date(b.firstEvent).getTime();
+          break;
+        case 'Campaign_Name':
+          comparison = a.campaignName.localeCompare(b.campaignName);
+          break;
+        case 'Delivered':
+          comparison = a.delivered - b.delivered;
+          break;
+        case 'Opened':
+          comparison = a.opened - b.opened;
+          break;
+        case 'Clicked':
+          comparison = a.clicked - b.clicked;
+          break;
+        case 'Open_Rate':
+          comparison = a.openRate - b.openRate;
+          break;
+        case 'Click_Rate':
+          comparison = a.clickRate - b.clickRate;
+          break;
+        default:
+          comparison = new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime();
+      }
+
+      return comparison * multiplier;
+    });
+  }
+
+  /**
+   * Create pagination metadata
+   */
+  private createPaginationMeta(total: number, page: number, limit: number): PaginationMeta {
+    const totalPages = Math.ceil(total / limit) || 1;
+    return {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
   }
 
   // ===========================================

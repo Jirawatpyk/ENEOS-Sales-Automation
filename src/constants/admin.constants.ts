@@ -10,6 +10,8 @@
 export const PAGINATION = {
   DEFAULT_PAGE: 1,
   DEFAULT_LIMIT: 20,
+  /** Default limit for campaign events (Story 5-2) */
+  EVENTS_DEFAULT_LIMIT: 50,
   MAX_LIMIT: 100,
 } as const;
 

@@ -600,4 +600,505 @@ describe('CampaignStatsService', () => {
       expect(row[7]).toBe(25); // Exact 25%
     });
   });
+
+  // ===========================================
+  // Story 5-2: READ Operations Tests
+  // ===========================================
+
+  describe('getAllCampaignStats', () => {
+    const mockStatsData = [
+      ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+      ['100', 'BMF2026 Launch', '1000', '450', '120', '400', '100', '40', '10', '0', '0', '0', '0', '2026-01-15T10:00:00.000Z', '2026-01-30T15:30:00.000Z'],
+      ['101', 'Q1 Promo', '500', '200', '50', '180', '45', '36', '9', '0', '0', '0', '0', '2026-01-10T08:00:00.000Z', '2026-01-28T12:00:00.000Z'],
+      ['102', 'Welcome Series', '250', '100', '30', '90', '25', '36', '10', '0', '0', '0', '0', '2026-01-20T14:00:00.000Z', '2026-01-29T09:00:00.000Z'],
+    ];
+
+    it('should return empty array when no campaigns exist', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats();
+
+      expect(result.data).toEqual([]);
+      expect(result.pagination.total).toBe(0);
+    });
+
+    it('should return all campaigns with pagination metadata', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({ page: 1, limit: 20 });
+
+      expect(result.data.length).toBe(3);
+      expect(result.pagination.total).toBe(3);
+      expect(result.pagination.totalPages).toBe(1);
+      expect(result.pagination.hasNext).toBe(false);
+    });
+
+    it('should apply pagination correctly', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({ page: 1, limit: 2 });
+
+      expect(result.data.length).toBe(2);
+      expect(result.pagination.total).toBe(3);
+      expect(result.pagination.totalPages).toBe(2);
+      expect(result.pagination.hasNext).toBe(true);
+      expect(result.pagination.hasPrev).toBe(false);
+    });
+
+    it('should filter by search term (case-insensitive)', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({ search: 'bmf' });
+
+      expect(result.data.length).toBe(1);
+      expect(result.data[0].campaignName).toBe('BMF2026 Launch');
+    });
+
+    it('should filter by dateFrom', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({
+        dateFrom: '2026-01-15',
+      });
+
+      expect(result.data.length).toBe(2); // BMF2026 Launch and Welcome Series
+    });
+
+    it('should filter by dateTo', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({
+        dateTo: '2026-01-12',
+      });
+
+      expect(result.data.length).toBe(1); // Only Q1 Promo (2026-01-10)
+    });
+
+    it('should filter by date range', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({
+        dateFrom: '2026-01-12',
+        dateTo: '2026-01-18',
+      });
+
+      expect(result.data.length).toBe(1); // Only BMF2026 Launch
+    });
+
+    it('should sort by Last_Updated descending by default', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats();
+
+      // Newest updated first: BMF2026 (30th), Welcome (29th), Q1 (28th)
+      expect(result.data[0].campaignName).toBe('BMF2026 Launch');
+      expect(result.data[2].campaignName).toBe('Q1 Promo');
+    });
+
+    it('should sort by Campaign_Name ascending', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({
+        sortBy: 'Campaign_Name',
+        sortOrder: 'asc',
+      });
+
+      expect(result.data[0].campaignName).toBe('BMF2026 Launch');
+      expect(result.data[1].campaignName).toBe('Q1 Promo');
+      expect(result.data[2].campaignName).toBe('Welcome Series');
+    });
+
+    it('should sort by Delivered descending', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({
+        sortBy: 'Delivered',
+        sortOrder: 'desc',
+      });
+
+      expect(result.data[0].delivered).toBe(1000);
+      expect(result.data[1].delivered).toBe(500);
+      expect(result.data[2].delivered).toBe(250);
+    });
+
+    it('should sort by Open_Rate', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({
+        sortBy: 'Open_Rate',
+        sortOrder: 'desc',
+      });
+
+      expect(result.data[0].openRate).toBe(40);
+      expect(result.data[1].openRate).toBe(36);
+    });
+
+    it('should correctly parse campaign stats item fields', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats();
+      const campaign = result.data.find((c) => c.campaignId === 100);
+
+      expect(campaign).toBeDefined();
+      expect(campaign?.campaignId).toBe(100);
+      expect(campaign?.campaignName).toBe('BMF2026 Launch');
+      expect(campaign?.delivered).toBe(1000);
+      expect(campaign?.opened).toBe(450);
+      expect(campaign?.clicked).toBe(120);
+      expect(campaign?.uniqueOpens).toBe(400);
+      expect(campaign?.uniqueClicks).toBe(100);
+      expect(campaign?.openRate).toBe(40);
+      expect(campaign?.clickRate).toBe(10);
+      expect(campaign?.hardBounce).toBe(0);
+      expect(campaign?.firstEvent).toBe('2026-01-15T10:00:00.000Z');
+      expect(campaign?.lastUpdated).toBe('2026-01-30T15:30:00.000Z');
+    });
+  });
+
+  describe('getCampaignStatsById', () => {
+    it('should return null when campaign not found', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },
+      });
+
+      const result = await campaignStatsService.getCampaignStatsById(999);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return campaign stats when found', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Test Campaign', '1000', '450', '120', '400', '100', '40', '10', '5', '2', '1', '0', '2026-01-15T10:00:00.000Z', '2026-01-30T15:30:00.000Z'],
+          ],
+        },
+      });
+
+      const result = await campaignStatsService.getCampaignStatsById(100);
+
+      expect(result).not.toBeNull();
+      expect(result?.campaignId).toBe(100);
+      expect(result?.campaignName).toBe('Test Campaign');
+      expect(result?.delivered).toBe(1000);
+      expect(result?.hardBounce).toBe(5);
+      expect(result?.softBounce).toBe(2);
+      expect(result?.unsubscribe).toBe(1);
+      expect(result?.spam).toBe(0);
+    });
+
+    it('should include all future columns even if 0', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Test', '100', '50', '20', '40', '15', '40', '15', '0', '0', '0', '0', '2026-01-01', '2026-01-30'],
+          ],
+        },
+      });
+
+      const result = await campaignStatsService.getCampaignStatsById(100);
+
+      expect(result?.hardBounce).toBe(0);
+      expect(result?.softBounce).toBe(0);
+      expect(result?.unsubscribe).toBe(0);
+      expect(result?.spam).toBe(0);
+    });
+  });
+
+  describe('getCampaignEvents', () => {
+    const mockEventsData = [
+      ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event', 'Event_At', 'Sent_At', 'URL', 'Tag', 'Segment_IDs', 'Created_At'],
+      ['1001', '100', 'BMF2026', 'user1@example.com', 'delivered', '2026-01-30T10:00:00.000Z', '2026-01-30T09:55:00.000Z', '', '', '[]', '2026-01-30T10:00:00.000Z'],
+      ['1002', '100', 'BMF2026', 'user1@example.com', 'opened', '2026-01-30T10:05:00.000Z', '', '', '', '[]', '2026-01-30T10:05:00.000Z'],
+      ['1003', '100', 'BMF2026', 'user1@example.com', 'click', '2026-01-30T10:10:00.000Z', '', 'https://example.com/promo', '', '[]', '2026-01-30T10:10:00.000Z'],
+      ['1004', '200', 'Other Campaign', 'user2@example.com', 'delivered', '2026-01-30T11:00:00.000Z', '', '', '', '[]', '2026-01-30T11:00:00.000Z'],
+      ['1005', '100', 'BMF2026', 'user2@example.com', 'opened', '2026-01-29T08:00:00.000Z', '', '', '', '[]', '2026-01-29T08:00:00.000Z'],
+    ];
+
+    it('should return empty array when no events for campaign', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(999);
+
+      expect(result.data).toEqual([]);
+      expect(result.pagination.total).toBe(0);
+    });
+
+    it('should return events for specific campaign only', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100);
+
+      expect(result.data.length).toBe(4); // Events for campaign 100 only
+      expect(result.pagination.total).toBe(4);
+    });
+
+    it('should apply pagination correctly', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100, { page: 1, limit: 2 });
+
+      expect(result.data.length).toBe(2);
+      expect(result.pagination.total).toBe(4);
+      expect(result.pagination.totalPages).toBe(2);
+      expect(result.pagination.hasNext).toBe(true);
+    });
+
+    it('should filter by event type', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100, { event: 'opened' });
+
+      expect(result.data.length).toBe(2); // Two opened events for campaign 100
+      expect(result.data.every((e) => e.event === 'opened')).toBe(true);
+    });
+
+    it('should filter by dateFrom', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100, {
+        dateFrom: '2026-01-30',
+      });
+
+      expect(result.data.length).toBe(3); // Only events on Jan 30
+    });
+
+    it('should filter by dateTo', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100, {
+        dateTo: '2026-01-29T23:59:59.999Z',
+      });
+
+      expect(result.data.length).toBe(1); // Only the Jan 29 event
+    });
+
+    it('should sort events by eventAt descending', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100);
+
+      // Newest first
+      expect(new Date(result.data[0].eventAt).getTime()).toBeGreaterThan(
+        new Date(result.data[result.data.length - 1].eventAt).getTime()
+      );
+    });
+
+    it('should correctly parse event item fields', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100);
+      const clickEvent = result.data.find((e) => e.event === 'click');
+
+      expect(clickEvent).toBeDefined();
+      expect(clickEvent?.eventId).toBe(1003);
+      expect(clickEvent?.email).toBe('user1@example.com');
+      expect(clickEvent?.event).toBe('click');
+      expect(clickEvent?.eventAt).toBe('2026-01-30T10:10:00.000Z');
+      expect(clickEvent?.url).toBe('https://example.com/promo');
+    });
+
+    it('should return null URL for non-click events', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100);
+      const deliveredEvent = result.data.find((e) => e.event === 'delivered');
+
+      expect(deliveredEvent?.url).toBeNull();
+    });
+  });
+
+  // ===========================================
+  // Performance Tests (AC5)
+  // ===========================================
+
+  describe('Performance (AC5)', () => {
+    /**
+     * Generate mock campaign stats data for performance testing
+     * @param count Number of campaigns to generate
+     */
+    const generateMockCampaigns = (count: number) => {
+      const header = [
+        'Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked',
+        'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate',
+        'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam',
+        'First_Event', 'Last_Updated',
+      ];
+
+      const rows = [];
+      for (let i = 1; i <= count; i++) {
+        rows.push([
+          i,                                    // Campaign_ID
+          `Campaign ${i}`,                      // Campaign_Name
+          1000 + i,                             // Delivered
+          400 + i,                              // Opened
+          100 + i,                              // Clicked
+          350 + i,                              // Unique_Opens
+          80 + i,                               // Unique_Clicks
+          35 + (i % 10),                        // Open_Rate
+          8 + (i % 5),                          // Click_Rate
+          0,                                    // Hard_Bounce
+          0,                                    // Soft_Bounce
+          0,                                    // Unsubscribe
+          0,                                    // Spam
+          `2026-01-${String(1 + (i % 28)).padStart(2, '0')}T10:00:00.000Z`, // First_Event
+          `2026-01-30T15:${String(i % 60).padStart(2, '0')}:00.000Z`,       // Last_Updated
+        ]);
+      }
+
+      return [header, ...rows];
+    };
+
+    it('should process 100 campaigns in under 2 seconds (AC5)', async () => {
+      const mockData = generateMockCampaigns(100);
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockData },
+      });
+
+      const startTime = Date.now();
+      const result = await campaignStatsService.getAllCampaignStats({
+        page: 1,
+        limit: 100,
+      });
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      // Assert performance requirement: < 2000ms (2 seconds)
+      expect(duration).toBeLessThan(2000);
+      expect(result.data.length).toBe(100);
+      expect(result.pagination.total).toBe(100);
+    });
+
+    it('should process 100 campaigns with search filter in under 2 seconds', async () => {
+      const mockData = generateMockCampaigns(100);
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockData },
+      });
+
+      const startTime = Date.now();
+      const result = await campaignStatsService.getAllCampaignStats({
+        page: 1,
+        limit: 100,
+        search: 'Campaign 5', // Should match Campaign 5, 50, 51-59
+      });
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      expect(duration).toBeLessThan(2000);
+      // Search should filter results
+      expect(result.data.every((c) => c.campaignName.includes('Campaign 5'))).toBe(true);
+    });
+
+    it('should process 100 campaigns with sorting in under 2 seconds', async () => {
+      const mockData = generateMockCampaigns(100);
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockData },
+      });
+
+      const startTime = Date.now();
+      const result = await campaignStatsService.getAllCampaignStats({
+        page: 1,
+        limit: 100,
+        sortBy: 'Delivered',
+        sortOrder: 'desc',
+      });
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      expect(duration).toBeLessThan(2000);
+      expect(result.data.length).toBe(100);
+      // Verify sorting - first should have highest delivered count
+      expect(result.data[0].delivered).toBeGreaterThanOrEqual(result.data[99].delivered);
+    });
+
+    it('should process 100 campaigns with date range filter in under 2 seconds', async () => {
+      const mockData = generateMockCampaigns(100);
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockData },
+      });
+
+      const startTime = Date.now();
+      const result = await campaignStatsService.getAllCampaignStats({
+        page: 1,
+        limit: 100,
+        dateFrom: '2026-01-10',
+        dateTo: '2026-01-20',
+      });
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      expect(duration).toBeLessThan(2000);
+      // All returned campaigns should be within date range
+      result.data.forEach((campaign) => {
+        const eventDate = new Date(campaign.firstEvent);
+        expect(eventDate.getTime()).toBeGreaterThanOrEqual(new Date('2026-01-10').getTime());
+        expect(eventDate.getTime()).toBeLessThanOrEqual(new Date('2026-01-20').getTime());
+      });
+    });
+
+    it('should handle 200 campaigns with pagination efficiently', async () => {
+      const mockData = generateMockCampaigns(200);
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockData },
+      });
+
+      const startTime = Date.now();
+      const result = await campaignStatsService.getAllCampaignStats({
+        page: 2,
+        limit: 50,
+      });
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      expect(duration).toBeLessThan(2000);
+      expect(result.data.length).toBe(50);
+      expect(result.pagination.total).toBe(200);
+      expect(result.pagination.page).toBe(2);
+      expect(result.pagination.totalPages).toBe(4);
+    });
+  });
 });

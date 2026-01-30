@@ -876,3 +876,94 @@ export interface GetAllStatusHistoryOptions {
   status?: string[];             // Filter by status values
   changedBy?: string;            // LINE User ID or 'System'
 }
+
+// ============================================================================
+// Campaign Stats Types (Story 5-2)
+// ============================================================================
+
+/**
+ * Campaign Statistics Item
+ * Single campaign with aggregated email metrics
+ */
+export interface CampaignStatsItem {
+  campaignId: number;
+  campaignName: string;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  uniqueOpens: number;
+  uniqueClicks: number;
+  openRate: number;              // Percentage (0-100)
+  clickRate: number;             // Percentage (0-100)
+  hardBounce: number;            // Future (default 0)
+  softBounce: number;            // Future (default 0)
+  unsubscribe: number;           // Future (default 0)
+  spam: number;                  // Future (default 0)
+  firstEvent: string;            // ISO 8601
+  lastUpdated: string;           // ISO 8601
+}
+
+/**
+ * Campaign Stats List Response
+ * GET /api/admin/campaigns/stats
+ */
+export interface CampaignStatsListResponse {
+  data: CampaignStatsItem[];
+  pagination: PaginationMeta;
+}
+
+/**
+ * Campaign Event Item
+ * Single event in campaign event log
+ */
+export interface CampaignEventItem {
+  eventId: number;
+  email: string;
+  event: string;                 // delivered | opened | click
+  eventAt: string;               // ISO 8601
+  url: string | null;            // URL for click events
+}
+
+/**
+ * Campaign Events Response
+ * GET /api/admin/campaigns/:id/events
+ */
+export interface CampaignEventsResponse {
+  data: CampaignEventItem[];
+  pagination: PaginationMeta;
+}
+
+/**
+ * Campaign Stats Query Parameters
+ * GET /api/admin/campaigns/stats
+ */
+export interface CampaignStatsQueryParams extends PaginationQueryParams {
+  search?: string;               // Search by Campaign_Name (case-insensitive)
+  dateFrom?: string;             // Filter by First_Event >= dateFrom
+  dateTo?: string;               // Filter by First_Event <= dateTo
+  sortBy?: CampaignStatsSortBy;
+  sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * Valid sortBy options for Campaign Stats
+ */
+export type CampaignStatsSortBy =
+  | 'Last_Updated'
+  | 'First_Event'
+  | 'Campaign_Name'
+  | 'Delivered'
+  | 'Opened'
+  | 'Clicked'
+  | 'Open_Rate'
+  | 'Click_Rate';
+
+/**
+ * Campaign Events Query Parameters
+ * GET /api/admin/campaigns/:id/events
+ */
+export interface CampaignEventsQueryParams extends PaginationQueryParams {
+  event?: string;                // Filter by event type (delivered/opened/click)
+  dateFrom?: string;             // Filter by Event_At >= dateFrom
+  dateTo?: string;               // Filter by Event_At <= dateTo
+}

@@ -138,7 +138,7 @@ development_status:
   5-1-campaign-webhook-backend: done  # POST /webhook/brevo/campaign + Sheets storage - Code review APPROVED (2026-01-30)
   5-2-campaign-stats-api: done                 # GET /api/admin/campaigns/stats + /campaigns/:id/events - Code review APPROVED (2026-01-30)
   # Frontend Features
-  5-3-campaign-summary-cards: backlog          # F-05.F1: Total Campaigns, Delivered, Opened, Clicked
+  5-3-campaign-summary-cards: in-progress       # F-05.F1: Total Campaigns, Delivered, Opened, Clicked - Started 2026-01-30
   5-4-campaign-table: backlog                  # F-05.F2: Campaign list with metrics
   5-5-open-click-rates: backlog                # F-05.F3: Open Rate & Click Rate display
   5-6-campaign-performance-chart: backlog      # F-05.F4: Bar chart comparison

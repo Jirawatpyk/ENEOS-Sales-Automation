@@ -14,7 +14,7 @@
 │   EPIC-02: Dashboard Overview                                    │
 │   EPIC-03: Sales Team Performance                                │
 │   EPIC-04: Lead Management                                       │
-│   EPIC-05: Campaign Analytics                                    │
+│   EPIC-05: Campaign Analytics (Email Metrics)                    │
 │   EPIC-06: Export & Reports                                      │
 │   EPIC-07: System Settings                                       │
 │                                                                  │
@@ -307,40 +307,184 @@ eneos-sales-automation/src/
 
 ---
 
-## EPIC-05: Campaign Analytics
+## EPIC-05: Campaign Analytics (Email Metrics)
 
 ### Description
-หน้าวิเคราะห์ประสิทธิภาพของ Email Campaign
+ระบบวิเคราะห์ประสิทธิภาพ Email Campaign โดยรับข้อมูลจาก Brevo Campaign Events Webhook (delivered/opened/click) แยกจาก Workflow Automation webhook ที่ใช้สร้าง Lead
 
 ### Business Value
-- วัดผล ROI ของแต่ละ Campaign
-- หา Campaign ที่ทำงานได้ดี
-- ปรับปรุง Campaign ในอนาคต
+- วัดผล Email Campaign: ส่งกี่คน, เปิดกี่คน, คลิกกี่คน
+- คำนวณ Open Rate และ Click Rate
+- ปรับปรุง Email Campaign ในอนาคต
+- แยก metrics ออกจาก Lead data เพื่อความแม่นยำ
+
+### Data Flow
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Brevo Campaign Events                                          │
+│  (delivered, opened, click)                                     │
+│           │                                                     │
+│           ▼                                                     │
+│  POST /webhook/brevo/campaign                                   │
+│           │                                                     │
+│           ├──→ Campaign_Events sheet (detail log)               │
+│           │                                                     │
+│           └──→ Campaign_Stats sheet (aggregate)                 │
+│                    │                                            │
+│                    ▼                                            │
+│           GET /api/admin/campaigns/stats                        │
+│                    │                                            │
+│                    ▼                                            │
+│           Admin Dashboard (Frontend)                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Brevo Campaign Events Webhook Payload
+```json
+{
+  "URL": "https://myCampaignUrl.net",
+  "camp_id": 123,
+  "campaign name": "My First Campaign",
+  "date_event": "2020-10-09 00:00:00",
+  "date_sent": "2020-10-09 00:00:00",
+  "email": "example@domain.com",
+  "event": "click",
+  "id": 123,
+  "segment_ids": [1, 10],
+  "tag": "",
+  "ts": 1604937337,
+  "ts_event": 1604933737,
+  "ts_sent": 1604933619
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `camp_id` | number | Campaign ID |
+| `campaign name` | string | Campaign Name (มีช่องว่าง!) |
+| `email` | string | Contact email |
+| `event` | string | Event type: `delivered`, `opened`, `click` |
+| `id` | number | Event ID (unique) |
+| `date_event` | string | Event datetime (format: YYYY-MM-DD HH:mm:ss) |
+| `date_sent` | string | Email sent datetime |
+| `ts` | number | Timestamp (received) |
+| `ts_event` | number | Event timestamp (unix) |
+| `ts_sent` | number | Sent timestamp (unix) |
+| `URL` | string | Clicked URL (for click events only) |
+| `segment_ids` | number[] | Segment IDs |
+| `tag` | string | Tag (optional) |
+
+### Google Sheets Structure
+
+#### Tab: Campaign_Stats (Aggregate)
+| Column | Type | Description |
+|--------|------|-------------|
+| Campaign_ID | string | Brevo campaign ID |
+| Campaign_Name | string | Campaign name |
+| Delivered | number | Total delivered |
+| Opened | number | Total opened |
+| Clicked | number | Total clicked |
+| Unique_Opens | number | Unique contacts who opened |
+| Unique_Clicks | number | Unique contacts who clicked |
+| Open_Rate | number | Unique_Opens / Delivered * 100 |
+| Click_Rate | number | Unique_Clicks / Delivered * 100 |
+| Hard_Bounce | number | **Future** - Permanent delivery failures (default 0) |
+| Soft_Bounce | number | **Future** - Temporary delivery failures (default 0) |
+| Unsubscribe | number | **Future** - Recipient opt-outs (default 0) |
+| Spam | number | **Future** - Marked as spam (default 0) |
+| First_Event | datetime | First event received |
+| Last_Updated | datetime | Last update time |
+
+#### Tab: Campaign_Events (Detail Log)
+| Column | Type | Description |
+|--------|------|-------------|
+| Event_ID | number | Unique event ID จาก Brevo (`id` field) |
+| Campaign_ID | number | Brevo campaign ID (`camp_id`) |
+| Campaign_Name | string | Campaign name |
+| Email | string | Contact email |
+| Event | string | delivered / opened / click |
+| Event_At | datetime | Event timestamp (`date_event` หรือ `ts_event`) |
+| Sent_At | datetime | Email sent timestamp (`date_sent` หรือ `ts_sent`) |
+| URL | string | Clicked URL (for click events) |
+| Tag | string | Tag (optional) |
+| Segment_IDs | string | Segment IDs (JSON array as string) |
+| Created_At | datetime | Record created timestamp |
 
 ### Features
+
+#### Backend Features (Must Have - Prerequisite)
 | ID | Feature | Priority | Description |
 |----|---------|----------|-------------|
-| F-05.1 | Campaign Summary Cards | Must Have | สรุป Total Campaigns, Leads, Closed |
-| F-05.2 | Campaign Table | Must Have | ตารางแสดงผลแต่ละ Campaign |
-| F-05.3 | Conversion by Campaign | Must Have | % Conversion ของแต่ละ Campaign |
-| F-05.4 | Leads by Campaign Pie | Should Have | Pie chart สัดส่วน Lead |
-| F-05.5 | Campaign Comparison | Should Have | เปรียบเทียบ Campaign |
-| F-05.6 | Revenue Estimation | Could Have | ประมาณการรายได้ |
-| F-05.7 | Campaign Detail | Could Have | รายละเอียด Campaign |
-| F-05.8 | Period Comparison | Could Have | เปรียบเทียบ Quarter/Year |
+| F-05.B1 | Campaign Webhook Endpoint | Must Have | `POST /webhook/brevo/campaign` รับ events |
+| F-05.B2 | Campaign Event Validator | Must Have | Zod schema validate payload |
+| F-05.B3 | Campaign Stats Service | Must Have | Aggregate stats, write to Sheets |
+| F-05.B4 | Campaign Events Sheet | Must Have | เก็บ detail log ทุก event |
+| F-05.B5 | Campaign Stats Sheet | Must Have | เก็บ aggregate per campaign |
+| F-05.B6 | Duplicate Event Check | Should Have | ป้องกัน event ซ้ำ |
+| F-05.B7 | GET Campaigns Stats API | Must Have | `GET /api/admin/campaigns/stats` |
+| F-05.B8 | GET Campaign Events API | Should Have | `GET /api/admin/campaigns/:id/events` |
+
+#### Frontend Features
+| ID | Feature | Priority | Description |
+|----|---------|----------|-------------|
+| F-05.F1 | Campaign Summary Cards | Must Have | Total Campaigns, Delivered, Opened, Clicked |
+| F-05.F2 | Campaign Table | Must Have | ตาราง campaigns พร้อม metrics |
+| F-05.F3 | Open Rate & Click Rate | Must Have | แสดง % Open Rate, Click Rate |
+| F-05.F4 | Campaign Performance Chart | Should Have | Bar chart เปรียบเทียบ campaigns |
+| F-05.F5 | Campaign Detail Modal | Should Have | ดู event log ของ campaign |
+| F-05.F6 | Date Range Filter | Should Have | กรองตามช่วงเวลา |
+| F-05.F7 | Export Campaign Data | Could Have | Export เป็น Excel/CSV |
+
+### Backend Files to Create
+```
+eneos-sales-automation/src/
+├── validators/
+│   └── campaign-event.validator.ts    # Zod schema for Brevo campaign events
+├── services/
+│   └── campaign-stats.service.ts      # Stats logic + Sheets write
+├── controllers/
+│   └── campaign-webhook.controller.ts # Handle campaign events
+├── routes/
+│   └── campaign.routes.ts             # Route definitions
+└── __tests__/
+    ├── validators/campaign-event.validator.test.ts
+    ├── services/campaign-stats.service.test.ts
+    └── controllers/campaign-webhook.controller.test.ts
+```
 
 ### Acceptance Criteria
-- [ ] แสดงข้อมูล Campaign ทั้งหมดจาก Leads sheet
-- [ ] Campaign ID และ Name แสดงถูกต้อง
-- [ ] Conversion Rate คำนวณถูกต้อง
-- [ ] กราฟแสดงข้อมูลตรงกับตาราง
+
+#### Backend
+- [ ] `POST /webhook/brevo/campaign` รับ events ได้ (delivered, opened, click)
+- [ ] Validate payload ด้วย Zod schema
+- [ ] เขียนลง Campaign_Events sheet ทุก event
+- [ ] อัพเดท Campaign_Stats sheet (increment counters)
+- [ ] ป้องกัน duplicate events
+- [ ] `GET /api/admin/campaigns/stats` ส่งกลับ campaign list พร้อม metrics
+- [ ] `GET /api/admin/campaigns/:id/events` ส่งกลับ event log
+- [ ] Unit tests ครอบคลุม 80%+
+
+#### Frontend
+- [ ] Summary Cards แสดง Total Campaigns, Delivered, Opened, Clicked
+- [ ] Campaign Table แสดง Open Rate, Click Rate ถูกต้อง
+- [ ] Campaign Detail แสดง event log
+- [ ] Date filter ทำงานได้
+- [ ] หน้าโหลดไม่เกิน 3 วินาที
 
 ### Dependencies
-- Backend API: GET /api/admin/campaigns
-- Campaign data จาก Leads sheet
+- Google Sheets API (มีอยู่แล้ว)
+- sheets.service.ts (เพิ่ม methods ใหม่)
+- Brevo Campaign Events webhook configuration
 
 ### Estimated Effort
-**4 days**
+**6 days** (Backend: 3 days, Frontend: 3 days)
+
+### Implementation Order
+1. **Phase 1 (Backend):** Webhook + Sheets + API
+2. **Phase 2 (Frontend):** Dashboard UI
+
+### Status
+**Not Started**
 
 ---
 
@@ -540,10 +684,10 @@ if (!existsInTeam) {
 | EPIC-02: Dashboard Overview | P0 | 5 days | Not Started | - |
 | EPIC-03: Sales Performance | P1 | 4 days | Not Started | - |
 | EPIC-04: Lead Management | P1 | 4 days | Not Started | - |
-| EPIC-05: Campaign Analytics | P2 | 4 days | Not Started | - |
+| EPIC-05: Campaign Analytics (Email Metrics) | P2 | 6 days | Not Started | - |
 | EPIC-06: Export & Reports | P2 | 4 days | Not Started | - |
 | EPIC-07: System Settings | P3 | 4 days | Not Started | - |
-| **Total** | | **34 days** | **1/8 Complete (12.5%)** | |
+| **Total** | | **36 days** | **1/8 Complete (12.5%)** | |
 
 ---
 
@@ -563,15 +707,15 @@ if (!existsInTeam) {
 - EPIC-02: Dashboard Overview
 - EPIC-04: Lead Management (basic)
 
-### Phase 2 - 8 days
+### Phase 2 - 10 days
 - EPIC-03: Sales Performance
-- EPIC-05: Campaign Analytics
+- EPIC-05: Campaign Analytics (Email Metrics)
 
 ### Phase 3 - 6 days
 - EPIC-06: Export & Reports
 - EPIC-07: System Settings
 
-### Total Timeline: 32 days
+### Total Timeline: 36 days
 
 ---
 

@@ -28,6 +28,7 @@ import webhookRoutes from './routes/webhook.routes.js';
 import lineRoutes from './routes/line.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import statusRoutes from './routes/status.routes.js';
+import campaignRoutes from './routes/campaign.routes.js';
 import { sheetsService } from './services/sheets.service.js';
 import { geminiService } from './services/gemini.service.js';
 import { lineService } from './services/line.service.js';
@@ -258,6 +259,7 @@ app.get('/', (_req, res) => {
       health: '/health',
       ready: '/ready',
       brevoWebhook: '/webhook/brevo',
+      brevoCampaignWebhook: '/webhook/brevo/campaign',
       lineWebhook: '/webhook/line',
       adminDashboard: '/api/admin/dashboard',
       adminLeads: '/api/admin/leads',
@@ -298,9 +300,20 @@ app.get('/metrics/summary', async (_req, res) => {
   }
 });
 
-// Webhook routes
-app.use('/webhook', webhookRoutes);
+// ===========================================
+// Webhook Routes
+// ===========================================
+// Note: Routes are mounted in order of specificity
+// - /webhook/brevo/campaign - Campaign events (Brevo email metrics)
+// - /webhook/line - LINE bot webhooks
+// - /webhook - General webhooks (Brevo lead webhooks at /webhook/brevo)
+//
+// Campaign routes are mounted separately to avoid path conflicts
+// and allow independent rate limiting in the future
+// ===========================================
+app.use('/webhook/brevo/campaign', campaignRoutes);
 app.use('/webhook/line', lineRoutes);
+app.use('/webhook', webhookRoutes);
 
 // Admin Dashboard API routes
 app.use('/api/admin', adminRoutes);

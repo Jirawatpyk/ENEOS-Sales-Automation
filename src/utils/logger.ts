@@ -54,6 +54,7 @@ export const lineLogger = createModuleLogger('line');
 export const sheetsLogger = createModuleLogger('sheets');
 export const geminiLogger = createModuleLogger('gemini');
 export const dedupLogger = createModuleLogger('dedup');
+export const campaignLogger = createModuleLogger('campaign');
 
 // ===========================================
 // Request Logger Middleware Helper

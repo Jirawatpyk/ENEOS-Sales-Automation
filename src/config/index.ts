@@ -30,6 +30,8 @@ const envSchema = z.object({
   DEDUP_SHEET_NAME: z.string().default('Deduplication_Log'),
   SALES_TEAM_SHEET_NAME: z.string().default('Sales_Team'),
   STATUS_HISTORY_SHEET_NAME: z.string().default('Status_History'),
+  CAMPAIGN_EVENTS_SHEET_NAME: z.string().default('Campaign_Events'),
+  CAMPAIGN_STATS_SHEET_NAME: z.string().default('Campaign_Stats'),
 
   // Gemini
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
@@ -135,6 +137,8 @@ export const config = {
       dedup: env.DEDUP_SHEET_NAME,
       salesTeam: env.SALES_TEAM_SHEET_NAME,
       statusHistory: env.STATUS_HISTORY_SHEET_NAME,
+      campaignEvents: env.CAMPAIGN_EVENTS_SHEET_NAME,
+      campaignStats: env.CAMPAIGN_STATS_SHEET_NAME,
     },
   },
 

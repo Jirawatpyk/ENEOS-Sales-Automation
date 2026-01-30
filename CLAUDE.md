@@ -172,7 +172,7 @@ src/
 
 ## Google Sheets Structure
 
-ระบบต้องการ 4 Sheets หลัก:
+ระบบต้องการ 6 Sheets หลัก:
 
 1. **Leads** (Main database)
    - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version, Lead_Source, Job_Title, City, Lead_UUID, Created_At, Updated_At, Contacted_At, Juristic_ID, DBD_Sector, Province, Full_Address
@@ -192,6 +192,18 @@ src/
    - **Fire-and-forget:** History writes are async to not block main operations
    - **Fallback:** Legacy leads without history use reconstructed timestamps
    - **UUID Migration:** Uses Lead_UUID (not row number) for Supabase compatibility
+
+5. **Campaign_Events** (Brevo Campaign Event Log)
+   - Columns: Event_ID, Campaign_ID, Campaign_Name, Email, Event, Event_At, Sent_At, URL, Tag, Segment_IDs, Created_At
+   - **Purpose:** Store raw events from Brevo Campaign webhook (delivered, opened, click)
+   - **Deduplication:** Event_ID is unique - prevents duplicate event processing
+   - **Source:** POST /webhook/brevo/campaign
+
+6. **Campaign_Stats** (Campaign Aggregate Metrics)
+   - Columns: Campaign_ID, Campaign_Name, Delivered, Opened, Clicked, Unique_Opens, Unique_Clicks, Open_Rate, Click_Rate, Hard_Bounce, Soft_Bounce, Unsubscribe, Spam, First_Event, Last_Updated
+   - **Purpose:** Aggregated stats per campaign for Admin Dashboard
+   - **Rates:** Open_Rate = Unique_Opens / Delivered * 100, Click_Rate = Unique_Clicks / Delivered * 100
+   - **Future columns:** Hard_Bounce, Soft_Bounce, Unsubscribe, Spam (prepared but not enabled)
 
 ## Environment Variables
 

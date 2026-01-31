@@ -155,8 +155,8 @@ development_status:
   6-1-export-to-excel: done          # Backend bugfixes: ExcelJS import, filename format, Thai font support - Code review passed (2026-01-27)
   6-2-export-to-pdf: done  # Code review APPROVED 2026-01-31 - PDF preview modal, viewer, 9 review fixes + TEA guardrails (72 tests total)
   6-3-quick-reports: done  # Code review APPROVED 2026-01-31 - Quick report presets (Daily/Weekly/Monthly), 43 tests, all review fixes applied
-  6-4-custom-date-range: ready-for-dev  # Story created 2026-01-31 - Enhanced date presets + validation + record count
-  6-5-select-data-fields: backlog
+  6-4-custom-date-range: done  # Code review APPROVED 2026-02-01 - 57 tests, all review fixes applied (M1 useDeferredValue, M2 act(), L3 negative range)
+  6-5-select-data-fields: ready-for-dev  # Story created 2026-01-31 - Field selection UI + backend column filtering
   6-6-export-history: backlog
   6-7-scheduled-reports: backlog
   6-8-export-to-csv: backlog

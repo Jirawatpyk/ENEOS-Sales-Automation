@@ -103,9 +103,11 @@ export async function getDashboard(
           closed: 0,
         });
       }
-      const trend = trendMap.get(dateKey)!;
-      trend.newLeads++;
-      if (lead.status === 'closed') {trend.closed++;}
+      const trend = trendMap.get(dateKey);
+      if (trend) {
+        trend.newLeads++;
+        if (lead.status === 'closed') {trend.closed++;}
+      }
     });
 
     const dailyTrends = Array.from(trendMap.values()).sort((a, b) =>
@@ -117,14 +119,15 @@ export async function getDashboard(
     leads
       .filter((lead) => lead.salesOwnerId)
       .forEach((lead) => {
-        if (!salesMap.has(lead.salesOwnerId!)) {
-          salesMap.set(lead.salesOwnerId!, {
+        const ownerId = lead.salesOwnerId as string;
+        if (!salesMap.has(ownerId)) {
+          salesMap.set(ownerId, {
             leads: [],
             name: lead.salesOwnerName || 'Unknown',
             email: undefined,
           });
         }
-        salesMap.get(lead.salesOwnerId!)!.leads.push(lead);
+        salesMap.get(ownerId)?.leads.push(lead);
       });
 
     const topSales: TopSalesPerson[] = Array.from(salesMap.entries())

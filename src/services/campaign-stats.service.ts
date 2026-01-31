@@ -553,7 +553,7 @@ export class CampaignStatsService {
         let campaigns: CampaignStatsItem[] = [];
         for (let i = 1; i < values.length; i++) {
           const row = values[i];
-          if (!row || !row[0]) continue;
+          if (!row || !row[0]) { continue; }
 
           const item = this.rowToCampaignStatsItem(row);
           campaigns.push(item);
@@ -645,14 +645,14 @@ export class CampaignStatsService {
         const toTime = dateTo ? new Date(dateTo).getTime() : undefined;
 
         // Parse and filter rows (single pass)
-        let events: CampaignEventItem[] = [];
+        const events: CampaignEventItem[] = [];
         for (let i = 1; i < values.length; i++) {
           const row = values[i];
-          if (!row || !row[0]) continue;
+          if (!row || !row[0]) { continue; }
 
           // Filter by campaign ID
           const rowCampaignId = Number(row[CAMPAIGN_EVENTS_COLUMNS.CAMPAIGN_ID]);
-          if (rowCampaignId !== campaignId) continue;
+          if (rowCampaignId !== campaignId) { continue; }
 
           const item = this.rowToCampaignEventItem(row);
 
@@ -721,18 +721,18 @@ export class CampaignStatsService {
     dateFrom?: string,
     dateTo?: string
   ): CampaignStatsItem[] {
-    if (!search && !dateFrom && !dateTo) return campaigns;
+    if (!search && !dateFrom && !dateTo) { return campaigns; }
 
     const searchLower = search ? search.toLowerCase() : undefined;
     const fromTime = dateFrom ? new Date(dateFrom).getTime() : undefined;
     const toTime = dateTo ? new Date(dateTo).getTime() : undefined;
 
     return campaigns.filter((c) => {
-      if (searchLower && !c.campaignName.toLowerCase().includes(searchLower)) return false;
+      if (searchLower && !c.campaignName.toLowerCase().includes(searchLower)) { return false; }
       if (fromTime !== undefined || toTime !== undefined) {
         const eventTime = new Date(c.firstEvent).getTime();
-        if (fromTime !== undefined && eventTime < fromTime) return false;
-        if (toTime !== undefined && eventTime > toTime) return false;
+        if (fromTime !== undefined && eventTime < fromTime) { return false; }
+        if (toTime !== undefined && eventTime > toTime) { return false; }
       }
       return true;
     });
@@ -748,12 +748,12 @@ export class CampaignStatsService {
     fromTime?: number,
     toTime?: number
   ): boolean {
-    if (eventFilter && item.event !== eventFilter) return false;
+    if (eventFilter && item.event !== eventFilter) { return false; }
 
     if (fromTime !== undefined || toTime !== undefined) {
       const eventTime = new Date(item.eventAt).getTime();
-      if (fromTime !== undefined && eventTime < fromTime) return false;
-      if (toTime !== undefined && eventTime > toTime) return false;
+      if (fromTime !== undefined && eventTime < fromTime) { return false; }
+      if (toTime !== undefined && eventTime > toTime) { return false; }
     }
 
     return true;

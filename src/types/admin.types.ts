@@ -54,7 +54,7 @@ export interface PaginationMeta {
  * Period Information
  */
 export interface PeriodInfo {
-  type: 'today' | 'yesterday' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
+  type: 'today' | 'yesterday' | 'week' | 'lastWeek' | 'month' | 'lastMonth' | 'quarter' | 'year' | 'custom';
   startDate: string; // ISO 8601
   endDate: string;   // ISO 8601
 }

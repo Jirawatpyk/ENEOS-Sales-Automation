@@ -38,8 +38,22 @@ export function parsePeriod(
       break;
     }
 
+    case 'lastWeek': {
+      const dow = now.getDay();
+      const diffMon = dow === 0 ? 6 : dow - 1;
+      // This Monday minus 7 days = last Monday
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffMon - 7);
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffMon - 1, 23, 59, 59, 999);
+      break;
+    }
+
     case 'month':
       start = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+
+    case 'lastMonth':
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999); // Last day of previous month
       break;
 
     case 'quarter': {
@@ -111,10 +125,24 @@ export function getPreviousPeriod(currentPeriod: PeriodInfo): PeriodInfo {
       break;
     }
 
+    case 'lastWeek': {
+      // Two weeks ago (7 days before last week)
+      prevStart = new Date(start.getTime() - MS_PER_WEEK);
+      prevEnd = new Date(end.getTime() - MS_PER_WEEK);
+      break;
+    }
+
     case 'month': {
       // Last month (use local time consistent with parsePeriod)
       prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
       prevEnd = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59, 999); // Last day of previous month
+      break;
+    }
+
+    case 'lastMonth': {
+      // Two months ago
+      prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+      prevEnd = new Date(start.getFullYear(), start.getMonth(), 0, 23, 59, 59, 999);
       break;
     }
 

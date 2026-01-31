@@ -432,8 +432,8 @@ describe('API Contract Tests', () => {
       expect(SORT_ORDERS).toContain('desc');
     });
 
-    it('should have exactly 7 period options', () => {
-      expect(VALID_PERIODS).toHaveLength(7);
+    it('should have exactly 9 period options', () => {
+      expect(VALID_PERIODS).toHaveLength(9);
     });
 
     it('should have 5 leads sort options (including createdAt alias and salesOwnerName)', () => {

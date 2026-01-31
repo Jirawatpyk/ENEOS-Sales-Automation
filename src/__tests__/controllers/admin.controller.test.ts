@@ -458,6 +458,16 @@ describe('Admin Controller', () => {
   // Activity Timestamp Selection (getActivityTimestamp helper)
   // ===========================================
   describe('Activity Timestamp Selection', () => {
+    beforeEach(() => {
+      // Freeze time to Jan 20 so hardcoded January dates fall within "month" period
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-20T12:00:00.000Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('should use closedAt for closed status in recentActivity', async () => {
       const req = createMockRequest();
       const res = createMockResponse();
@@ -1426,6 +1436,10 @@ describe('Admin Controller', () => {
     });
 
     it('should calculate month period comparison correctly', async () => {
+      // Freeze time to mid-month so thisMonth dates are within range
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-20T12:00:00.000Z'));
+
       const req = createMockRequest({ query: { period: 'month' } });
       const res = createMockResponse();
       const next = createMockNext();
@@ -1454,6 +1468,8 @@ describe('Admin Controller', () => {
       expect(response.data.summary.totalLeads).toBe(3); // 3 this month
       expect(response.data.summary.changes.totalLeads).toBe(-50); // (3-6)/6 * 100 = -50%
       expect(response.data.summary.changes.closed).toBe(-50); // (1-2)/2 * 100 = -50%
+
+      vi.useRealTimers();
     });
 
     it('should handle custom period with same duration before', async () => {

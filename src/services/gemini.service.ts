@@ -367,6 +367,7 @@ export class GeminiService {
       tools: [
         {
           google_search: {}, // Google Search grounding tool (v1beta API)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any, // Beta API workaround - SDK type definition incomplete
       ],
     });
@@ -563,6 +564,7 @@ export class GeminiService {
       const industry = parsed.industry || DEFAULT_ANALYSIS.industry;
 
       // Helper: normalize "Unknown" values to null
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalizeValue = (value: any): string | null => {
         if (!value || value === 'Unknown' || value === 'unknown' || value === 'ไม่ระบุ') {
           return null;
@@ -672,10 +674,10 @@ export class GeminiService {
   private calculateConfidence(
     domain: string,
     companyName: string,
-    parsed: any,
+    parsed: Record<string, unknown>,
     _dbdSector: string | null,
     geminiSector: string | null
-  ): { score: number; factors: any } {
+  ): { score: number; factors: NonNullable<CompanyAnalysis['confidenceFactors']> } {
     let score = 100; // Start with perfect score
 
     // Check if domain exists and is valid

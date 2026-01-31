@@ -71,7 +71,7 @@ export async function getCampaigns(
       if (!campaignMap.has(lead.campaignId)) {
         campaignMap.set(lead.campaignId, []);
       }
-      campaignMap.get(lead.campaignId)!.push(lead);
+      campaignMap.get(lead.campaignId)?.push(lead);
     });
 
     // สร้าง campaign items
@@ -101,9 +101,11 @@ export async function getCampaigns(
         if (!trendMap.has(weekKey)) {
           trendMap.set(weekKey, { leads: 0, closed: 0 });
         }
-        const trend = trendMap.get(weekKey)!;
-        trend.leads++;
-        if (lead.status === 'closed') {trend.closed++;}
+        const trend = trendMap.get(weekKey);
+        if (trend) {
+          trend.leads++;
+          if (lead.status === 'closed') {trend.closed++;}
+        }
       });
 
       const trend = Array.from(trendMap.entries()).map(([week, data]) => ({
@@ -315,13 +317,14 @@ export async function getCampaignDetail(
     campaignLeads
       .filter((lead) => lead.salesOwnerId)
       .forEach((lead) => {
-        if (!salesMap.has(lead.salesOwnerId!)) {
-          salesMap.set(lead.salesOwnerId!, {
+        const ownerId = lead.salesOwnerId as string;
+        if (!salesMap.has(ownerId)) {
+          salesMap.set(ownerId, {
             leads: [],
             name: lead.salesOwnerName || 'Unknown',
           });
         }
-        salesMap.get(lead.salesOwnerId!)!.leads.push(lead);
+        salesMap.get(ownerId)?.leads.push(lead);
       });
 
     const leadsBySales = Array.from(salesMap.entries()).map(([id, data]) => ({
@@ -338,9 +341,11 @@ export async function getCampaignDetail(
       if (!dailyMap.has(dateKey)) {
         dailyMap.set(dateKey, { claimed: 0, closed: 0 });
       }
-      const daily = dailyMap.get(dateKey)!;
-      if (lead.salesOwnerId) {daily.claimed++;}
-      if (lead.status === 'closed') {daily.closed++;}
+      const daily = dailyMap.get(dateKey);
+      if (daily) {
+        if (lead.salesOwnerId) {daily.claimed++;}
+        if (lead.status === 'closed') {daily.closed++;}
+      }
     });
 
     const dailyTrend = Array.from(dailyMap.entries())

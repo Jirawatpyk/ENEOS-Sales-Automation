@@ -99,14 +99,16 @@ describe('Admin Constants', () => {
       expect(VALID_PERIODS).toContain('today');
       expect(VALID_PERIODS).toContain('yesterday');
       expect(VALID_PERIODS).toContain('week');
+      expect(VALID_PERIODS).toContain('lastWeek');
       expect(VALID_PERIODS).toContain('month');
+      expect(VALID_PERIODS).toContain('lastMonth');
       expect(VALID_PERIODS).toContain('quarter');
       expect(VALID_PERIODS).toContain('year');
       expect(VALID_PERIODS).toContain('custom');
     });
 
-    it('should have exactly 7 period options', () => {
-      expect(VALID_PERIODS).toHaveLength(7);
+    it('should have exactly 9 period options', () => {
+      expect(VALID_PERIODS).toHaveLength(9);
     });
 
     it('should be readonly array', () => {

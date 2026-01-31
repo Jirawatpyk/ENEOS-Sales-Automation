@@ -3,7 +3,7 @@
  * End-to-end tests for async lead processing flow
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
 import { processingStatusService } from '../../services/processing-status.service.js';

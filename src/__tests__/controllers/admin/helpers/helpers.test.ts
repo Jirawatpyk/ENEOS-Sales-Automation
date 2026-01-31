@@ -108,6 +108,43 @@ describe('Admin Controller Helpers', () => {
       const result = parsePeriod('unknown');
       expect(result.type).toBe('month');
     });
+
+    it('should parse "lastWeek" period', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-20T12:00:00.000Z'));
+
+      const result = parsePeriod('lastWeek');
+      expect(result.type).toBe('lastWeek');
+
+      const start = new Date(result.startDate);
+      const end = new Date(result.endDate);
+      // Mon 00:00 to Sun 23:59:59 ≈ 7 days
+      const durationDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
+      expect(durationDays).toBe(7);
+
+      // start should be a Monday (getDay() = 1)
+      expect(start.getDay()).toBe(1);
+
+      vi.useRealTimers();
+    });
+
+    it('should parse "lastMonth" period', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-02-15T12:00:00.000Z'));
+
+      const result = parsePeriod('lastMonth');
+      expect(result.type).toBe('lastMonth');
+
+      const start = new Date(result.startDate);
+      const end = new Date(result.endDate);
+      // Last month: Jan 1 - Jan 31 (local time)
+      expect(start.getMonth()).toBe(0); // January
+      expect(start.getDate()).toBe(1);
+      // End should be last day of January
+      expect(end.getDate()).toBe(31);
+
+      vi.useRealTimers();
+    });
   });
 
   describe('getPreviousPeriod', () => {
@@ -118,13 +155,48 @@ describe('Admin Controller Helpers', () => {
 
       const todayStart = new Date(today.startDate);
       const prevStart = new Date(previous.startDate);
-      expect(todayStart.getDate() - prevStart.getDate()).toBe(1);
+      // Use ms difference instead of getDate() which breaks at month boundaries
+      const diffMs = todayStart.getTime() - prevStart.getTime();
+      const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+      expect(diffDays).toBe(1);
     });
 
     it('should return last month for month period', () => {
       const month = parsePeriod('month');
       const previous = getPreviousPeriod(month);
       expect(previous.type).toBe('month');
+    });
+
+    it('should return two months ago for lastMonth period', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-02-15T12:00:00.000Z'));
+
+      const lastMonth = parsePeriod('lastMonth');
+      const previous = getPreviousPeriod(lastMonth);
+      expect(previous.type).toBe('lastMonth');
+
+      const prevStart = new Date(previous.startDate);
+      // Previous of lastMonth (Jan) = December
+      expect(prevStart.getMonth()).toBe(11); // December (local)
+
+      vi.useRealTimers();
+    });
+
+    it('should return two weeks ago for lastWeek period', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-20T12:00:00.000Z'));
+
+      const lastWeek = parsePeriod('lastWeek');
+      const previous = getPreviousPeriod(lastWeek);
+      expect(previous.type).toBe('lastWeek');
+
+      const prevStart = new Date(previous.startDate);
+      const lastWeekStart = new Date(lastWeek.startDate);
+      const diffMs = lastWeekStart.getTime() - prevStart.getTime();
+      const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+      expect(diffDays).toBe(7);
+
+      vi.useRealTimers();
     });
   });
 

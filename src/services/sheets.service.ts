@@ -1109,7 +1109,7 @@ export class SheetsService {
         logger.info('Unlinked LINE accounts retrieved', { count: unlinkedAccounts.length });
 
         return unlinkedAccounts.map((account) => ({
-          lineUserId: account.lineUserId!,
+          lineUserId: account.lineUserId as string,
           name: account.name,
           createdAt: account.createdAt,
         }));

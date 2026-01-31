@@ -78,10 +78,11 @@ export async function getSalesPerformance(
     leads
       .filter((lead) => lead.salesOwnerId)
       .forEach((lead) => {
-        if (!salesMap.has(lead.salesOwnerId!)) {
-          salesMap.set(lead.salesOwnerId!, []);
+        const ownerId = lead.salesOwnerId as string;
+        if (!salesMap.has(ownerId)) {
+          salesMap.set(ownerId, []);
         }
-        salesMap.get(lead.salesOwnerId!)!.push(lead);
+        salesMap.get(ownerId)?.push(lead);
       });
 
     // สร้าง team members array
@@ -99,7 +100,7 @@ export async function getSalesPerformance(
       // คำนวณ avg response time (นาที)
       const responseTimes = salesLeads
         .filter((l) => l.contactedAt)
-        .map((l) => getMinutesBetween(l.date, l.contactedAt!))
+        .map((l) => getMinutesBetween(l.date, l.contactedAt as string))
         .filter((t) => t > 0);
 
       const avgResponseTime =
@@ -110,7 +111,7 @@ export async function getSalesPerformance(
       // คำนวณ avg closing time (นาที)
       const closingTimes = salesLeads
         .filter((l) => l.closedAt && l.contactedAt)
-        .map((l) => getMinutesBetween(l.contactedAt!, l.closedAt!))
+        .map((l) => getMinutesBetween(l.contactedAt as string, l.closedAt as string))
         .filter((t) => t > 0);
 
       const avgClosingTime =
@@ -141,7 +142,7 @@ export async function getSalesPerformance(
       salesLeads
         .filter((l) => l.closedAt)
         .forEach((l) => {
-          const weekNum = getWeekNumber(new Date(l.closedAt!));
+          const weekNum = getWeekNumber(new Date(l.closedAt as string));
           const weekKey = `W${weekNum}`;
           trendMap.set(weekKey, (trendMap.get(weekKey) || 0) + 1);
         });
@@ -341,26 +342,30 @@ export async function getSalesPerformanceTrend(
 
       // Update user data (filter by userId)
       if (lead.salesOwnerId === userId) {
-        const userDay = userDailyMap.get(dateKey)!;
-        userDay.claimed++;
-        if (lead.status === 'contacted') {
-          userDay.contacted++;
-        }
-        if (lead.status === 'closed') {
-          userDay.closed++;
+        const userDay = userDailyMap.get(dateKey);
+        if (userDay) {
+          userDay.claimed++;
+          if (lead.status === 'contacted') {
+            userDay.contacted++;
+          }
+          if (lead.status === 'closed') {
+            userDay.closed++;
+          }
         }
       }
 
       // Update team data (all users with salesOwnerId)
       if (lead.salesOwnerId) {
-        const teamDay = teamDailyMap.get(dateKey)!;
-        teamDay.claimed++;
-        teamDay.userCount.add(lead.salesOwnerId);
-        if (lead.status === 'contacted') {
-          teamDay.contacted++;
-        }
-        if (lead.status === 'closed') {
-          teamDay.closed++;
+        const teamDay = teamDailyMap.get(dateKey);
+        if (teamDay) {
+          teamDay.claimed++;
+          teamDay.userCount.add(lead.salesOwnerId);
+          if (lead.status === 'contacted') {
+            teamDay.contacted++;
+          }
+          if (lead.status === 'closed') {
+            teamDay.closed++;
+          }
         }
       }
     });
@@ -369,26 +374,26 @@ export async function getSalesPerformanceTrend(
     const sortedDates = Array.from(userDailyMap.keys()).sort();
 
     const dailyData: DailyMetric[] = sortedDates.map((date) => {
-      const day = userDailyMap.get(date)!;
+      const day = userDailyMap.get(date);
       return {
         date,
-        claimed: day.claimed,
-        contacted: day.contacted,
-        closed: day.closed,
-        conversionRate: day.claimed > 0 ? Number(((day.closed / day.claimed) * 100).toFixed(2)) : 0,
+        claimed: day?.claimed ?? 0,
+        contacted: day?.contacted ?? 0,
+        closed: day?.closed ?? 0,
+        conversionRate: day && day.claimed > 0 ? Number(((day.closed / day.claimed) * 100).toFixed(2)) : 0,
       };
     });
 
     // Calculate team average per day
     const teamAverage: DailyMetric[] = sortedDates.map((date) => {
-      const teamDay = teamDailyMap.get(date)!;
-      const userCount = teamDay.userCount.size || 1;
+      const teamDay = teamDailyMap.get(date);
+      const userCount = teamDay?.userCount.size || 1;
       return {
         date,
-        claimed: Math.round(teamDay.claimed / userCount),
-        contacted: Math.round(teamDay.contacted / userCount),
-        closed: Math.round(teamDay.closed / userCount),
-        conversionRate: teamDay.claimed > 0 ? Number(((teamDay.closed / teamDay.claimed) * 100).toFixed(2)) : 0,
+        claimed: Math.round((teamDay?.claimed ?? 0) / userCount),
+        contacted: Math.round((teamDay?.contacted ?? 0) / userCount),
+        closed: Math.round((teamDay?.closed ?? 0) / userCount),
+        conversionRate: teamDay && teamDay.claimed > 0 ? Number(((teamDay.closed / teamDay.claimed) * 100).toFixed(2)) : 0,
       };
     });
 

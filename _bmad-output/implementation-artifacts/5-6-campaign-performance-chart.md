@@ -1,6 +1,6 @@
 # Story 5.6: Campaign Performance Chart
 
-Status: review
+Status: done
 
 ## Story
 
@@ -761,9 +761,10 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
-- All 48 new tests pass (3 test files)
+- All 49 tests pass (3 test files) - 48 original + 1 new AC#8 mobile truncation test
 - Full regression: 2521 passed, 2 pre-existing failures (middleware-role timeout, mobile-filter-sheet disabled state), 2 skipped
 - No regressions introduced by Story 5-6
+- Post-review: 8 Rex findings fixed (3 HIGH, 4 MEDIUM, 1 LOW), all tests green
 
 ### Completion Notes List
 
@@ -797,4 +798,15 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 ### Change Log
 
 - 2026-01-31: Story 5-6 implementation complete - Campaign Performance Chart with horizontal bar chart, custom tooltip, count selector, loading/empty/error states, benchmark reference lines, and 48 tests
+- 2026-01-31: Code review fixes applied (Rex review round 1):
+  - **H-1**: Removed `limit` from queryKey, moved slicing to `select` option → single API call for all limit values
+  - **H-2**: Replaced `useDefaultLimit` useEffect pattern with `useState(getResponsiveConfig)` function initializer → no double-render on mobile
+  - **H-3**: Added `@internal` JSDoc to `ChartTooltip` export (kept exported for testing)
+  - **M-1**: Implemented AC#8 responsive font sizes (12px desktop, 11px tablet, 10px mobile) and responsive truncation (25 chars desktop/tablet, 20 chars mobile) via `useResponsiveChart` hook
+  - **M-2**: Added `resize` event listener to `useResponsiveChart` for reactive viewport changes
+  - **M-3**: Fixed skeleton row count test - use `.flex.items-center.gap-4` selector with exact `toHaveLength(5)`
+  - **M-4**: Fixed TestWrapper in hook tests - each test now uses `createWrapper()` for isolated QueryClient
+  - **L-1**: Changed `aria-busy="true"` to `aria-busy={true}` boolean
+  - Added new test: AC#8 mobile truncation at 20 characters
+  - All 49 tests pass (48 original + 1 new), no type errors in Story 5-6 files
 

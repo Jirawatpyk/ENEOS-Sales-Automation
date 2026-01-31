@@ -142,7 +142,7 @@ development_status:
   5-4-campaign-table: done                      # F-05.F2: Campaign list with metrics - Code review APPROVED, E2E tests added (2026-01-31)
   5-5-open-click-rates: done                      # F-05.F3: Open Rate & Click Rate display - Code review APPROVED + TEA guardrail tests (2026-01-31)
   5-6-campaign-performance-chart: done   # F-05.F4: Bar chart comparison - Code review APPROVED + TEA guardrail tests (43 tests) 2026-01-31
-  5-7-campaign-detail-sheet: review            # F-05.F5: Event log per campaign - Implementation complete 2026-01-31 (82 new tests, 9 test files)
+  5-7-campaign-detail-sheet: done               # F-05.F5: Event log per campaign - Code review APPROVED + TEA guardrails (125 tests, 12 files) 2026-01-31
   5-8-campaign-date-filter: ready-for-dev      # F-05.F6: Date range filter - Story created 2026-01-31
   5-9-campaign-export: ready-for-dev           # F-05.F7: Export campaign data - Story created 2026-01-31
   epic-5-retrospective: optional
@@ -218,9 +218,9 @@ development_status:
 # EPIC-04 Status: ✅ COMPLETED (14/14 stories done + retrospective)
 #   - All stories completed 2026-01-27 (including grounding fields UI)
 #
-# EPIC-05 Status: 🚧 IN PROGRESS (7/9 done, 1 review, 1 ready-for-dev)
+# EPIC-05 Status: 🚧 IN PROGRESS (7/9 done, 2 ready-for-dev)
 #   - Backend: 5-1, 5-2 done
-#   - Frontend: 5-3, 5-4, 5-5, 5-6 done, 5-7 review, 5-8, 5-9 ready-for-dev
+#   - Frontend: 5-3, 5-4, 5-5, 5-6, 5-7 done, 5-8, 5-9 ready-for-dev
 #
 # Completed Epics: 5 (EPIC-00, EPIC-01, EPIC-02, EPIC-03, EPIC-04)
 # Completed Stories: 53 (15 + 5 + 9 + 8 + 14 + 2)  # E0:15, E1:5, E2:9, E3:8, E4:14, E5:2
@@ -233,7 +233,7 @@ development_status:
 #   - 5-4 Campaign Table: ✅ done (2026-01-31) - Code review APPROVED
 #   - 5-5 Open/Click Rates: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (172 tests)
 #   - 5-6 Campaign Performance Chart: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (92 tests)
-#   - 5-7 Campaign Detail Sheet: 🔍 review (2026-01-31) - 82 new tests, 9 test files
+#   - 5-7 Campaign Detail Sheet: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (125 tests, 12 files)
 #   - 5-8 Campaign Date Filter: 📋 ready-for-dev (story created 2026-01-31)
 #   - 5-9 Campaign Export: 📋 ready-for-dev (story created 2026-01-31)
 #

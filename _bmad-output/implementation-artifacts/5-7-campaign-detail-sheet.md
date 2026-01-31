@@ -1,6 +1,6 @@
 # Story 5.7: Campaign Detail Sheet
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -91,99 +91,99 @@ so that **I can analyze individual campaign engagement and understand which cont
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create Campaign Detail Sheet Component** (AC: #1, #2, #9, #10)
-  - [ ] 1.1 Create `src/components/campaigns/campaign-detail-sheet.tsx`
-  - [ ] 1.2 Use shadcn/ui Sheet component (consistent with LeadDetailSheet pattern)
-  - [ ] 1.3 Accept props: `campaign`, `open`, `onOpenChange`
-  - [ ] 1.4 Display campaign summary header (passed from table data)
-  - [ ] 1.5 Implement close on X, outside click, and Escape key (Sheet handles automatically)
-  - [ ] 1.6 Add responsive width classes (`w-full sm:max-w-xl overflow-y-auto`)
-  - [ ] 1.7 Write unit tests (10+ test cases)
+- [x] **Task 1: Create Campaign Detail Sheet Component** (AC: #1, #2, #9, #10)
+  - [x] 1.1 Create `src/components/campaigns/campaign-detail-sheet.tsx`
+  - [x] 1.2 Use shadcn/ui Sheet component (consistent with LeadDetailSheet pattern)
+  - [x] 1.3 Accept props: `campaign`, `open`, `onOpenChange`
+  - [x] 1.4 Display campaign summary header (passed from table data)
+  - [x] 1.5 Implement close on X, outside click, and Escape key (Sheet handles automatically)
+  - [x] 1.6 Add responsive width classes (`w-full sm:max-w-xl overflow-y-auto`)
+  - [x] 1.7 Write unit tests (10 test cases)
 
-- [ ] **Task 2: Create Campaign Events Hook** (AC: #3, #4, #5, #6, #7)
-  - [ ] 2.1 Create `src/hooks/use-campaign-events.ts`
-  - [ ] 2.2 TanStack Query hook calling `GET /api/admin/campaigns/:id/events`
-  - [ ] 2.3 Support pagination params (page, limit)
-  - [ ] 2.4 Support event type filter param
-  - [ ] 2.5 Reuse types from `src/types/campaigns.ts`
-  - [ ] 2.6 Write unit tests (8+ test cases)
+- [x] **Task 2: Create Campaign Events Hook** (AC: #3, #4, #5, #6, #7)
+  - [x] 2.1 Create `src/hooks/use-campaign-events.ts`
+  - [x] 2.2 TanStack Query hook calling `GET /api/admin/campaigns/:id/events`
+  - [x] 2.3 Support pagination params (page, limit)
+  - [x] 2.4 Support event type filter param
+  - [x] 2.5 Reuse types from `src/types/campaigns.ts`
+  - [x] 2.6 Write unit tests (8 test cases)
 
-- [ ] **Task 3: Create API Client for Events** (AC: #3)
-  - [ ] 3.1 Add `fetchCampaignEvents()` to `src/lib/api/campaigns.ts`
-  - [ ] 3.2 Handle error responses consistently
-  - [ ] 3.3 Write unit tests (5+ test cases)
+- [x] **Task 3: Create API Client for Events** (AC: #3)
+  - [x] 3.1 Add `fetchCampaignEvents()` to `src/lib/api/campaigns.ts`
+  - [x] 3.2 Handle error responses consistently (503, 404, generic, success=false)
+  - [x] 3.3 Write unit tests (11 test cases)
 
-- [ ] **Task 4: Create API Proxy Route for Events** (AC: #3)
-  - [ ] 4.1 Create `src/app/api/admin/campaigns/[id]/events/route.ts`
-  - [ ] 4.2 Forward to backend with auth token
-  - [ ] 4.3 Support query params (page, limit, event, dateFrom, dateTo)
-  - [ ] 4.4 Add Cache-Control headers
+- [x] **Task 4: Create API Proxy Route for Events** (AC: #3)
+  - [x] 4.1 Create `src/app/api/admin/campaigns/[id]/events/route.ts`
+  - [x] 4.2 Forward to backend with Google ID token auth (NextAuth JWT)
+  - [x] 4.3 Support query params (page, limit, event, dateFrom, dateTo)
+  - [x] 4.4 Add Cache-Control: private, max-age=60
 
-- [ ] **Task 5: Create Event Log Table** (AC: #3, #5)
-  - [ ] 5.1 Create `src/components/campaigns/campaign-events-table.tsx`
-  - [ ] 5.2 Display columns: Email, Event Type, Timestamp, URL
-  - [ ] 5.3 Format timestamp with date-fns
-  - [ ] 5.4 Show URL as link (for click events only)
-  - [ ] 5.5 Add pagination controls
-  - [ ] 5.6 Write unit tests (8+ test cases)
+- [x] **Task 5: Create Event Log Table** (AC: #3, #5)
+  - [x] 5.1 Create `src/components/campaigns/campaign-events-table.tsx`
+  - [x] 5.2 Display columns: Email, Event Type, Timestamp, URL
+  - [x] 5.3 Format timestamp with date-fns
+  - [x] 5.4 Show URL as external link (for click events), dash for null
+  - [x] 5.5 Add pagination controls (Previous/Next, page info, range display)
+  - [x] 5.6 Write unit tests (16 test cases)
 
-- [ ] **Task 6: Event Type Filter Tabs** (AC: #4)
-  - [ ] 6.1 Create `src/components/campaigns/campaign-event-filter.tsx`
-  - [ ] 6.2 Use shadcn/ui Tabs or Button group
-  - [ ] 6.3 Options: All, Delivered, Opened, Clicked
-  - [ ] 6.4 Show event count per type (optional, from API if available)
-  - [ ] 6.5 Write unit tests (5+ test cases)
+- [x] **Task 6: Event Type Filter Tabs** (AC: #4)
+  - [x] 6.1 Create `src/components/campaigns/campaign-event-filter.tsx`
+  - [x] 6.2 Use Button group with aria-pressed accessibility
+  - [x] 6.3 Options: All Events, Delivered, Opened, Clicked
+  - [x] 6.4 Accessibility: role="group", aria-label, data-testid
+  - [x] 6.5 Write unit tests (5 test cases)
 
-- [ ] **Task 7: Loading, Error, Empty States** (AC: #6, #7, #8)
-  - [ ] 7.1 Create `src/components/campaigns/campaign-events-skeleton.tsx`
-  - [ ] 7.2 Reuse CampaignsError component for error state
-  - [ ] 7.3 Create empty state message component
-  - [ ] 7.4 Write unit tests (5+ test cases)
+- [x] **Task 7: Loading, Error, Empty States** (AC: #6, #7, #8)
+  - [x] 7.1 Create `src/components/campaigns/campaign-events-skeleton.tsx` (5 skeleton rows)
+  - [x] 7.2 Reuse CampaignsError component for error state with retry
+  - [x] 7.3 Empty state with contextual messages (search/filter/default)
+  - [x] 7.4 Write unit tests (5 test cases)
 
-- [ ] **Task 8: Integration with Campaign Table** (AC: #1)
-  - [ ] 8.1 Update `src/components/campaigns/campaign-table.tsx`
-  - [ ] 8.2 Add onClick handler to table rows
-  - [ ] 8.3 Manage sheet state (selectedCampaign, isOpen)
-  - [ ] 8.4 Pass campaign data to sheet
-  - [ ] 8.5 Update barrel export `src/components/campaigns/index.ts`
+- [x] **Task 8: Integration with Campaign Table** (AC: #1)
+  - [x] 8.1 Update `src/components/campaigns/campaign-table.tsx`
+  - [x] 8.2 Add onClick handler to table rows (cursor-pointer, hover:bg-muted/50)
+  - [x] 8.3 Manage sheet state (selectedCampaign, isSheetOpen)
+  - [x] 8.4 Pass campaign data to CampaignDetailSheet
+  - [x] 8.5 Update barrel export `src/components/campaigns/index.ts`
 
-- [ ] **Task 9: TypeScript Types** (AC: #3)
-  - [ ] 9.1 Update `src/types/campaigns.ts` with event types
-  - [ ] 9.2 Add CampaignEventItem, CampaignEventsResponse interfaces
+- [x] **Task 9: TypeScript Types** (AC: #3)
+  - [x] 9.1 Update `src/types/campaigns.ts` with event types
+  - [x] 9.2 Add CampaignEventItem, CampaignEventsResponse, CampaignEventsParams, CampaignEventType
 
-- [ ] **Task 10: Email Search Feature** (AC: #11)
-  - [ ] 10.1 Add search input to sheet header area
-  - [ ] 10.2 Implement debounced search (300ms) using `useDebouncedValue` or similar
-  - [ ] 10.3 Filter events client-side OR pass `search` param to API (if supported)
-  - [ ] 10.4 Case-insensitive partial match
-  - [ ] 10.5 Clear button to reset search
-  - [ ] 10.6 Write unit tests (4+ test cases)
+- [x] **Task 10: Email Search Feature** (AC: #11)
+  - [x] 10.1 Create `src/components/campaigns/campaign-event-search.tsx`
+  - [x] 10.2 Implement debounced search (300ms) with useEffect + setTimeout
+  - [x] 10.3 Filter events client-side (case-insensitive partial match)
+  - [x] 10.4 Clear button to reset search
+  - [x] 10.5 Accessible: aria-label, data-testid
+  - [x] 10.6 Write unit tests (10 test cases)
 
-- [ ] **Task 11: Copy Email Feature** (AC: #12)
-  - [ ] 11.1 Add copy button/icon next to email in table cell
-  - [ ] 11.2 Use `navigator.clipboard.writeText()` for copy
-  - [ ] 11.3 Show toast notification using `sonner` or existing toast system
-  - [ ] 11.4 Add visual feedback on click (icon change briefly)
-  - [ ] 11.5 Write unit tests (3+ test cases)
+- [x] **Task 11: Copy Email Feature** (AC: #12)
+  - [x] 11.1 Create `src/components/campaigns/copy-email-button.tsx`
+  - [x] 11.2 Use `navigator.clipboard.writeText()` with async/await
+  - [x] 11.3 Show toast notification using project's `@/hooks/use-toast` (not sonner)
+  - [x] 11.4 Visual feedback: Check icon for 2s after copy, stopPropagation
+  - [x] 11.5 Write unit tests (6 test cases)
 
-- [ ] **Task 12: Date Range Filter** (AC: #13)
-  - [ ] 12.1 Add date picker inputs (From/To) using shadcn/ui DatePicker or Calendar
-  - [ ] 12.2 Pass `dateFrom` and `dateTo` to `useCampaignEvents` hook
-  - [ ] 12.3 Update API proxy to forward date params (already supported)
-  - [ ] 12.4 Add clear button to reset date range
-  - [ ] 12.5 Validate that From <= To
-  - [ ] 12.6 Write unit tests (5+ test cases)
+- [x] **Task 12: Date Range Filter** (AC: #13)
+  - [x] 12.1 Create `src/components/campaigns/campaign-date-filter.tsx` with Calendar+Popover
+  - [x] 12.2 Pass `dateFrom` and `dateTo` to `useCampaignEvents` hook
+  - [x] 12.3 API proxy forwards date params (already supported)
+  - [x] 12.4 Clear button to reset both dates
+  - [x] 12.5 Validate From <= To via disabled dates on Calendar
+  - [x] 12.6 Write unit tests (11 test cases)
 
-- [ ] **Task 13: Testing** (AC: #1-#13)
-  - [ ] 13.1 Verify sheet opens on row click
-  - [ ] 13.2 Verify event filter works
-  - [ ] 13.3 Verify pagination works
-  - [ ] 13.4 Verify loading/error/empty states
-  - [ ] 13.5 Verify sheet closes properly
-  - [ ] 13.6 Verify responsive layout
-  - [ ] 13.7 Verify email search filters correctly
-  - [ ] 13.8 Verify copy email works and shows toast
-  - [ ] 13.9 Verify date range filter works
+- [x] **Task 13: Testing** (AC: #1-#13)
+  - [x] 13.1 Verify sheet opens on row click (campaign-detail-sheet.test.tsx)
+  - [x] 13.2 Verify event filter works (campaign-event-filter.test.tsx)
+  - [x] 13.3 Verify pagination works (campaign-events-table.test.tsx)
+  - [x] 13.4 Verify loading/error/empty states (campaign-detail-sheet.test.tsx)
+  - [x] 13.5 Verify sheet closes properly (Sheet component handles automatically)
+  - [x] 13.6 Verify responsive layout (w-full sm:max-w-xl classes applied)
+  - [x] 13.7 Verify email search filters correctly (campaign-event-search.test.tsx)
+  - [x] 13.8 Verify copy email works and shows toast (copy-email-button.test.tsx)
+  - [x] 13.9 Verify date range filter works (campaign-date-filter.test.tsx)
 
 ## Dev Notes
 
@@ -1394,10 +1394,74 @@ eneos-admin-dashboard/src/
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+- TypeScript error: Next.js API route params needed `Promise<{ id: string }>` pattern (fixed)
+- Module error: Project uses `@/hooks/use-toast` not `sonner` for toast (fixed)
+- Test fix: Timestamp assertion used timezone-dependent exact match (changed to regex pattern)
+- Test fix: Hook `retry: 2` requires 3 mock failures for error state test
+
 ### Completion Notes List
 
+- All 13 tasks completed with 96 new tests across 10 test files (82 initial + 14 API route tests)
+- Full regression passed: 204 test files, 2893 tests, 0 failures (post-Rex-fix)
+- TypeScript type check passed with no errors for all new files
+- Used project's existing toast system (`@/hooks/use-toast`) instead of sonner
+- API proxy uses Google ID token via NextAuth JWT (consistent with existing routes)
+- CopyEmailButton uses `e.stopPropagation()` to prevent row click propagation
+- Date filter validates From <= To via Calendar disabled dates prop
+- Client-side email search with 300ms debounce (server-side not supported by backend)
+
+### Rex Code Review Fix Notes (Round 1)
+
+8 issues found by Rex (3 HIGH, 5 MEDIUM), all fixed:
+
+| # | Severity | Issue | Fix |
+|---|----------|-------|-----|
+| 1 | HIGH | No validation on campaign ID in API route | Added `/^\d+$/.test(id)` regex validation → 400 |
+| 2 | HIGH | AC#2 missing "First Event" date in summary | Added First Event grid cell with fallback to '-' |
+| 3 | HIGH | Client-side email search only works on current page | Fetch all events (limit:1000) when searching |
+| 4 | MEDIUM | Missing `keepPreviousData` in hook | Added `placeholderData: keepPreviousData` |
+| 5 | MEDIUM | XSS risk - no URL protocol validation | Added `isSafeUrl()` to reject javascript:/data: URIs |
+| 6 | MEDIUM | Filters not reset when switching campaigns | Added `key={campaignId}` to force remount |
+| 7 | MEDIUM | campaign-table.tsx 451 lines (>200 limit) | Extracted SortableHeader + columns → 225 lines |
+| 8 | MEDIUM | API route has zero tests | Created 14 tests covering validation, auth, params, errors |
+
+**New files from Fix #7:**
+- `src/components/campaigns/sortable-header.tsx` - Extracted SortableHeader component + COLUMN_TO_SORT_BY
+- `src/components/campaigns/campaign-table-columns.tsx` - Extracted column definitions factory
+
+**New test file from Fix #8:**
+- `src/__tests__/campaign-events-route.test.ts` - 14 tests for API route
+
+**Post-fix regression:** 204 test files, 2893 tests passed, 0 failures
+
 ### File List
+
+**New Files (Frontend - eneos-admin-dashboard):**
+- `src/components/campaigns/campaign-detail-sheet.tsx` - Main Sheet component (Task 1)
+- `src/components/campaigns/campaign-events-table.tsx` - Event log table with pagination (Task 5)
+- `src/components/campaigns/campaign-event-filter.tsx` - Event type filter tabs (Task 6)
+- `src/components/campaigns/campaign-events-skeleton.tsx` - Loading skeleton (Task 7)
+- `src/components/campaigns/campaign-event-search.tsx` - Debounced email search (Task 10)
+- `src/components/campaigns/copy-email-button.tsx` - Copy email to clipboard (Task 11)
+- `src/components/campaigns/campaign-date-filter.tsx` - Date range filter (Task 12)
+- `src/hooks/use-campaign-events.ts` - TanStack Query hook (Task 2)
+- `src/app/api/admin/campaigns/[id]/events/route.ts` - API proxy route (Task 4)
+- `src/__tests__/campaign-detail-sheet.test.tsx` - 10 tests
+- `src/__tests__/campaign-events-table.test.tsx` - 16 tests
+- `src/__tests__/campaign-event-filter.test.tsx` - 5 tests
+- `src/__tests__/campaign-events-skeleton.test.tsx` - 5 tests
+- `src/__tests__/campaign-event-search.test.tsx` - 10 tests
+- `src/__tests__/copy-email-button.test.tsx` - 6 tests
+- `src/__tests__/campaign-date-filter.test.tsx` - 11 tests
+- `src/__tests__/campaigns-events-api.test.ts` - 11 tests
+- `src/__tests__/use-campaign-events.test.tsx` - 8 tests
+
+**Modified Files (Frontend - eneos-admin-dashboard):**
+- `src/types/campaigns.ts` - Added CampaignEventItem, CampaignEventsResponse, CampaignEventsParams, CampaignEventType (Task 9)
+- `src/lib/api/campaigns.ts` - Added fetchCampaignEvents() (Task 3)
+- `src/components/campaigns/campaign-table.tsx` - Row click integration, sheet state (Task 8)
+- `src/components/campaigns/index.ts` - Barrel exports for new components (Task 8.5)

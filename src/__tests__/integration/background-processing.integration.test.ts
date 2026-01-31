@@ -139,17 +139,19 @@ describe('Background Processing Integration Tests', () => {
     },
   };
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    processingStatusService.clear();
-
-    // Import routes after mocks are set up
+  // Import routes ONCE in beforeAll (expensive dynamic imports should not repeat per test)
+  beforeAll(async () => {
     const webhookModule = await import('../../routes/webhook.routes.js');
     const statusModule = await import('../../routes/status.routes.js');
     webhookRoutes = webhookModule.default;
     statusRoutes = statusModule.default;
+  });
 
-    // Setup Express app
+  beforeEach(() => {
+    vi.clearAllMocks();
+    processingStatusService.clear();
+
+    // Setup Express app (cheap - just wiring routes)
     app = express();
     app.use(express.json());
     app.use('/webhook', webhookRoutes);

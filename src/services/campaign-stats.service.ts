@@ -292,49 +292,6 @@ export class CampaignStatsService {
     });
   }
 
-  /**
-   * @deprecated Use countUniqueEmailsForEvent instead (race condition safe)
-   * Kept for backward compatibility with existing tests
-   */
-  async checkIsFirstEventForEmail(
-    campaignId: number,
-    email: string,
-    eventType: string
-  ): Promise<boolean> {
-    logger.debug('Checking if first event for email', { campaignId, email, eventType });
-
-    return circuitBreaker.execute(async () => {
-      return withRetry(async () => {
-        // Get Campaign_ID (B), Email (D), Event (E) columns
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: this.spreadsheetId,
-          range: this.getSheetRange(this.eventsSheet, 'B:E'),
-        });
-
-        const values = response.data.values || [];
-        const emailLower = email.toLowerCase();
-
-        // Check if combination already exists (skip header row)
-        for (let i = 1; i < values.length; i++) {
-          const row = values[i];
-          if (row) {
-            const rowCampaignId = Number(row[0]); // Column B (index 0 in this range)
-            const rowEmail = (row[2] || '').toLowerCase(); // Column D (index 2 in this range)
-            const rowEvent = row[3] || ''; // Column E (index 3 in this range)
-
-            if (rowCampaignId === campaignId &&
-                rowEmail === emailLower &&
-                rowEvent === eventType) {
-              return false; // Already exists, not the first
-            }
-          }
-        }
-
-        return true; // First time
-      });
-    });
-  }
-
   // ===========================================
   // Get Campaign Stats
   // ===========================================
@@ -403,36 +360,6 @@ export class CampaignStatsService {
   }
 
   /**
-   * @deprecated Use updateCampaignStatsWithUniqueCount instead
-   * Kept for backward compatibility with existing tests
-   */
-  async updateCampaignStats(
-    event: NormalizedCampaignEvent,
-    isFirstForEmail: boolean
-  ): Promise<void> {
-    logger.debug('Updating campaign stats', {
-      campaignId: event.campaignId,
-      event: event.event,
-      isFirstForEmail,
-    });
-
-    return circuitBreaker.execute(async () => {
-      return withRetry(async () => {
-        const now = formatISOTimestamp();
-        const existing = await this.getCampaignStats(event.campaignId);
-
-        if (!existing) {
-          // Create new campaign stats row
-          await this.createNewCampaignStats(event, isFirstForEmail, now);
-        } else {
-          // Update existing campaign stats
-          await this.incrementCampaignStats(existing, event, isFirstForEmail, now);
-        }
-      });
-    });
-  }
-
-  /**
    * Create new campaign stats row with accurate unique count
    */
   private async createNewCampaignStatsWithUniqueCount(
@@ -467,34 +394,6 @@ export class CampaignStatsService {
   }
 
   /**
-   * @deprecated Use createNewCampaignStatsWithUniqueCount instead
-   */
-  private async createNewCampaignStats(
-    event: NormalizedCampaignEvent,
-    isFirstForEmail: boolean,
-    timestamp: string
-  ): Promise<void> {
-    logger.debug('Creating new campaign stats', { campaignId: event.campaignId });
-
-    const row = createDefaultStatsRow(event.campaignId, event.campaignName, timestamp);
-
-    // Set initial count based on event type
-    this.applyEventIncrement(row, event.event, isFirstForEmail);
-
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: this.spreadsheetId,
-      range: this.getSheetRange(this.statsSheet, 'A:O'),
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: {
-        values: [row],
-      },
-    });
-
-    logger.info('New campaign stats created', { campaignId: event.campaignId });
-  }
-
-  /**
    * Update existing campaign stats with accurate unique count
    */
   private async updateExistingCampaignStats(
@@ -505,17 +404,7 @@ export class CampaignStatsService {
   ): Promise<void> {
     const { row, rowIndex } = existing;
 
-    // Clone row and ensure all columns exist (pad if needed)
-    const updatedRow: (string | number)[] = [];
-    for (let i = 0; i < 15; i++) {
-      const value = row[i];
-      // Convert numeric columns (2-12) to numbers, keep strings for text columns
-      if (i >= 2 && i <= 12) {
-        updatedRow.push(Number(value || 0));
-      } else {
-        updatedRow.push(value || (i === 0 ? event.campaignId : (i === 1 ? event.campaignName : '')));
-      }
-    }
+    const updatedRow = this.cloneAndPadStatsRow(row, event.campaignId, event.campaignName);
 
     // Apply event with accurate unique count
     this.applyEventWithUniqueCount(updatedRow, event.event, uniqueCount);
@@ -545,52 +434,6 @@ export class CampaignStatsService {
   }
 
   /**
-   * @deprecated Use updateExistingCampaignStats instead
-   */
-  private async incrementCampaignStats(
-    existing: CampaignStatsRow,
-    event: NormalizedCampaignEvent,
-    isFirstForEmail: boolean,
-    timestamp: string
-  ): Promise<void> {
-    const { row, rowIndex } = existing;
-
-    // Clone row and ensure all columns exist (pad if needed)
-    const updatedRow: (string | number)[] = [];
-    for (let i = 0; i < 15; i++) {
-      const value = row[i];
-      // Convert numeric columns (2-12) to numbers, keep strings for text columns
-      if (i >= 2 && i <= 12) {
-        updatedRow.push(Number(value || 0));
-      } else {
-        updatedRow.push(value || (i === 0 ? event.campaignId : (i === 1 ? event.campaignName : '')));
-      }
-    }
-
-    // Apply increment based on event type
-    this.applyEventIncrement(updatedRow, event.event, isFirstForEmail);
-
-    // Update Last_Updated
-    updatedRow[CAMPAIGN_STATS_COLUMNS.LAST_UPDATED] = timestamp;
-
-    // Recalculate rates
-    this.recalculateRates(updatedRow);
-
-    // Write back to sheet (rowIndex + 1 because Sheets is 1-indexed)
-    const sheetRow = rowIndex + 1;
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: this.spreadsheetId,
-      range: this.getSheetRange(this.statsSheet, `A${sheetRow}:O${sheetRow}`),
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: [updatedRow],
-      },
-    });
-
-    logger.debug('Campaign stats updated', { campaignId: event.campaignId, sheetRow });
-  }
-
-  /**
    * Apply event with accurate unique count (race condition safe)
    * Sets the unique count directly from sheet data instead of incrementing
    */
@@ -614,53 +457,6 @@ export class CampaignStatsService {
         row[CAMPAIGN_STATS_COLUMNS.CLICKED] = Number(row[CAMPAIGN_STATS_COLUMNS.CLICKED] || 0) + 1;
         // Set unique count from actual sheet data (not increment)
         row[CAMPAIGN_STATS_COLUMNS.UNIQUE_CLICKS] = uniqueCount;
-        break;
-
-      // Future event types (prepared but not enabled in ENABLED_EVENTS)
-      case CAMPAIGN_EVENTS.HARD_BOUNCE:
-        row[CAMPAIGN_STATS_COLUMNS.HARD_BOUNCE] = Number(row[CAMPAIGN_STATS_COLUMNS.HARD_BOUNCE] || 0) + 1;
-        break;
-
-      case CAMPAIGN_EVENTS.SOFT_BOUNCE:
-        row[CAMPAIGN_STATS_COLUMNS.SOFT_BOUNCE] = Number(row[CAMPAIGN_STATS_COLUMNS.SOFT_BOUNCE] || 0) + 1;
-        break;
-
-      case CAMPAIGN_EVENTS.UNSUBSCRIBE:
-        row[CAMPAIGN_STATS_COLUMNS.UNSUBSCRIBE] = Number(row[CAMPAIGN_STATS_COLUMNS.UNSUBSCRIBE] || 0) + 1;
-        break;
-
-      case CAMPAIGN_EVENTS.SPAM:
-        row[CAMPAIGN_STATS_COLUMNS.SPAM] = Number(row[CAMPAIGN_STATS_COLUMNS.SPAM] || 0) + 1;
-        break;
-    }
-  }
-
-  /**
-   * @deprecated Use applyEventWithUniqueCount instead
-   * Kept for backward compatibility with existing tests
-   */
-  private applyEventIncrement(
-    row: (string | number)[],
-    eventType: string,
-    isFirstForEmail: boolean
-  ): void {
-    switch (eventType) {
-      case CAMPAIGN_EVENTS.DELIVERED:
-        row[CAMPAIGN_STATS_COLUMNS.DELIVERED] = Number(row[CAMPAIGN_STATS_COLUMNS.DELIVERED] || 0) + 1;
-        break;
-
-      case CAMPAIGN_EVENTS.OPENED:
-        row[CAMPAIGN_STATS_COLUMNS.OPENED] = Number(row[CAMPAIGN_STATS_COLUMNS.OPENED] || 0) + 1;
-        if (isFirstForEmail) {
-          row[CAMPAIGN_STATS_COLUMNS.UNIQUE_OPENS] = Number(row[CAMPAIGN_STATS_COLUMNS.UNIQUE_OPENS] || 0) + 1;
-        }
-        break;
-
-      case CAMPAIGN_EVENTS.CLICK:
-        row[CAMPAIGN_STATS_COLUMNS.CLICKED] = Number(row[CAMPAIGN_STATS_COLUMNS.CLICKED] || 0) + 1;
-        if (isFirstForEmail) {
-          row[CAMPAIGN_STATS_COLUMNS.UNIQUE_CLICKS] = Number(row[CAMPAIGN_STATS_COLUMNS.UNIQUE_CLICKS] || 0) + 1;
-        }
         break;
 
       // Future event types (prepared but not enabled in ENABLED_EVENTS)
@@ -763,30 +559,8 @@ export class CampaignStatsService {
           campaigns.push(item);
         }
 
-        // Apply search filter (case-insensitive partial match on campaign name)
-        if (search) {
-          const searchLower = search.toLowerCase();
-          campaigns = campaigns.filter((c) =>
-            c.campaignName.toLowerCase().includes(searchLower)
-          );
-        }
-
-        // Apply date range filter (on firstEvent)
-        if (dateFrom) {
-          const fromDate = new Date(dateFrom).getTime();
-          campaigns = campaigns.filter((c) => {
-            const eventDate = new Date(c.firstEvent).getTime();
-            return eventDate >= fromDate;
-          });
-        }
-
-        if (dateTo) {
-          const toDate = new Date(dateTo).getTime();
-          campaigns = campaigns.filter((c) => {
-            const eventDate = new Date(c.firstEvent).getTime();
-            return eventDate <= toDate;
-          });
-        }
+        // Apply filters
+        campaigns = this.filterCampaignStats(campaigns, search, dateFrom, dateTo);
 
         // Apply sorting
         campaigns = this.sortCampaignStats(campaigns, sortBy, sortOrder);
@@ -866,7 +640,11 @@ export class CampaignStatsService {
           };
         }
 
-        // Filter and parse rows
+        // Pre-compute date boundaries once (avoid repeated Date parsing per row)
+        const fromTime = dateFrom ? new Date(dateFrom).getTime() : undefined;
+        const toTime = dateTo ? new Date(dateTo).getTime() : undefined;
+
+        // Parse and filter rows (single pass)
         let events: CampaignEventItem[] = [];
         for (let i = 1; i < values.length; i++) {
           const row = values[i];
@@ -878,23 +656,9 @@ export class CampaignStatsService {
 
           const item = this.rowToCampaignEventItem(row);
 
-          // Apply event type filter
-          if (eventFilter && item.event !== eventFilter) continue;
-
-          // Apply date range filter
-          if (dateFrom) {
-            const fromDate = new Date(dateFrom).getTime();
-            const eventDate = new Date(item.eventAt).getTime();
-            if (eventDate < fromDate) continue;
+          if (this.matchesCampaignEventFilter(item, eventFilter, fromTime, toTime)) {
+            events.push(item);
           }
-
-          if (dateTo) {
-            const toDate = new Date(dateTo).getTime();
-            const eventDate = new Date(item.eventAt).getTime();
-            if (eventDate > toDate) continue;
-          }
-
-          events.push(item);
         }
 
         // Sort by eventAt descending (newest first)
@@ -919,8 +683,81 @@ export class CampaignStatsService {
   }
 
   // ===========================================
-  // Row Conversion Helpers (Story 5-2)
+  // Filtering & Row Helpers
   // ===========================================
+
+  /**
+   * Clone a stats row and pad to full column count with proper types
+   * Numeric columns (DELIVERED..SPAM) are converted to numbers, text columns kept as strings
+   */
+  private cloneAndPadStatsRow(
+    row: (string | number)[],
+    fallbackCampaignId: number,
+    fallbackCampaignName: string
+  ): (string | number)[] {
+    const totalColumns = CAMPAIGN_STATS_COLUMNS.LAST_UPDATED + 1; // 15
+    const padded: (string | number)[] = [];
+    for (let i = 0; i < totalColumns; i++) {
+      const value = row[i];
+      if (i >= CAMPAIGN_STATS_COLUMNS.DELIVERED && i <= CAMPAIGN_STATS_COLUMNS.SPAM) {
+        padded.push(Number(value || 0));
+      } else if (i === CAMPAIGN_STATS_COLUMNS.CAMPAIGN_ID) {
+        padded.push(value || fallbackCampaignId);
+      } else if (i === CAMPAIGN_STATS_COLUMNS.CAMPAIGN_NAME) {
+        padded.push(value || fallbackCampaignName);
+      } else {
+        padded.push(value || '');
+      }
+    }
+    return padded;
+  }
+
+  /**
+   * Filter campaign stats by search term and date range (single pass)
+   */
+  private filterCampaignStats(
+    campaigns: CampaignStatsItem[],
+    search?: string,
+    dateFrom?: string,
+    dateTo?: string
+  ): CampaignStatsItem[] {
+    if (!search && !dateFrom && !dateTo) return campaigns;
+
+    const searchLower = search ? search.toLowerCase() : undefined;
+    const fromTime = dateFrom ? new Date(dateFrom).getTime() : undefined;
+    const toTime = dateTo ? new Date(dateTo).getTime() : undefined;
+
+    return campaigns.filter((c) => {
+      if (searchLower && !c.campaignName.toLowerCase().includes(searchLower)) return false;
+      if (fromTime !== undefined || toTime !== undefined) {
+        const eventTime = new Date(c.firstEvent).getTime();
+        if (fromTime !== undefined && eventTime < fromTime) return false;
+        if (toTime !== undefined && eventTime > toTime) return false;
+      }
+      return true;
+    });
+  }
+
+  /**
+   * Check if a campaign event matches the given filters
+   * Accepts pre-computed timestamps to avoid repeated Date parsing in hot loops
+   */
+  private matchesCampaignEventFilter(
+    item: CampaignEventItem,
+    eventFilter?: string,
+    fromTime?: number,
+    toTime?: number
+  ): boolean {
+    if (eventFilter && item.event !== eventFilter) return false;
+
+    if (fromTime !== undefined || toTime !== undefined) {
+      const eventTime = new Date(item.eventAt).getTime();
+      if (fromTime !== undefined && eventTime < fromTime) return false;
+      if (toTime !== undefined && eventTime > toTime) return false;
+    }
+
+    return true;
+  }
 
   /**
    * Convert sheet row to CampaignStatsItem

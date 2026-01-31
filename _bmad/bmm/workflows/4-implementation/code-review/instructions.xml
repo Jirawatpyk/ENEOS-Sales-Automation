@@ -41,6 +41,16 @@
 
     <invoke-protocol name="discover_inputs" />
     <action>Load {project_context} for coding standards (if exists)</action>
+
+    <!-- Pre-Review Checklist as review context (Epic 5 Action Items) -->
+    <check if="{pre_review_checklist} file exists">
+      <action>Load {pre_review_checklist} for additional review criteria</action>
+      <action>Use checklist sections as review context:
+        - Section 0: Verify no component file exceeds 300 lines
+        - Section 0b: Verify SSR/Hydration safety ('use client' directives)
+        - Quick Reference: Check for common Epic 4 and Epic 5 issues
+      </action>
+    </check>
   </step>
 
   <step n="2" goal="Build review attack plan">

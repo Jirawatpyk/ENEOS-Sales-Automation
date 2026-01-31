@@ -145,7 +145,7 @@ development_status:
   5-7-campaign-detail-sheet: done               # F-05.F5: Event log per campaign - Code review APPROVED + TEA guardrails (125 tests, 12 files) 2026-01-31
   5-8-campaign-date-filter: done                  # F-05.F6: Date range filter - Code review APPROVED + fixes applied (2026-01-31)
   5-9-campaign-export: done                       # F-05.F7: Export campaign data - Code review APPROVED + TEA guardrails (58 tests) 2026-01-31
-  epic-5-retrospective: optional
+  epic-5-retrospective: done  # Completed 2026-01-31
 
   # ============================================================
   # EPIC-06: Export & Reports
@@ -153,8 +153,8 @@ development_status:
   # ============================================================
   epic-6: in-progress
   6-1-export-to-excel: done          # Backend bugfixes: ExcelJS import, filename format, Thai font support - Code review passed (2026-01-27)
-  6-2-export-to-pdf: ready-for-dev  # Story created 2026-01-31 - PDF preview modal, viewer integration
-  6-3-quick-reports: backlog
+  6-2-export-to-pdf: done  # Code review APPROVED 2026-01-31 - PDF preview modal, viewer, 41 tests, 9 review fixes applied
+  6-3-quick-reports: ready-for-dev  # Story created 2026-01-31 - Quick report presets (Daily/Weekly/Monthly)
   6-4-custom-date-range: backlog
   6-5-select-data-fields: backlog
   6-6-export-history: backlog

@@ -324,6 +324,18 @@
     <action>Verify ALL tasks and subtasks are marked [x] (re-scan the story document now)</action>
     <action>Run the full regression suite (do not skip)</action>
     <action>Confirm File List includes every changed file</action>
+
+    <!-- Pre-Review Checklist Validation (Epic 5 Action Items) -->
+    <check if="{pre_review_checklist} file exists">
+      <action>Load {pre_review_checklist} for pre-review validation</action>
+      <action>Validate against checklist sections:
+        - Section 0: File Size - No component file exceeds 300 lines
+        - Section 0b: SSR/Hydration - All client components have 'use client' directive
+        - Sections 1-6: Edge cases, accessibility, UI/UX, API integration, code quality, documentation
+      </action>
+      <action if="checklist violations found">Fix violations before marking story for review</action>
+    </check>
+
     <action>Execute enhanced definition-of-done validation</action>
     <action>Update the story Status to: "review"</action>
 

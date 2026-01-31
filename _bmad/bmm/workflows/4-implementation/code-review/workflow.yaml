@@ -25,6 +25,7 @@ variables:
   # Project context
   project_context: "**/project-context.md"
   story_dir: "{implementation_artifacts}"
+  pre_review_checklist: "{implementation_artifacts}/pre-code-review-checklist.md"
 
 # Smart input file references - handles both whole docs and sharded docs
 # Priority: Whole document first, then sharded version

@@ -2,14 +2,79 @@
 
 > **Purpose:** Catch common issues BEFORE code review to reduce review cycles.
 > **Created:** Epic 4 Retrospective Action Item #2
+> **Updated:** Epic 5 Retrospective Action Items #1, #2, #3
 > **Owner:** Bob (SM Agent)
-> **Last Updated:** 2026-01-19
+> **Last Updated:** 2026-01-31
 
 ---
 
 ## How to Use
 
 Before requesting code review, run through this checklist. Check off each item or mark N/A if not applicable.
+
+---
+
+## 0. File Size & Structure (Epic 5 Action Item #1)
+
+> **Why:** Story 5-7 reached 451 lines, requiring rework during code review. Check BEFORE requesting review.
+
+### Component Files
+- [ ] **File size < 300 lines** - No single component file exceeds 300 lines
+- [ ] **Split if > 200 lines** - Files 200+ lines should be split into sub-components
+- [ ] **Extract hooks** - Complex state logic extracted to `use-*.ts` custom hooks
+- [ ] **Extract sub-components** - Reusable UI sections in separate files
+
+### Quick Check Command
+```bash
+# Find files > 200 lines in components (run from admin-dashboard root)
+find src/components -name "*.tsx" -exec awk 'END{if(NR>200)print NR" "FILENAME}' {} \;
+```
+
+### Split Pattern (from Story 5-7)
+```
+# BEFORE: CampaignDetailSheet.tsx (451 lines)
+# AFTER:
+CampaignDetailSheet.tsx (225 lines)  # Main orchestrator
+├── CampaignEventTable.tsx           # Extracted sub-component
+├── CampaignMetricsSummary.tsx       # Extracted sub-component
+└── hooks/useCampaignDetail.ts       # Extracted hook
+```
+
+---
+
+## 0b. SSR/Hydration Safety (Epic 5 Action Item #2)
+
+> **Why:** Stories 5-4, 5-6, 5-8 all had SSR hydration mismatches. This was the #1 recurring code review issue in Epic 5.
+
+### Client Directive Check
+- [ ] **`'use client'` added** - Components using these MUST have `'use client'` as first line:
+  - `useState`, `useEffect`, `useRef`, `useReducer`
+  - `useRouter()`, `usePathname()`, `useSearchParams()`
+  - `onClick`, `onChange`, `onSubmit` handlers
+  - Browser APIs (`window`, `document`, `localStorage`)
+  - Third-party hooks (TanStack Query, TanStack Table)
+
+### Hydration Mismatch Prevention
+- [ ] **No Date in initial render** - Use `useEffect` for `new Date()` / `Date.now()`
+- [ ] **No `Math.random()`** - Don't generate random values during render
+- [ ] **No `window` checks** - Use `typeof window !== 'undefined'` in `useEffect` only
+- [ ] **Suspense boundary** - Components using `useSearchParams()` wrapped in `<Suspense>`
+
+### Quick Pattern
+```typescript
+// WRONG - Causes hydration mismatch
+export function TimeDisplay() {
+  return <span>{new Date().toLocaleString()}</span>
+}
+
+// CORRECT - Client-side only
+'use client'
+export function TimeDisplay() {
+  const [time, setTime] = useState('')
+  useEffect(() => setTime(new Date().toLocaleString()), [])
+  return <span>{time}</span>
+}
+```
 
 ---
 
@@ -136,8 +201,9 @@ Before requesting code review, run through this checklist. Check off each item o
 
 ---
 
-## Quick Reference: Common Epic 4 Issues
+## Quick Reference: Common Issues
 
+### From Epic 4
 | Issue | How to Avoid |
 |-------|--------------|
 | API param mismatch | Check `docs/api/api-contract.md` |
@@ -148,6 +214,14 @@ Before requesting code review, run through this checklist. Check off each item o
 | Missing aria-sort | Add to sortable column headers |
 | Time in wrong unit | Backend returns MINUTES, not seconds |
 
+### From Epic 5
+| Issue | How to Avoid |
+|-------|--------------|
+| Component > 300 lines | Split before code review, extract hooks + sub-components |
+| Hydration mismatch | Add `'use client'`, no Date in render, Suspense for searchParams |
+| Naming conflict | Check existing component names before creating new ones |
+| Missing TEA guardrail | Run TEA after every story approval |
+
 ---
 
 ## Checklist Summary
@@ -155,6 +229,8 @@ Before requesting code review, run through this checklist. Check off each item o
 Before requesting code review, confirm:
 
 ```
+[ ] File size checked - No component > 300 lines (Epic 5 Action #1)
+[ ] SSR/Hydration safe - 'use client' added where needed (Epic 5 Action #2)
 [ ] Edge cases handled (null, undefined, empty, whitespace, NaN)
 [ ] Accessibility complete (keyboard, screen reader, touch)
 [ ] UI states covered (loading, empty, error, responsive)
@@ -163,6 +239,42 @@ Before requesting code review, confirm:
 [ ] Documentation updated (story file, comments)
 ```
 
+After code review APPROVED, confirm:
+
+```
+[ ] TEA Guardrail Automation run (Epic 5 Action #3)
+```
+
+---
+
+## 7. Post-Implementation: TEA Guardrail (Epic 5 Action Item #3)
+
+> **Why:** TEA guardrail automation caught 3 production bugs in Epic 5 (isBelow logic, race condition, async error handling). Run after EVERY story.
+
+### When to Run
+- After code review is **APPROVED**
+- Before marking story as **done**
+
+### How to Run
+```
+/bmad:bmm:agents:tea
+# Select: [TA] TEA Automate (expand test coverage)
+```
+
+### Expected Outcome
+- TEA analyzes existing tests and source code
+- Generates additional guardrail tests for edge cases
+- May discover bugs in source code (happened 3 times in Epic 5)
+- Typical output: +25-80 new tests per story
+
+### Epic 5 TEA Results (Reference)
+| Story | New Tests | Bugs Found |
+|-------|-----------|------------|
+| 5-1 | +40 | Race condition in unique counting |
+| 5-5 | +80 | `isBelow` logic bug |
+| 5-7 | +48 | - |
+| 5-9 | +25 | - |
+
 ---
 
 ## Version History
@@ -170,3 +282,7 @@ Before requesting code review, confirm:
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-19 | Initial version from Epic 4 Retrospective | Bob (SM Agent) |
+| 2026-01-31 | Added Section 0: File Size & Structure (Epic 5 Action #1) | Amelia (Dev Agent) |
+| 2026-01-31 | Added Section 0b: SSR/Hydration Safety (Epic 5 Action #2) | Amelia (Dev Agent) |
+| 2026-01-31 | Added Section 7: TEA Guardrail post-implementation step (Epic 5 Action #3) | Amelia (Dev Agent) |
+| 2026-01-31 | Added Epic 5 Common Issues to Quick Reference | Amelia (Dev Agent) |

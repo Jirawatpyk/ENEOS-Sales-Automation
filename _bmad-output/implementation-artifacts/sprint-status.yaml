@@ -133,18 +133,18 @@ development_status:
   # Updated: 2026-01-30 - New structure with Backend webhook first
   # Data Source: Brevo Campaign Events webhook (NOT from Leads sheet)
   # ============================================================
-  epic-5: in-progress
+  epic-5: done  # All 9 stories completed 2026-01-31
   # Backend Features (Prerequisite)
-  5-1-campaign-webhook-backend: done  # POST /webhook/brevo/campaign + Sheets storage - Code review APPROVED (2026-01-30)
-  5-2-campaign-stats-api: done                 # GET /api/admin/campaigns/stats + /campaigns/:id/events - Code review APPROVED (2026-01-30)
+  5-1-campaign-webhook-backend: done  # POST /webhook/brevo/campaign + Sheets storage - Code review APPROVED (2026-01-30), TEA guardrails +40 tests + 3 source fixes (2026-01-31)
+  5-2-campaign-stats-api: done                 # GET /api/admin/campaigns/stats + /campaigns/:id/events - Code review APPROVED (2026-01-30), TEA guardrails +41 tests (175 total) 2026-01-31
   # Frontend Features
   5-3-campaign-summary-cards: done              # F-05.F1: Total Campaigns, Delivered, Opened, Clicked - Code review APPROVED (2026-01-31)
   5-4-campaign-table: done                      # F-05.F2: Campaign list with metrics - Code review APPROVED, E2E tests added (2026-01-31)
   5-5-open-click-rates: done                      # F-05.F3: Open Rate & Click Rate display - Code review APPROVED + TEA guardrail tests (2026-01-31)
   5-6-campaign-performance-chart: done   # F-05.F4: Bar chart comparison - Code review APPROVED + TEA guardrail tests (43 tests) 2026-01-31
   5-7-campaign-detail-sheet: done               # F-05.F5: Event log per campaign - Code review APPROVED + TEA guardrails (125 tests, 12 files) 2026-01-31
-  5-8-campaign-date-filter: ready-for-dev      # F-05.F6: Date range filter - Story created 2026-01-31
-  5-9-campaign-export: ready-for-dev           # F-05.F7: Export campaign data - Story created 2026-01-31
+  5-8-campaign-date-filter: done                  # F-05.F6: Date range filter - Code review APPROVED + fixes applied (2026-01-31)
+  5-9-campaign-export: done                       # F-05.F7: Export campaign data - Code review APPROVED + TEA guardrails (58 tests) 2026-01-31
   epic-5-retrospective: optional
 
   # ============================================================
@@ -153,7 +153,7 @@ development_status:
   # ============================================================
   epic-6: in-progress
   6-1-export-to-excel: done          # Backend bugfixes: ExcelJS import, filename format, Thai font support - Code review passed (2026-01-27)
-  6-2-export-to-pdf: backlog
+  6-2-export-to-pdf: ready-for-dev  # Story created 2026-01-31 - PDF preview modal, viewer integration
   6-3-quick-reports: backlog
   6-4-custom-date-range: backlog
   6-5-select-data-fields: backlog
@@ -218,24 +218,24 @@ development_status:
 # EPIC-04 Status: ✅ COMPLETED (14/14 stories done + retrospective)
 #   - All stories completed 2026-01-27 (including grounding fields UI)
 #
-# EPIC-05 Status: 🚧 IN PROGRESS (7/9 done, 2 ready-for-dev)
+# EPIC-05 Status: ✅ COMPLETED (9/9 stories done)
 #   - Backend: 5-1, 5-2 done
-#   - Frontend: 5-3, 5-4, 5-5, 5-6, 5-7 done, 5-8, 5-9 ready-for-dev
+#   - Frontend: 5-3, 5-4, 5-5, 5-6, 5-7, 5-8, 5-9 all done (2026-01-31)
 #
-# Completed Epics: 5 (EPIC-00, EPIC-01, EPIC-02, EPIC-03, EPIC-04)
-# Completed Stories: 53 (15 + 5 + 9 + 8 + 14 + 2)  # E0:15, E1:5, E2:9, E3:8, E4:14, E5:2
-# In Progress: Epic-5 (2 done, 1 review, 1 ready-for-dev, 5 backlog)
+# Completed Epics: 6 (EPIC-00, EPIC-01, EPIC-02, EPIC-03, EPIC-04, EPIC-05)
+# Completed Stories: 62 (15 + 5 + 9 + 8 + 14 + 9 + 2)  # E0:15, E1:5, E2:9, E3:8, E4:14, E5:9, E6:2
+# In Progress: Epic-6 (2 done, 6 backlog)
 #
-# CURRENT: Epic-5 Campaign Analytics (9 stories)
-#   - 5-1 Campaign Webhook Backend: ✅ done (2026-01-30)
-#   - 5-2 Campaign Stats API: ✅ done (2026-01-30)
+# COMPLETED: Epic-5 Campaign Analytics (9/9 stories done - 2026-01-31)
+#   - 5-1 Campaign Webhook Backend: ✅ done (2026-01-30) + TEA guardrails (2026-01-31)
+#   - 5-2 Campaign Stats API: ✅ done (2026-01-30) + TEA guardrails (175 tests) 2026-01-31
 #   - 5-3 Campaign Summary Cards: ✅ done (2026-01-31)
 #   - 5-4 Campaign Table: ✅ done (2026-01-31) - Code review APPROVED
 #   - 5-5 Open/Click Rates: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (172 tests)
 #   - 5-6 Campaign Performance Chart: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (92 tests)
 #   - 5-7 Campaign Detail Sheet: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (125 tests, 12 files)
-#   - 5-8 Campaign Date Filter: 📋 ready-for-dev (story created 2026-01-31)
-#   - 5-9 Campaign Export: 📋 ready-for-dev (story created 2026-01-31)
+#   - 5-8 Campaign Date Filter: ✅ done (2026-01-31) - Code review APPROVED + 6 fixes applied
+#   - 5-9 Campaign Export: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (58 tests)
 #
 # RECOMMENDED MVP (Phase 1):
 # - EPIC-01: Authentication (5 stories) - ✅ COMPLETED

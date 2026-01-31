@@ -1101,4 +1101,621 @@ describe('CampaignStatsService', () => {
       expect(result.pagination.totalPages).toBe(4);
     });
   });
+
+  // ===========================================
+  // Guardrail Tests - Edge Cases & Resilience
+  // ===========================================
+
+  describe('Guardrail: Rate Calculation Edge Cases', () => {
+    it('[P1] should return 0 rates when delivered is 0', async () => {
+      // Simulates a scenario where no deliveries but somehow opens/clicks exist (data corruption)
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Test', '0', '5', '3', '2', '1', '0', '0', '0', '0', '0', '0', '2026-01-01', '2026-01-30'],
+          ],
+        },
+      });
+      mockSheetsClient.spreadsheets.values.update.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'opened' });
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 3);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.update.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      // With 0 delivered, rates should be 0 (not NaN or Infinity)
+      expect(row[7]).toBe(0); // Open_Rate
+      expect(row[8]).toBe(0); // Click_Rate
+    });
+
+    it('[P2] should calculate rates correctly with large numbers', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Test', '100000', '50000', '10000', '0', '0', '0', '0', '0', '0', '0', '0', '2026-01-01', '2026-01-30'],
+          ],
+        },
+      });
+      mockSheetsClient.spreadsheets.values.update.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'opened' });
+      // 33333 unique opens / 100000 delivered = 33.33%
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 33333);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.update.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      expect(row[5]).toBe(33333); // Unique_Opens set directly
+      expect(row[7]).toBe(33.33); // Open_Rate with 2 decimal precision
+    });
+  });
+
+  describe('Guardrail: countUniqueEmailsForEvent Edge Cases', () => {
+    it('[P1] should count empty email rows as 1 unique (empty string)', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Email', 'Event'],
+            ['100', 'Test', '', 'opened'],      // empty email
+            ['100', 'Test', '', 'opened'],      // same empty email
+            ['100', 'Test', 'a@b.com', 'opened'],
+          ],
+        },
+      });
+
+      const result = await campaignStatsService.countUniqueEmailsForEvent(100, 'opened');
+      // 2 unique: '' and 'a@b.com'
+      expect(result).toBe(2);
+    });
+
+    it('[P1] should handle sparse rows with missing columns', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Email', 'Event'],
+            ['100', 'Test'],                    // Only 2 columns (sparse row)
+            ['100', 'Test', 'a@b.com', 'opened'], // Full row
+          ],
+        },
+      });
+
+      const result = await campaignStatsService.countUniqueEmailsForEvent(100, 'opened');
+      // Sparse row has undefined email and event, should not match
+      expect(result).toBe(1);
+    });
+
+    it('[P2] should return 0 when no events exist for campaign', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },
+      });
+
+      const result = await campaignStatsService.countUniqueEmailsForEvent(999, 'opened');
+      expect(result).toBe(0);
+    });
+
+    it('[P2] should be case-insensitive for email matching', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Email', 'Event'],
+            ['100', 'Test', 'User@Example.COM', 'opened'],
+            ['100', 'Test', 'user@example.com', 'opened'],
+          ],
+        },
+      });
+
+      const result = await campaignStatsService.countUniqueEmailsForEvent(100, 'opened');
+      // Both should count as 1 unique (case insensitive)
+      expect(result).toBe(1);
+    });
+  });
+
+  describe('Guardrail: Partial Failure Scenarios', () => {
+    it('[P0] should return error when writeCampaignEvent fails after duplicate check passes', async () => {
+      // Step 1: duplicate check passes
+      mockSheetsClient.spreadsheets.values.get
+        .mockResolvedValueOnce({ data: { values: [['header']] } }); // checkDuplicate - no rows
+      // Step 2: write fails
+      mockSheetsClient.spreadsheets.values.append
+        .mockRejectedValueOnce(new Error('Sheets quota exceeded'));
+
+      const event = createMockEvent();
+      const result = await campaignStatsService.recordCampaignEvent(event);
+
+      // Write failure is a hard error - event not recorded
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Sheets quota exceeded');
+    });
+
+    it('[P1] should return success when countUnique fails after write succeeds (stats stale)', async () => {
+      // Step 1: duplicate check passes
+      mockSheetsClient.spreadsheets.values.get
+        .mockResolvedValueOnce({ data: { values: [['header']] } }); // checkDuplicate
+      // Step 2: write succeeds
+      mockSheetsClient.spreadsheets.values.append
+        .mockResolvedValueOnce({ data: {} });
+      // Step 3: countUnique fails
+      mockSheetsClient.spreadsheets.values.get
+        .mockRejectedValueOnce(new Error('Network timeout'));
+
+      const event = createMockEvent();
+      const result = await campaignStatsService.recordCampaignEvent(event);
+
+      // Event was written (source of truth) — return success even though stats failed
+      // Stats can be reconciled later from Campaign_Events
+      expect(result.success).toBe(true);
+      expect(result.duplicate).toBe(false);
+    });
+
+    it('[P1] should return success when updateStats fails after countUnique succeeds (stats stale)', async () => {
+      // Step 1: duplicate check
+      mockSheetsClient.spreadsheets.values.get
+        .mockResolvedValueOnce({ data: { values: [['header']] } }); // checkDuplicate
+      // Step 2: write succeeds
+      mockSheetsClient.spreadsheets.values.append
+        .mockResolvedValueOnce({ data: {} });
+      // Step 3: countUnique succeeds
+      mockSheetsClient.spreadsheets.values.get
+        .mockResolvedValueOnce({
+          data: { values: [['header'], ['100', 'Test', 'test@test.com', 'click']] },
+        });
+      // Step 4: getCampaignStats (inside updateStatsWithUniqueCount)
+      mockSheetsClient.spreadsheets.values.get
+        .mockResolvedValueOnce({ data: { values: [['header']] } }); // no existing stats
+      // Step 5: createNew fails
+      mockSheetsClient.spreadsheets.values.append
+        .mockRejectedValueOnce(new Error('Stats sheet locked'));
+
+      const event = createMockEvent();
+      const result = await campaignStatsService.recordCampaignEvent(event);
+
+      // Event was written (source of truth) — return success even though stats failed
+      expect(result.success).toBe(true);
+      expect(result.duplicate).toBe(false);
+    });
+  });
+
+  describe('Guardrail: checkDuplicateEvent Edge Cases', () => {
+    it('[P1] should handle malformed eventId in sheet (non-numeric)', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header'], ['abc'], ['12345'], ['not_a_number']] },
+      });
+
+      // NaN !== 12345 so malformed rows should not match
+      const result = await campaignStatsService.checkDuplicateEvent(12345);
+      expect(result).toBe(true);
+    });
+
+    it('[P1] should handle empty sheet (no data rows)', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },
+      });
+
+      const result = await campaignStatsService.checkDuplicateEvent(12345);
+      expect(result).toBe(false);
+    });
+
+    it('[P2] should handle null/undefined values in response', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: null },
+      });
+
+      const result = await campaignStatsService.checkDuplicateEvent(12345);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('Guardrail: updateExistingCampaignStats Padding', () => {
+    it('[P1] should pad short rows to 15 columns', async () => {
+      // Existing row with only 5 columns (missing most fields)
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked'],
+            ['100', 'Short Row', '10', '5', '2'],  // Only 5 columns
+          ],
+        },
+      });
+      mockSheetsClient.spreadsheets.values.update.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'delivered' });
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 0);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.update.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      // Row should be padded to 15 columns
+      expect(row.length).toBe(15);
+      // Delivered should be incremented (10 + 1 = 11)
+      expect(row[2]).toBe(11);
+    });
+  });
+
+  describe('Guardrail: Future Event Types in New Flow', () => {
+    it('[P1] should increment hard_bounce in updateCampaignStatsWithUniqueCount', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },  // No existing stats
+      });
+      mockSheetsClient.spreadsheets.values.append.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'hard_bounce' });
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 0);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.append.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      expect(row[9]).toBe(1);   // Hard_Bounce = 1
+      expect(row[10]).toBe(0);  // Soft_Bounce = 0
+    });
+
+    it('[P1] should increment soft_bounce in updateCampaignStatsWithUniqueCount', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },
+      });
+      mockSheetsClient.spreadsheets.values.append.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'soft_bounce' });
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 0);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.append.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      expect(row[10]).toBe(1); // Soft_Bounce = 1
+    });
+
+    it('[P1] should increment unsubscribe in updateCampaignStatsWithUniqueCount', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },
+      });
+      mockSheetsClient.spreadsheets.values.append.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'unsubscribe' });
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 0);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.append.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      expect(row[11]).toBe(1); // Unsubscribe = 1
+    });
+
+    it('[P1] should increment spam in updateCampaignStatsWithUniqueCount', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['header']] },
+      });
+      mockSheetsClient.spreadsheets.values.append.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'spam' });
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 0);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.append.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      expect(row[12]).toBe(1); // Spam = 1
+    });
+  });
+
+  describe('Guardrail: healthCheck', () => {
+    it('[P1] should return healthy:true when sheets are accessible', async () => {
+      mockSheetsClient.spreadsheets = {
+        ...mockSheetsClient.spreadsheets,
+        get: vi.fn().mockResolvedValue({ data: { spreadsheetId: 'test-id' } }),
+      };
+
+      const result = await campaignStatsService.healthCheck();
+
+      expect(result.healthy).toBe(true);
+      expect(result.latency).toBeGreaterThanOrEqual(0);
+    });
+
+    it('[P1] should return healthy:false when sheets are inaccessible', async () => {
+      mockSheetsClient.spreadsheets = {
+        ...mockSheetsClient.spreadsheets,
+        get: vi.fn().mockRejectedValue(new Error('Service unavailable')),
+      };
+
+      const result = await campaignStatsService.healthCheck();
+
+      expect(result.healthy).toBe(false);
+      expect(result.latency).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  // ===========================================
+  // TEA Guardrail Tests - Story 5-2 (Automate)
+  // ===========================================
+
+  describe('Guardrail: Pagination Boundary Conditions', () => {
+    const mockStatsData = [
+      ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+      ['100', 'Campaign A', '100', '50', '20', '40', '15', '40', '15', '0', '0', '0', '0', '2026-01-15T10:00:00.000Z', '2026-01-30T15:30:00.000Z'],
+      ['101', 'Campaign B', '200', '100', '50', '80', '40', '40', '20', '0', '0', '0', '0', '2026-01-10T08:00:00.000Z', '2026-01-28T12:00:00.000Z'],
+    ];
+
+    it('[P1] should return empty array when page exceeds totalPages', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      // There are only 2 campaigns, with limit=20 that's 1 page
+      // Requesting page 5 should return empty
+      const result = await campaignStatsService.getAllCampaignStats({ page: 5, limit: 20 });
+
+      expect(result.data).toEqual([]);
+      expect(result.pagination.total).toBe(2);
+      expect(result.pagination.totalPages).toBe(1);
+      expect(result.pagination.page).toBe(5);
+    });
+
+    it('[P1] should return all data when limit exceeds total', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({ page: 1, limit: 100 });
+
+      expect(result.data.length).toBe(2);
+      expect(result.pagination.total).toBe(2);
+      expect(result.pagination.hasNext).toBe(false);
+    });
+
+    it('[P2] should handle page 2 with exact boundary (limit = total)', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      // 2 campaigns, limit=2, page=2 should be empty
+      const result = await campaignStatsService.getAllCampaignStats({ page: 2, limit: 2 });
+
+      expect(result.data).toEqual([]);
+      expect(result.pagination.page).toBe(2);
+      expect(result.pagination.totalPages).toBe(1);
+    });
+  });
+
+  describe('Guardrail: Sorting with Missing/Empty Date Fields', () => {
+    it('[P1] should handle rows with empty firstEvent in sorting', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Campaign A', '100', '50', '20', '40', '15', '40', '15', '0', '0', '0', '0', '', '2026-01-30T15:30:00.000Z'],  // Empty firstEvent
+            ['101', 'Campaign B', '200', '100', '50', '80', '40', '40', '20', '0', '0', '0', '0', '2026-01-10T08:00:00.000Z', '2026-01-28T12:00:00.000Z'],
+          ],
+        },
+      });
+
+      // Should not throw - empty string becomes Invalid Date with NaN timestamp
+      const result = await campaignStatsService.getAllCampaignStats({
+        sortBy: 'First_Event',
+        sortOrder: 'asc',
+      });
+
+      expect(result.data.length).toBe(2);
+      // Empty date (NaN) comparison behavior may vary, but should not crash
+    });
+
+    it('[P1] should handle rows with empty lastUpdated in sorting', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Campaign A', '100', '50', '20', '40', '15', '40', '15', '0', '0', '0', '0', '2026-01-15T10:00:00.000Z', ''],  // Empty lastUpdated
+            ['101', 'Campaign B', '200', '100', '50', '80', '40', '40', '20', '0', '0', '0', '0', '2026-01-10T08:00:00.000Z', '2026-01-28T12:00:00.000Z'],
+          ],
+        },
+      });
+
+      // Default sort is by Last_Updated desc
+      const result = await campaignStatsService.getAllCampaignStats();
+
+      expect(result.data.length).toBe(2);
+      // Empty date rows should not crash the sort
+    });
+  });
+
+  describe('Guardrail: Row Parsing with Sparse/Missing Data', () => {
+    it('[P1] should skip rows with empty campaignId (row[0])', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered'],
+            ['', 'Empty ID Campaign', '100'],  // Empty campaign ID - should be skipped
+            ['100', 'Valid Campaign', '200'],
+          ],
+        },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats();
+
+      // Only valid campaign should be returned
+      expect(result.data.length).toBe(1);
+      expect(result.data[0].campaignId).toBe(100);
+    });
+
+    it('[P1] should handle row with only 2 columns (sparse)', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Sparse Row'],  // Only 2 columns
+          ],
+        },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats();
+
+      expect(result.data.length).toBe(1);
+      expect(result.data[0].campaignId).toBe(100);
+      expect(result.data[0].campaignName).toBe('Sparse Row');
+      // Missing columns should default to 0 or empty string
+      expect(result.data[0].delivered).toBe(0);
+      expect(result.data[0].firstEvent).toBe('');
+    });
+
+    it('[P2] should handle getCampaignEvents with sparse event rows', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event', 'Event_At', 'Sent_At', 'URL', 'Tag', 'Segment_IDs', 'Created_At'],
+            ['1001', '100'],  // Sparse row - missing most fields
+            ['1002', '100', 'BMF2026', 'user@test.com', 'click', '2026-01-30T10:00:00.000Z', '', 'https://example.com', '', '[]', '2026-01-30T10:00:00.000Z'],
+          ],
+        },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100);
+
+      // Both rows match campaign 100, but sparse row should have defaults
+      expect(result.data.length).toBe(2);
+    });
+  });
+
+  describe('Guardrail: Search Edge Cases', () => {
+    const mockStatsData = [
+      ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+      ['100', 'BMF2026 Launch', '100', '50', '20', '40', '15', '40', '15', '0', '0', '0', '0', '2026-01-15T10:00:00.000Z', '2026-01-30T15:30:00.000Z'],
+      ['101', 'Q1 Promo', '200', '100', '50', '80', '40', '40', '20', '0', '0', '0', '0', '2026-01-10T08:00:00.000Z', '2026-01-28T12:00:00.000Z'],
+    ];
+
+    it('[P2] should treat empty search string as no filter (return all)', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({ search: '' });
+
+      // Empty string search should match all (includes('') is always true)
+      expect(result.data.length).toBe(2);
+    });
+
+    it('[P2] should handle whitespace-only search', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({ search: '   ' });
+
+      // Whitespace search matches campaigns with spaces in name
+      // 'bmf2026 launch'.includes('   ') = false (no triple space)
+      expect(result.data.length).toBe(0);
+    });
+
+    it('[P2] should handle special characters in search', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockStatsData },
+      });
+
+      const result = await campaignStatsService.getAllCampaignStats({ search: '*' });
+
+      // Asterisk is literal, not wildcard
+      expect(result.data.length).toBe(0);
+    });
+  });
+
+  describe('Guardrail: Rate Precision Edge Cases', () => {
+    it('[P1] should handle very small open rates (0.01%)', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Test', '10000', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '2026-01-01', '2026-01-30'],
+          ],
+        },
+      });
+      mockSheetsClient.spreadsheets.values.update.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'opened' });
+      // 1 unique open / 10000 delivered = 0.01%
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 1);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.update.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      expect(row[7]).toBe(0.01); // 0.01% with 2 decimal precision
+    });
+
+    it('[P2] should handle rates that round to 100%', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Test', '100', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '2026-01-01', '2026-01-30'],
+          ],
+        },
+      });
+      mockSheetsClient.spreadsheets.values.update.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'opened' });
+      // 100 unique opens / 100 delivered = 100%
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 100);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.update.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      expect(row[7]).toBe(100); // Exactly 100%
+    });
+
+    it('[P2] should handle rates over 100% (data anomaly)', async () => {
+      // This can happen if unique count > delivered (data corruption)
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Campaign_ID', 'Campaign_Name', 'Delivered', 'Opened', 'Clicked', 'Unique_Opens', 'Unique_Clicks', 'Open_Rate', 'Click_Rate', 'Hard_Bounce', 'Soft_Bounce', 'Unsubscribe', 'Spam', 'First_Event', 'Last_Updated'],
+            ['100', 'Test', '50', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '2026-01-01', '2026-01-30'],
+          ],
+        },
+      });
+      mockSheetsClient.spreadsheets.values.update.mockResolvedValue({});
+
+      const event = createMockEvent({ event: 'opened' });
+      // 75 unique opens / 50 delivered = 150% (anomaly)
+      await campaignStatsService.updateCampaignStatsWithUniqueCount(event, 75);
+
+      const callArgs = mockSheetsClient.spreadsheets.values.update.mock.calls[0][0];
+      const row = callArgs.requestBody.values[0];
+
+      // Service doesn't validate this, just calculates
+      expect(row[7]).toBe(150); // 150% (allowed, flags data issue)
+    });
+  });
+
+  describe('Guardrail: getCampaignEvents Date Filtering Edge Cases', () => {
+    const mockEventsData = [
+      ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event', 'Event_At', 'Sent_At', 'URL', 'Tag', 'Segment_IDs', 'Created_At'],
+      ['1001', '100', 'BMF2026', 'user1@test.com', 'click', '2026-01-15T00:00:00.000Z', '', '', '', '[]', '2026-01-15T00:00:00.000Z'],
+      ['1002', '100', 'BMF2026', 'user2@test.com', 'click', '2026-01-15T23:59:59.999Z', '', '', '', '[]', '2026-01-15T23:59:59.999Z'],
+      ['1003', '100', 'BMF2026', 'user3@test.com', 'click', '2026-01-16T00:00:00.000Z', '', '', '', '[]', '2026-01-16T00:00:00.000Z'],
+    ];
+
+    it('[P1] should include events at exact dateFrom boundary', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100, {
+        dateFrom: '2026-01-15T00:00:00.000Z',
+      });
+
+      // Should include event at exactly 2026-01-15T00:00:00.000Z
+      expect(result.data.some((e) => e.eventId === 1001)).toBe(true);
+    });
+
+    it('[P1] should include events at exact dateTo boundary', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100, {
+        dateTo: '2026-01-15T23:59:59.999Z',
+      });
+
+      // Should include event at exactly 2026-01-15T23:59:59.999Z
+      expect(result.data.some((e) => e.eventId === 1002)).toBe(true);
+      // Should NOT include event at 2026-01-16
+      expect(result.data.some((e) => e.eventId === 1003)).toBe(false);
+    });
+  });
 });

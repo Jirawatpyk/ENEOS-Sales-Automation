@@ -470,4 +470,160 @@ describe('Campaign Webhook Controller', () => {
       );
     });
   });
+
+  // ===========================================
+  // Guardrail Tests - Edge Cases & Security
+  // ===========================================
+
+  describe('handleCampaignWebhook - Guardrail: DLQ Arguments', () => {
+    it('[P1] should pass correct arguments to DLQ on service failure', async () => {
+      mockRecordCampaignEvent.mockResolvedValue({
+        success: false,
+        duplicate: false,
+        error: 'Sheets API timeout',
+        eventId: 456,
+        campaignId: 123,
+      });
+      mockAddFailedCampaignWebhook.mockReturnValue('dlq-456');
+
+      const req = createMockRequest(validPayload);
+      const { res } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      await vi.runAllTimersAsync();
+
+      // Verify DLQ receives the raw payload, error, and requestId
+      expect(mockAddFailedCampaignWebhook).toHaveBeenCalledWith(
+        validPayload,
+        expect.any(Error),
+        'test-request-id'
+      );
+    });
+  });
+
+  describe('handleCampaignWebhook - Guardrail: Edge Cases', () => {
+    it('[P2] should handle undefined requestId gracefully', async () => {
+      mockRecordCampaignEvent.mockResolvedValue({
+        success: false,
+        duplicate: false,
+        error: 'Failure',
+        eventId: 456,
+        campaignId: 123,
+      });
+      mockAddFailedCampaignWebhook.mockReturnValue('dlq-789');
+
+      const req = {
+        body: validPayload,
+        requestId: undefined,
+      } as Partial<Request>;
+      const { res, statusMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(200);
+
+      await vi.runAllTimersAsync();
+
+      expect(mockAddFailedCampaignWebhook).toHaveBeenCalledWith(
+        validPayload,
+        expect.any(Error),
+        undefined
+      );
+    });
+
+    it('[P1] should return 400 for empty string event type (rejected by validator)', async () => {
+      const emptyEventPayload = {
+        camp_id: 1,
+        email: 'test@example.com',
+        event: '',
+        id: 100,
+      };
+
+      const req = createMockRequest(emptyEventPayload);
+      const { res, statusMock, jsonMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      // Empty event is now rejected by Zod .min(1) constraint
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: 'Invalid payload',
+        })
+      );
+      expect(mockRecordCampaignEvent).not.toHaveBeenCalled();
+    });
+
+    it('[P1] should return 200 with eventId and campaignId in response body', async () => {
+      mockRecordCampaignEvent.mockResolvedValue({
+        success: true,
+        duplicate: false,
+        eventId: 456,
+        campaignId: 123,
+      });
+
+      const req = createMockRequest(validPayload);
+      const { res, jsonMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventId: 456,
+          campaignId: 123,
+        })
+      );
+
+      await vi.runAllTimersAsync();
+    });
+
+    it('[P1] should handle all disabled event types without calling service', async () => {
+      const disabledEvents = ['hard_bounce', 'soft_bounce', 'unsubscribe', 'spam', 'unknown_type'];
+
+      for (const eventType of disabledEvents) {
+        vi.clearAllMocks();
+        const payload = {
+          camp_id: 1,
+          email: 'test@example.com',
+          event: eventType,
+          id: 1,
+        };
+
+        const req = createMockRequest(payload);
+        const { res, statusMock } = createMockResponse();
+        const next = vi.fn();
+
+        await handleCampaignWebhook(
+          req as Request,
+          res as Response,
+          next as NextFunction
+        );
+
+        expect(statusMock).toHaveBeenCalledWith(200);
+        expect(mockRecordCampaignEvent).not.toHaveBeenCalled();
+      }
+    });
+  });
 });

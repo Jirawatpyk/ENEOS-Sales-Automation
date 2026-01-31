@@ -1,6 +1,6 @@
 # Story 5.9: Campaign Export
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -82,57 +82,57 @@ so that **I can share email campaign performance reports with stakeholders, anal
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create Campaign Export Column Config** (AC: #5)
-  - [ ] 1.1 Create `src/lib/export-campaigns.ts`
-  - [ ] 1.2 Define `CAMPAIGN_EXPORT_COLUMNS` array with key, header, width, format
-  - [ ] 1.3 Include all campaign stats fields: campaignId, campaignName, delivered, opened, clicked, uniqueOpens, uniqueClicks, openRate, clickRate, firstEvent, lastUpdated
-  - [ ] 1.4 Add format functions for percentages and dates
-  - [ ] 1.5 Export `exportCampaignsToExcel()` function
-  - [ ] 1.6 Export `exportCampaignsToCSV()` function
-  - [ ] 1.7 Write unit tests (6+ test cases)
+- [x] **Task 1: Create Campaign Export Column Config** (AC: #5)
+  - [x] 1.1 Create `src/lib/export-campaigns.ts`
+  - [x] 1.2 Define `CAMPAIGN_EXPORT_COLUMNS` array with key, header, width, format
+  - [x] 1.3 Include all campaign stats fields: campaignId, campaignName, delivered, opened, clicked, uniqueOpens, uniqueClicks, openRate, clickRate, firstEvent, lastUpdated
+  - [x] 1.4 Add format functions for percentages and dates
+  - [x] 1.5 Export `exportCampaignsToExcel()` function
+  - [x] 1.6 Export `exportCampaignsToCSV()` function
+  - [x] 1.7 Write unit tests (24 test cases)
 
-- [ ] **Task 2: Create Campaign Export Hook** (AC: #3, #6, #7, #8, #9)
-  - [ ] 2.1 Create `src/hooks/use-export-campaigns.ts`
-  - [ ] 2.2 Accept `dateFrom` and `dateTo` params for filtered export
-  - [ ] 2.3 Manage `isExporting` loading state
-  - [ ] 2.4 Fetch all campaign data using existing `fetchCampaignStats()`
-  - [ ] 2.5 Call export functions from `export-campaigns.ts`
-  - [ ] 2.6 Show success/error toasts using `useToast()`
-  - [ ] 2.7 Handle empty results with info toast
-  - [ ] 2.8 Write unit tests (8+ test cases)
+- [x] **Task 2: Create Campaign Export Hook** (AC: #3, #6, #7, #8, #9)
+  - [x] 2.1 Create `src/hooks/use-export-campaigns.ts`
+  - [x] 2.2 Accept `dateFrom` and `dateTo` params for filtered export
+  - [x] 2.3 Manage `isExporting` loading state
+  - [x] 2.4 Fetch all campaign data using existing `fetchCampaignStats()`
+  - [x] 2.5 Call export functions from `export-campaigns.ts`
+  - [x] 2.6 Show success/error toasts using `useToast()`
+  - [x] 2.7 Handle empty results with info toast
+  - [x] 2.8 Write unit tests (17 test cases)
 
-- [ ] **Task 3: Create Campaign Export Dropdown Component** (AC: #1, #2, #10, #11)
-  - [ ] 3.1 Create `src/components/campaigns/campaign-export-dropdown.tsx`
-  - [ ] 3.2 REUSE pattern from `src/components/leads/lead-export-dropdown.tsx`
-  - [ ] 3.3 Use shadcn/ui DropdownMenu component
-  - [ ] 3.4 Add Excel and CSV options with icons (FileSpreadsheet, FileText)
-  - [ ] 3.5 Show loading spinner during export
-  - [ ] 3.6 Add confirmation dialog for large exports (>100 campaigns)
-  - [ ] 3.7 Add aria-labels and keyboard accessibility
-  - [ ] 3.8 Write unit tests (6+ test cases)
+- [x] **Task 3: Create Campaign Export Dropdown Component** (AC: #1, #2, #10, #11)
+  - [x] 3.1 Create `src/components/campaigns/campaign-export-dropdown.tsx`
+  - [x] 3.2 REUSE pattern from `src/components/leads/lead-export-dropdown.tsx`
+  - [x] 3.3 Use shadcn/ui DropdownMenu component
+  - [x] 3.4 Add Excel and CSV options with icons (FileSpreadsheet, FileText)
+  - [x] 3.5 Show loading spinner during export
+  - [x] 3.6 Add confirmation dialog for large exports (>100 campaigns)
+  - [x] 3.7 Add aria-labels and keyboard accessibility
+  - [x] 3.8 Write unit tests (14 test cases)
 
-- [ ] **Task 4: Update Campaigns Content Component** (AC: #1, #3)
-  - [ ] 4.1 Update `src/components/campaigns/campaigns-content.tsx`
-  - [ ] 4.2 Import and add `CampaignExportDropdown` to header
-  - [ ] 4.3 Pass `dateFrom` and `dateTo` props from `useCampaignDateFilter()`
-  - [ ] 4.4 Position export dropdown next to date filter
+- [x] **Task 4: Update Campaigns Content Component** (AC: #1, #3)
+  - [x] 4.1 Update `src/components/campaigns/campaigns-content.tsx`
+  - [x] 4.2 Import and add `CampaignExportDropdown` to header
+  - [x] 4.3 Pass `dateFrom` and `dateTo` props from `useCampaignDateFilter()`
+  - [x] 4.4 Position export dropdown next to date filter
 
-- [ ] **Task 5: Update Barrel Exports** (AC: #1)
-  - [ ] 5.1 Update `src/components/campaigns/index.ts`
-  - [ ] 5.2 Export `CampaignExportDropdown`
-  - [ ] 5.3 Update `src/hooks/index.ts` (if exists)
-  - [ ] 5.4 Export `useExportCampaigns`
+- [x] **Task 5: Update Barrel Exports** (AC: #1)
+  - [x] 5.1 Update `src/components/campaigns/index.ts`
+  - [x] 5.2 Export `CampaignExportDropdown`
+  - [x] 5.3 Update `src/hooks/index.ts` (if exists)
+  - [x] 5.4 Export `useExportCampaigns`
 
-- [ ] **Task 6: Testing** (AC: #1-#11)
-  - [ ] 6.1 Test export dropdown renders correctly
-  - [ ] 6.2 Test Excel export generates valid file
-  - [ ] 6.3 Test CSV export generates valid file
-  - [ ] 6.4 Test date filter is applied to export
-  - [ ] 6.5 Test loading state during export
-  - [ ] 6.6 Test success toast after export
-  - [ ] 6.7 Test empty data shows info toast
-  - [ ] 6.8 Test large dataset confirmation dialog
-  - [ ] 6.9 Test keyboard accessibility
+- [x] **Task 6: Testing** (AC: #1-#11)
+  - [x] 6.1 Test export dropdown renders correctly
+  - [x] 6.2 Test Excel export generates valid file
+  - [x] 6.3 Test CSV export generates valid file
+  - [x] 6.4 Test date filter is applied to export
+  - [x] 6.5 Test loading state during export
+  - [x] 6.6 Test success toast after export
+  - [x] 6.7 Test empty data shows info toast
+  - [x] 6.8 Test large dataset confirmation dialog
+  - [x] 6.9 Test keyboard accessibility
 
 ## Dev Notes
 
@@ -649,11 +649,40 @@ export interface CampaignStatsItem {
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+N/A
+
 ### Completion Notes List
 
+1. All 11 acceptance criteria implemented and tested
+2. Followed existing Lead Export patterns from Story 4.10 and 6.1
+3. Total 58 tests passing:
+   - export-campaigns.test.ts: 25 tests
+   - use-export-campaigns.test.tsx: 17 tests
+   - campaign-export-dropdown.test.tsx: 16 tests
+4. Date filter integration working with filename generation
+5. Confirmation dialog triggers for >100 campaigns
+6. Full accessibility support (aria-labels, keyboard navigation, screen reader announcements)
+7. **Code Review Fixes (Rex - 2026-01-31):**
+   - Fixed invalid date handling in format functions (returns empty string instead of "Invalid Date")
+   - Added CSV header escaping for future-proofing
+   - Added 3 new tests: invalid date edge cases (1) + loading state display (2)
+
 ### File List
+
+**NEW FILES (Frontend - eneos-admin-dashboard):**
+- `src/lib/export-campaigns.ts` - Column config and export functions
+- `src/hooks/use-export-campaigns.ts` - Export hook with toast notifications
+- `src/components/campaigns/campaign-export-dropdown.tsx` - Export dropdown UI
+- `src/__tests__/lib/export-campaigns.test.ts` - Export functions tests
+- `src/__tests__/hooks/use-export-campaigns.test.tsx` - Hook tests
+- `src/__tests__/components/campaign-export-dropdown.test.tsx` - Component tests
+
+**UPDATED FILES:**
+- `src/components/campaigns/campaigns-content.tsx` - Added export dropdown
+- `src/components/campaigns/index.ts` - Added CampaignExportDropdown export
+- `src/hooks/index.ts` - Added useExportCampaigns export
 

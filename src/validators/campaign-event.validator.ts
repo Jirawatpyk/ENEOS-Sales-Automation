@@ -17,10 +17,10 @@ import { z } from 'zod';
  */
 export const campaignEventSchema = z.object({
   // Required fields
-  camp_id: z.number({ required_error: 'camp_id is required' }),
+  camp_id: z.number({ required_error: 'camp_id is required' }).int('camp_id must be an integer').positive('camp_id must be positive'),
   email: z.string().email('Invalid email format'),
-  event: z.string({ required_error: 'event is required' }),
-  id: z.number({ required_error: 'id is required' }),
+  event: z.string({ required_error: 'event is required' }).min(1, 'event must not be empty'),
+  id: z.number({ required_error: 'id is required' }).int('id must be an integer').positive('id must be positive'),
 
   // Optional fields
   'campaign name': z.string().optional(),

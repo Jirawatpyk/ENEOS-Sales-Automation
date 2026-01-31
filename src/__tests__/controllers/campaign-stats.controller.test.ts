@@ -513,4 +513,213 @@ describe('campaign-stats.controller', () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
   });
+
+  // ===========================================
+  // TEA Guardrail Tests - Story 5-2 (Automate)
+  // ===========================================
+
+  describe('Guardrail: getCampaignStats Edge Cases', () => {
+    it('[P1] should handle empty search parameter (returns all)', async () => {
+      const req = createMockRequest({
+        query: { search: '' },
+      });
+      const res = createMockResponse();
+
+      mockCampaignStatsService.getAllCampaignStats.mockResolvedValue({
+        data: [mockCampaignStatsItem],
+        pagination: mockPagination,
+      });
+
+      await getCampaignStats(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      // Empty search should pass to service (service decides behavior)
+      expect(mockCampaignStatsService.getAllCampaignStats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          search: '',
+        })
+      );
+    });
+
+    it('[P1] should handle service returning empty data array', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+
+      mockCampaignStatsService.getAllCampaignStats.mockResolvedValue({
+        data: [],
+        pagination: { ...mockPagination, total: 0, totalPages: 1 },
+      });
+
+      await getCampaignStats(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: {
+          data: [],
+          pagination: expect.objectContaining({ total: 0 }),
+        },
+      });
+    });
+
+    it('[P2] should pass all query params simultaneously', async () => {
+      const req = createMockRequest({
+        query: {
+          page: '2',
+          limit: '10',
+          search: 'test',
+          dateFrom: '2026-01-01',
+          dateTo: '2026-01-31',
+          sortBy: 'Delivered',
+          sortOrder: 'asc',
+        },
+      });
+      const res = createMockResponse();
+
+      mockCampaignStatsService.getAllCampaignStats.mockResolvedValue({
+        data: [],
+        pagination: mockPagination,
+      });
+
+      await getCampaignStats(req, res, mockNext);
+
+      expect(mockCampaignStatsService.getAllCampaignStats).toHaveBeenCalledWith({
+        page: 2,
+        limit: 10,
+        search: 'test',
+        dateFrom: '2026-01-01',
+        dateTo: '2026-01-31',
+        sortBy: 'Delivered',
+        sortOrder: 'asc',
+      });
+    });
+  });
+
+  describe('Guardrail: getCampaignById Edge Cases', () => {
+    it('[P1] should return 400 for zero campaign ID', async () => {
+      const req = createMockRequest({
+        params: { id: '0' },
+      });
+      const res = createMockResponse();
+
+      await getCampaignById(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: expect.objectContaining({
+            code: 'VALIDATION_ERROR',
+          }),
+        })
+      );
+    });
+
+    it('[P2] should handle very large campaign ID', async () => {
+      const req = createMockRequest({
+        params: { id: '999999999' },
+      });
+      const res = createMockResponse();
+
+      mockCampaignStatsService.getCampaignStatsById.mockResolvedValue(null);
+
+      await getCampaignById(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+    });
+  });
+
+  describe('Guardrail: getCampaignEvents Edge Cases', () => {
+    it('[P1] should handle campaign exists but has no events', async () => {
+      const req = createMockRequest({
+        params: { id: '100' },
+      });
+      const res = createMockResponse();
+
+      mockCampaignStatsService.getCampaignStatsById.mockResolvedValue(mockCampaignStatsItem);
+      mockCampaignStatsService.getCampaignEvents.mockResolvedValue({
+        data: [],
+        pagination: { ...mockPagination, total: 0, totalPages: 1 },
+      });
+
+      await getCampaignEvents(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        data: {
+          data: [],
+          pagination: expect.objectContaining({ total: 0 }),
+        },
+      });
+    });
+
+    it('[P2] should pass all filter params to service', async () => {
+      const req = createMockRequest({
+        params: { id: '100' },
+        query: {
+          page: '3',
+          limit: '25',
+          event: 'click',
+          dateFrom: '2026-01-15',
+          dateTo: '2026-01-30',
+        },
+      });
+      const res = createMockResponse();
+
+      mockCampaignStatsService.getCampaignStatsById.mockResolvedValue(mockCampaignStatsItem);
+      mockCampaignStatsService.getCampaignEvents.mockResolvedValue({
+        data: [],
+        pagination: mockPagination,
+      });
+
+      await getCampaignEvents(req, res, mockNext);
+
+      expect(mockCampaignStatsService.getCampaignEvents).toHaveBeenCalledWith(
+        100,
+        {
+          page: 3,
+          limit: 25,
+          event: 'click',
+          dateFrom: '2026-01-15',
+          dateTo: '2026-01-30',
+        }
+      );
+    });
+  });
+
+  describe('Guardrail: Request User Context', () => {
+    it('[P2] should not crash when req.user is undefined', async () => {
+      const req = createMockRequest({
+        user: undefined,
+      });
+      const res = createMockResponse();
+
+      mockCampaignStatsService.getAllCampaignStats.mockResolvedValue({
+        data: [],
+        pagination: mockPagination,
+      });
+
+      // Should not throw even if user is undefined
+      await getCampaignStats(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('[P2] should not crash when req.user.email is undefined', async () => {
+      const req = createMockRequest({
+        user: { name: 'Test', role: 'admin' } as any, // Missing email
+      });
+      const res = createMockResponse();
+
+      mockCampaignStatsService.getAllCampaignStats.mockResolvedValue({
+        data: [],
+        pagination: mockPagination,
+      });
+
+      await getCampaignStats(req, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+  });
 });

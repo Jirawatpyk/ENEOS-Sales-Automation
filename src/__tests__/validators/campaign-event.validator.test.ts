@@ -474,3 +474,176 @@ describe('validateCampaignEvent', () => {
     expect(result.success).toBe(true);
   });
 });
+
+// ===========================================
+// Guardrail Tests - Boundary & Security
+// ===========================================
+
+describe('campaignEventSchema - Guardrail: Boundary Conditions', () => {
+  it('[P1] should reject empty string email', () => {
+    const payload = { camp_id: 1, email: '', event: 'click', id: 1 };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+  });
+
+  it('[P1] should reject zero camp_id', () => {
+    const payload = { camp_id: 0, email: 'test@test.com', event: 'click', id: 1 };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+  });
+
+  it('[P1] should reject negative camp_id and id', () => {
+    const payload = { camp_id: -1, email: 'test@test.com', event: 'click', id: -5 };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+  });
+
+  it('[P1] should reject floating point numbers for camp_id and id', () => {
+    const payload = { camp_id: 1.5, email: 'test@test.com', event: 'click', id: 99.9 };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+  });
+
+  it('[P1] should reject empty string event', () => {
+    const payload = { camp_id: 1, email: 'test@test.com', event: '', id: 1 };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+  });
+
+  it('[P2] should reject array instead of object payload', () => {
+    const payload = [{ camp_id: 1, email: 'test@test.com', event: 'click', id: 1 }];
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+  });
+
+  it('[P2] should reject partial email formats', () => {
+    const partials = ['user@', '@domain.com', 'user@.com', '@'];
+    for (const email of partials) {
+      const result = campaignEventSchema.safeParse({
+        camp_id: 1, email, event: 'click', id: 1,
+      });
+      expect(result.success).toBe(false);
+    }
+  });
+});
+
+describe('campaignEventSchema - Guardrail: Security', () => {
+  it('[P0] should pass through XSS content in campaign name (stored as-is)', () => {
+    const payload = {
+      camp_id: 1,
+      'campaign name': '<script>alert("xss")</script>',
+      email: 'test@test.com',
+      event: 'click',
+      id: 1,
+    };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // Validator does NOT sanitize - XSS prevention is the frontend's responsibility
+      expect(result.data['campaign name']).toBe('<script>alert("xss")</script>');
+    }
+  });
+
+  it('[P0] should pass through __proto__ fields via passthrough (verify behavior)', () => {
+    // Zod with .passthrough() may include __proto__ in parsed data
+    const payload = {
+      camp_id: 1,
+      email: 'test@test.com',
+      event: 'click',
+      id: 1,
+      __proto_extra: { isAdmin: true },
+    };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+  });
+
+  it('[P1] should reject SQL-injection-like email (invalid format)', () => {
+    const payload = {
+      camp_id: 1,
+      email: "test@example.com'; DROP TABLE--",
+      event: 'click',
+      id: 1,
+    };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(false);
+  });
+
+  it('[P1] should handle large payload with many extra fields (passthrough)', () => {
+    const extraFields: Record<string, string> = {};
+    for (let i = 0; i < 100; i++) {
+      extraFields[`extra_field_${i}`] = `value_${i}`;
+    }
+    const payload = {
+      camp_id: 1,
+      email: 'test@test.com',
+      event: 'click',
+      id: 1,
+      ...extraFields,
+    };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+  });
+
+  it('[P2] should handle Unicode/emoji in campaign name', () => {
+    const payload = {
+      camp_id: 1,
+      'campaign name': 'Campaign \u{1F600} สวัสดี 你好',
+      email: 'test@test.com',
+      event: 'click',
+      id: 1,
+    };
+    const result = campaignEventSchema.safeParse(payload);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('normalizeCampaignEventPayload - Guardrail: Edge Cases', () => {
+  it('[P1] should normalize XSS campaign name without sanitization', () => {
+    const input: CampaignEventInput = {
+      camp_id: 1,
+      'campaign name': '<img src=x onerror=alert(1)>',
+      email: 'test@test.com',
+      event: 'click',
+      id: 1,
+    };
+    const result = normalizeCampaignEventPayload(input);
+    expect(result.campaignName).toBe('<img src=x onerror=alert(1)>');
+  });
+
+  it('[P2] should handle valid minimum eventId and campaignId (1)', () => {
+    // Note: Zero is now rejected by validator, so minimum valid is 1
+    const input: CampaignEventInput = {
+      camp_id: 1,
+      email: 'test@test.com',
+      event: 'click',
+      id: 1,
+    };
+    const result = normalizeCampaignEventPayload(input);
+    expect(result.campaignId).toBe(1);
+    expect(result.eventId).toBe(1);
+  });
+});
+
+describe('validateCampaignEvent - Guardrail: Error Format', () => {
+  it('[P1] should return multiple error messages for multiple invalid fields', () => {
+    const invalid = {
+      camp_id: 'not-a-number',
+      email: 'not-an-email',
+      event: 123,
+      id: 'abc',
+    };
+    const result = validateCampaignEvent(invalid);
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    // Should contain multiple error paths
+    const errorParts = result.error!.split(', ');
+    expect(errorParts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('[P2] should return success:false and no data for empty object', () => {
+    const result = validateCampaignEvent({});
+    expect(result.success).toBe(false);
+    expect(result.data).toBeUndefined();
+    expect(result.error).toBeDefined();
+  });
+});

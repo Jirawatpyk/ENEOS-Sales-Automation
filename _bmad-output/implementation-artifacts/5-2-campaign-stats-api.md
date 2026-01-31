@@ -306,14 +306,28 @@ N/A
 **New Files Created:**
 - `src/controllers/admin/campaign-stats.controller.ts` - Controller with 3 handlers
 - `src/validators/campaign-stats.validator.ts` - Zod schemas and validation functions
-- `src/__tests__/controllers/campaign-stats.controller.test.ts` - 21 tests
-- `src/__tests__/validators/campaign-stats.validator.test.ts` - 32 tests
+- `src/__tests__/controllers/campaign-stats.controller.test.ts` - 21 tests → 30 tests (after TEA)
+- `src/__tests__/validators/campaign-stats.validator.test.ts` - 32 tests → 52 tests (after TEA)
 
 **Files Modified:**
 - `src/services/campaign-stats.service.ts` - Added getAllCampaignStats, getCampaignStatsById, getCampaignEvents
-- `src/__tests__/services/campaign-stats.service.test.ts` - Added 58 tests for service methods (includes 5 performance tests)
+- `src/__tests__/services/campaign-stats.service.test.ts` - Added 58 tests → 93 tests (after TEA)
 - `src/types/admin.types.ts` - Added CampaignStatsItem, CampaignEventItem, response interfaces
 - `src/routes/admin.routes.ts` - Added 3 new GET routes with requireViewer middleware
 - `src/__tests__/routes/campaign.routes.test.ts` - Added 23 integration tests
 - `src/constants/admin.constants.ts` - Added EVENTS_DEFAULT_LIMIT constant
+
+### TEA Guardrail Automation (2026-01-31)
+
+**Run:** TEA automate workflow after dev-story completion
+**Tests Before:** 134 | **Tests After:** 175 | **New Tests:** +41
+
+**Guardrail Tests Added:**
+| Layer | Tests Added | Key Coverage |
+|-------|-------------|--------------|
+| Service | +35 | Pagination boundaries, sorting with missing dates, sparse data, search edge cases, rate precision |
+| Controller | +9 | Empty responses, undefined user context, query param pass-through |
+| Validator | +20 | Numeric edge cases, multiple errors, date validation, case sensitivity |
+
+**Summary:** `_bmad-output/implementation-artifacts/automation-summary-story-5-2.md`
 

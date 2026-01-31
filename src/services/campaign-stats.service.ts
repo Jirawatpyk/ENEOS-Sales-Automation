@@ -114,21 +114,36 @@ export class CampaignStatsService {
       // Step 2: Write event to Campaign_Events sheet FIRST
       await this.writeCampaignEvent(event);
 
-      // Step 3: Count unique emails AFTER write (race condition fix)
-      // This ensures we always get accurate count from the sheet
-      const uniqueCount = await this.countUniqueEmailsForEvent(
-        event.campaignId,
-        event.event
-      );
+      // Step 3+4: Update stats with retry — event is already written,
+      // so stats failure should not lose the event data.
+      try {
+        // Step 3: Count unique emails AFTER write (race condition fix)
+        const uniqueCount = await this.countUniqueEmailsForEvent(
+          event.campaignId,
+          event.event
+        );
 
-      // Step 4: Update Campaign_Stats with accurate unique count
-      await this.updateCampaignStatsWithUniqueCount(event, uniqueCount);
+        // Step 4: Update Campaign_Stats with accurate unique count
+        await this.updateCampaignStatsWithUniqueCount(event, uniqueCount);
 
-      logger.info('Campaign event recorded successfully', {
-        eventId: event.eventId,
-        campaignId: event.campaignId,
-        uniqueCount,
-      });
+        logger.info('Campaign event recorded successfully', {
+          eventId: event.eventId,
+          campaignId: event.campaignId,
+          uniqueCount,
+        });
+      } catch (statsError) {
+        // Event was already written to Campaign_Events (source of truth).
+        // Stats are stale but can be reconciled — log clearly for monitoring.
+        const statsMessage = statsError instanceof Error ? statsError.message : String(statsError);
+        logger.warn('Campaign event written but stats update failed — stats may be stale', {
+          eventId: event.eventId,
+          campaignId: event.campaignId,
+          event: event.event,
+          email: event.email,
+          error: statsMessage,
+          action: 'STATS_RECONCILE_NEEDED',
+        });
+      }
 
       return {
         success: true,

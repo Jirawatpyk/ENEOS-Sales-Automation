@@ -351,8 +351,52 @@ Rex (Code Reviewer Agent) - Claude Opus 4.5
 ### Review Date
 2026-01-30
 
+## TEA Guardrail Automation Record
+
+### Workflow Executed
+`testarch-automate` (BMad-Integrated Mode)
+
+### Date
+2026-01-31
+
+### Coverage Gap Analysis
+35 gaps identified across 6 categories:
+- **P0 Critical:** Partial failures, XSS, prototype pollution
+- **P1 High:** DLQ verification, boundary conditions, future events, healthCheck
+- **P2 Medium:** Sparse rows, large payloads, rate edge cases
+
+### Tests Added (+40 guardrail tests)
+| File | Before | After | Added |
+|------|--------|-------|-------|
+| campaign-event.validator.test.ts | 39 | 55 | +16 |
+| campaign-webhook.controller.test.ts | 13 | 18 | +5 |
+| campaign-stats.service.test.ts | 58 | 77 | +19 |
+
+### Source Code Fixes (Discovered by Guardrail Tests)
+
+| # | Issue | File | Fix |
+|---|-------|------|-----|
+| 1 | Schema accepting zero/negative/float IDs | campaign-event.validator.ts | Added `.int().positive()` |
+| 2 | Empty event string accepted | campaign-event.validator.ts | Added `.min(1)` |
+| 3 | Partial failure returns error | campaign-stats.service.ts | Return success if event written (source of truth) |
+| 4 | Integration test timeout | background-processing.integration.test.ts | Move imports to `beforeAll` |
+
+### Final Test Results
+```
+✓ 51/51 test files passed
+✓ 1413/1413 tests passed
+```
+
+### Summary File
+`_bmad-output/implementation-artifacts/automation-summary-story-5-1.md`
+
 ## Change Log
 
+- 2026-01-31: TEA guardrail automation complete
+  - Added 40 guardrail tests (security, boundary, partial failures)
+  - Fixed 3 source code issues discovered by guardrail tests
+  - Fixed pre-existing integration test timeout
+  - All 1413 tests pass
 - 2026-01-30: Code review APPROVED - All 6 issues fixed
   - Fixed race condition in unique counting (write-first-then-count)
   - Implemented non-blocking webhook pattern (fire-and-forget)

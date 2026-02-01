@@ -5,27 +5,32 @@
 ## Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Services Layer                          │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   Sheets    │  │   Gemini    │  │    LINE     │          │
-│  │   Service   │  │   Service   │  │   Service   │          │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
-│         │                │                │                  │
-│         ▼                ▼                ▼                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   Google    │  │   Gemini    │  │    LINE     │          │
-│  │   Sheets    │  │    API      │  │    API      │          │
-│  └─────────────┘  └─────────────┘  └─────────────┘          │
-│                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │    Dedup    │  │     DLQ     │  │    Redis    │          │
-│  │   Service   │  │   Service   │  │   Service   │          │
-│  └─────────────┘  └─────────────┘  └─────────────┘          │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                          Services Layer                                │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
+│  │   Sheets    │  │   Gemini    │  │    LINE     │  │  Campaign   │   │
+│  │   Service   │  │   Service   │  │   Service   │  │   Stats     │   │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘   │
+│         │                │                │                │          │
+│         ▼                ▼                ▼                ▼          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
+│  │   Google    │  │  Gemini AI  │  │    LINE     │  │   Google    │   │
+│  │   Sheets    │  │  + Grounding│  │    API      │  │   Sheets    │   │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │
+│                                                                        │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
+│  │    Dedup    │  │     DLQ     │  │    Redis    │  │  Background │   │
+│  │   Service   │  │   Service   │  │   Service   │  │  Processor  │   │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │
+│                                                                        │
+│  ┌─────────────┐                                                       │
+│  │  Processing │                                                       │
+│  │   Status    │                                                       │
+│  └─────────────┘                                                       │
+│                                                                        │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -150,17 +155,58 @@ const message = await geminiService.generateSalesMessage('ACME Corp');
 #### `healthCheck(): Promise<HealthCheckResult>`
 ตรวจสอบการเชื่อมต่อ Gemini API
 
+### Google Search Grounding (Story 2-4)
+
+Gemini ใช้ Google Search Grounding ดึงข้อมูลบริษัทจาก DBD:
+
+```typescript
+interface CompanyAnalysis {
+  industry: string;         // อุตสาหกรรม (e.g., "Manufacturing")
+  talkingPoint: string;     // ประโยคสำหรับเซลล์ (Thai)
+  website: string | null;   // Official website
+  registeredCapital: string | null;  // ทุนจดทะเบียน
+  keywords: string[];       // Max 1 keyword
+  juristicId: string | null;  // เลขทะเบียนนิติบุคคล 13 หลัก
+  dbdSector: string | null;   // DBD Sector (e.g., "MFG-AUTO")
+  province: string | null;    // จังหวัด
+  fullAddress: string | null; // ที่อยู่เต็ม
+  confidence: number;         // 0-100 confidence score
+  confidenceFactors: {
+    hasRealDomain: boolean;
+    hasDBDData: boolean;
+    keywordMatch: boolean;
+    geminiConfident: boolean;
+    dataCompleteness: number;
+  };
+}
+```
+
+### DBD Sector Codes
+
+| Category | Code | Example |
+|----------|------|---------|
+| Construction | CON-B, CON-I | Building, Infrastructure |
+| Manufacturing | MFG-AUTO, MFG-F | Automotive, Food |
+| Food & Beverage | F&B-M, F&B-R | Manufacturing, Retail |
+| Transportation | TRANS-F, TRANS-W | Freight, Warehouse |
+| Technology | TECH-SW, TECH-IT | Software, IT Services |
+
 ### Fallback Values
 เมื่อ API ล้มเหลว จะใช้ค่า default:
 
 ```typescript
 {
-  industry: 'ไม่ระบุ',
-  companyType: 'B2B',
-  talkingPoint: 'ENEOS มีน้ำมันหล่อลื่นคุณภาพสูงสำหรับทุกอุตสาหกรรม',
+  industry: 'Unknown',
+  talkingPoint: 'ENEOS มีน้ำมันหล่อลื่นคุณภาพสูงจากญี่ปุ่น',
   website: null,
   registeredCapital: null,
-  keywords: []
+  keywords: ['B2B'],
+  juristicId: null,
+  dbdSector: null,
+  province: null,
+  fullAddress: null,
+  confidence: 0,
+  confidenceFactors: { /* all false/0 */ }
 }
 ```
 
@@ -365,6 +411,144 @@ const stats = deadLetterQueue.getStats();
 
 ### Fallback
 ถ้า Redis ไม่พร้อม ระบบจะใช้ in-memory cache อัตโนมัติ
+
+---
+
+## 7. Campaign Stats Service
+
+> Campaign Email Metrics - ติดตามสถิติ Email Campaign จาก Brevo
+
+### Location
+`src/services/campaign-stats.service.ts`
+
+### Responsibilities
+- รับ events จาก Brevo Campaign webhook (delivered, opened, click)
+- ป้องกัน duplicate events ด้วย Event_ID
+- นับ unique opens/clicks แบบ race condition safe
+- คำนวณ Open Rate / Click Rate
+
+### Methods
+
+#### `recordCampaignEvent(event: NormalizedCampaignEvent): Promise<RecordEventResult>`
+บันทึก campaign event ใหม่
+
+```typescript
+const result = await campaignStatsService.recordCampaignEvent({
+  eventId: 456,
+  campaignId: 123,
+  campaignName: 'ENEOS Q1 2024',
+  email: 'customer@company.com',
+  event: 'click', // delivered | opened | click
+  eventAt: '2026-01-30T10:00:00Z',
+  sentAt: '2026-01-30T09:00:00Z',
+  url: 'https://example.com/link',
+  tag: 'promo',
+  segmentIds: [1, 2],
+});
+// Returns: { success: true, duplicate: false, eventId: 456, campaignId: 123 }
+```
+
+#### `checkDuplicateEvent(eventId: number): Promise<boolean>`
+ตรวจสอบว่า event ซ้ำหรือไม่
+
+#### `getCampaignStats(campaignId: number): Promise<CampaignStatsItem | null>`
+ดึงสถิติของ campaign
+
+#### `getAllCampaignStats(options): Promise<{ data: CampaignStatsItem[], pagination: PaginationMeta }>`
+ดึงสถิติทุก campaigns พร้อม pagination
+
+### Race Condition Fix (Count-after-Write)
+
+```
+1. Check duplicate (Event_ID)
+2. Write event → Campaign_Events (source of truth)
+3. Count unique emails from sheet (AFTER write)
+4. Update Campaign_Stats with accurate count
+```
+
+### Google Sheets
+- **Campaign_Events**: Raw event log (immutable source of truth)
+- **Campaign_Stats**: Aggregated metrics (derived, can be recalculated)
+
+---
+
+## 8. Background Processor Service
+
+> Async Lead Processing - ประมวลผล Lead แบบ Background
+
+### Location
+`src/services/background-processor.service.ts`
+
+### Responsibilities
+- รับ payload จาก webhook → respond 200 OK ทันที
+- ประมวลผล Lead แบบ async (AI, Sheets, LINE)
+- Track status และ handle errors
+
+### Methods
+
+#### `processLeadInBackground(payload: NormalizedBrevoPayload, correlationId: string): Promise<void>`
+ประมวลผล Lead ใน background
+
+```typescript
+// Webhook Controller
+// 1. Respond 200 OK immediately
+res.json({ success: true, message: 'Processing' });
+
+// 2. Process in background (fire-and-forget)
+processLeadInBackground(payload, correlationId).catch(err => {
+  logger.error('Background processing failed', { correlationId, error: err });
+});
+```
+
+### Processing Steps
+
+```
+1. Update status → "processing"
+2. AI Enrichment (Gemini + Google Search Grounding)
+3. Save to Google Sheets (with UUID, timestamps)
+4. Send LINE notification (fire-and-forget)
+5. Update status → "completed" or "failed"
+```
+
+### Error Handling
+- AI failure → ใช้ default values, continue processing
+- Sheets failure → Add to DLQ, notify LINE with error
+- LINE failure → Log error only (non-critical)
+
+---
+
+## 9. Processing Status Service
+
+> Processing Tracking - ติดตามสถานะการประมวลผล
+
+### Location
+`src/services/processing-status.service.ts`
+
+### Responsibilities
+- Track processing status per correlation ID
+- Provide status lookup for debugging
+- Auto-cleanup expired entries
+
+### Methods
+
+#### `startProcessing(correlationId: string): void`
+เริ่มต้นการ tracking
+
+#### `completeProcessing(correlationId: string): void`
+Mark as completed
+
+#### `failProcessing(correlationId: string, error: string): void`
+Mark as failed พร้อม error message
+
+#### `getStatus(correlationId: string): ProcessingStatus | null`
+ดึงสถานะปัจจุบัน
+
+```typescript
+const status = processingStatusService.getStatus('abc-123');
+// Returns: { status: 'processing', startTime: Date, correlationId: 'abc-123' }
+// Or: { status: 'completed', startTime: Date, endTime: Date, correlationId: 'abc-123' }
+// Or: { status: 'failed', startTime: Date, endTime: Date, error: 'Google Sheets timeout', correlationId: 'abc-123' }
+```
 
 ---
 

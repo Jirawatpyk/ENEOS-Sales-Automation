@@ -4,9 +4,11 @@
 
 ## Overview
 
-ระบบมี 2 Scenarios หลัก:
-1. **Scenario A** - รับ Lead ใหม่จาก Brevo Email Campaign
+ระบบมี 4 Scenarios หลัก:
+1. **Scenario A** - รับ Lead ใหม่จาก Brevo Workflow Automation
 2. **Scenario B** - Sales กดรับงาน/อัปเดตสถานะผ่าน LINE
+3. **Scenario C** - รับ Email Events จาก Brevo Campaign (delivered/opened/click)
+4. **Scenario D** - Admin Dashboard API (ดึงข้อมูล/Export)
 
 ---
 
@@ -174,6 +176,219 @@ sequenceDiagram
         API->>S: Reply "ปิดการขายสำเร็จ"
     else Not Owner
         API->>S: Reply "คุณไม่ใช่เจ้าของ Lead นี้"
+    end
+```
+
+---
+
+## Scenario C: Email Marketing Events (Brevo Campaign)
+
+> POST /webhook/brevo/campaign - รับ events จาก Brevo Email Campaign
+
+### Flow Diagram
+
+```
+┌─────────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Brevo Email   │────▶│  Validator  │────▶│  Dedup by   │
+│   Campaign      │     │   (Zod)     │     │  Event_ID   │
+└─────────────────┘     └─────────────┘     └──────┬──────┘
+                                                   │
+                        ┌──────────────────────────┼──────────────────────────┐
+                        │                          │                          │
+                        ▼                          ▼                          ▼
+                  ┌───────────┐            ┌───────────────┐          ┌────────────┐
+                  │ Duplicate │            │ Write Event   │          │  Count     │
+                  │  Return   │            │ to Events     │          │  Unique    │
+                  └───────────┘            └───────┬───────┘          └─────┬──────┘
+                                                   │                        │
+                                                   └────────────┬───────────┘
+                                                                │
+                                                                ▼
+                                                        ┌───────────────┐
+                                                        │ Update Stats  │
+                                                        │ (Aggregate)   │
+                                                        └───────────────┘
+```
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant B as Brevo Campaign
+    participant API as API Server
+    participant V as Validator
+    participant CE as Campaign_Events
+    participant CS as Campaign_Stats
+
+    B->>API: POST /webhook/brevo/campaign
+    Note over B,API: {event: "click", email: "...", camp_id: 123, id: 456}
+
+    API->>V: Validate Payload
+    V-->>API: Normalized Event
+
+    API->>CE: Check Event_ID exists
+    alt Is Duplicate
+        CE-->>API: Already exists
+        API-->>B: 200 OK (duplicate: true)
+    else New Event
+        CE-->>API: Not found
+
+        API->>CE: Write Event Row
+        Note over CE: Source of Truth (immutable)
+
+        API->>CE: Count Unique Emails for (campaign_id, event_type)
+        CE-->>API: uniqueCount = 42
+
+        API->>CS: Update Stats with uniqueCount
+        Note over CS: Derived data (can be recalculated)
+
+        API-->>B: 200 OK (success)
+    end
+```
+
+### Supported Events
+
+| Event | Action | Stats Updated |
+|-------|--------|---------------|
+| `delivered` | Write event + count unique | Delivered, Unique_Opens (0) |
+| `opened` | Write event + count unique opens | Opened, Unique_Opens |
+| `click` | Write event + count unique clicks + store URL | Clicked, Unique_Clicks |
+| `hard_bounce` | Acknowledge only | (Future) |
+| `soft_bounce` | Acknowledge only | (Future) |
+| `unsubscribe` | Acknowledge only | (Future) |
+| `spam` | Acknowledge only | (Future) |
+
+### Count-after-Write Pattern (Race Condition Fix)
+
+```
+❌ Wrong: Read count → Increment → Write
+   Problem: Two concurrent requests both read count=5, both write count=6
+
+✅ Correct: Write event → Count from sheet → Write stats
+   Solution: Event is already written, count always reflects reality
+```
+
+```mermaid
+sequenceDiagram
+    participant R1 as Request 1
+    participant R2 as Request 2
+    participant Events as Campaign_Events
+    participant Stats as Campaign_Stats
+
+    Note over R1,R2: Both requests arrive simultaneously
+
+    R1->>Events: Write Event (id=100)
+    R2->>Events: Write Event (id=101)
+
+    Note over Events: Both events now exist
+
+    R1->>Events: COUNT unique emails WHERE campaign=123 AND event=opened
+    Events-->>R1: uniqueCount = 42 (includes both events)
+
+    R2->>Events: COUNT unique emails WHERE campaign=123 AND event=opened
+    Events-->>R2: uniqueCount = 42 (same accurate count)
+
+    R1->>Stats: UPDATE Unique_Opens = 42
+    R2->>Stats: UPDATE Unique_Opens = 42
+
+    Note over Stats: Both updates write same correct value
+```
+
+### Data Transformation
+
+```
+Brevo Campaign Webhook
+        │
+        ▼
+┌───────────────────────────────────────┐
+│ {                                     │
+│   "event": "click",                   │
+│   "email": "customer@company.com",    │
+│   "camp_id": 123,                     │
+│   "campaign name": "ENEOS Q1 2024",   │
+│   "id": 456,                          │
+│   "URL": "https://example.com/link",  │
+│   "date_event": "2026-01-30 10:00:00",│
+│   "date_sent": "2026-01-30 09:00:00", │
+│   "tag": "promo"                      │
+│ }                                     │
+└───────────────────────────────────────┘
+        │
+        │ Normalize
+        ▼
+┌───────────────────────────────────────┐
+│ Campaign_Events Row:                  │
+│ [456, 123, "ENEOS Q1 2024",           │
+│  "customer@company.com", "click",     │
+│  "2026-01-30T10:00:00Z", ...]        │
+└───────────────────────────────────────┘
+        │
+        │ Aggregate
+        ▼
+┌───────────────────────────────────────┐
+│ Campaign_Stats Update:                │
+│ Clicked = Clicked + 1                 │
+│ Unique_Clicks = COUNT(DISTINCT email) │
+│ Click_Rate = Unique_Clicks/Delivered  │
+└───────────────────────────────────────┘
+```
+
+---
+
+## Scenario D: Admin Dashboard API
+
+> GET /api/admin/* - Admin Dashboard data retrieval
+
+### Flow Diagram
+
+```
+┌─────────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Next.js       │────▶│  Admin Auth │────▶│  Role Check │
+│   Dashboard     │     │  Middleware │     │  (RBAC)     │
+└─────────────────┘     └─────────────┘     └──────┬──────┘
+                                                   │
+                        ┌──────────────────────────┼──────────────────────────┐
+                        │                          │                          │
+                        ▼                          ▼                          ▼
+                  ┌───────────┐            ┌───────────────┐          ┌────────────┐
+                  │ 403       │            │ Admin         │          │ Viewer     │
+                  │ Forbidden │            │ Full Access   │          │ Read Only  │
+                  └───────────┘            └───────────────┘          └────────────┘
+```
+
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant D as Dashboard
+    participant API as Backend API
+    participant G as Google OAuth
+    participant S as Sales_Team Sheet
+
+    D->>API: GET /api/admin/dashboard
+    Note over D,API: Authorization: Bearer <id_token>
+
+    API->>G: Verify ID Token
+    G-->>API: {email, name, sub}
+
+    alt Invalid Token
+        API-->>D: 401 INVALID_TOKEN
+    else Valid Token
+        API->>API: Check domain = @eneos.co.th
+        alt Wrong Domain
+            API-->>D: 403 FORBIDDEN_DOMAIN
+        else Valid Domain
+            API->>S: Query role by email
+            S-->>API: {role: "admin" | "sales"}
+
+            alt Inactive Status
+                API-->>D: 403 ACCOUNT_INACTIVE
+            else Active
+                Note over API: Map "sales" → "viewer"
+                API->>API: Attach req.user = {email, name, role}
+                API-->>D: 200 OK + data
+            end
+        end
     end
 ```
 

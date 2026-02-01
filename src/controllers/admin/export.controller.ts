@@ -33,7 +33,7 @@ export async function exportData(
       return;
     }
 
-    const { type, format, startDate, endDate, status, owner, campaign } = validation.data;
+    const { type, format, startDate, endDate, status, owner, campaign, fields } = validation.data;
 
     logger.info('exportData called', {
       type,
@@ -103,6 +103,26 @@ export async function exportData(
       }));
     }
 
+    // Apply column filtering if fields param provided (skip for PDF - fixed layout)
+    if (fields && format !== 'pdf' && dataToExport.length > 0) {
+      const allColumnHeaders = Object.keys(dataToExport[0]);
+      const requestedFields = fields.split(',').map(f => f.trim());
+      const filteredColumns = requestedFields.filter(f => allColumnHeaders.includes(f));
+
+      // Only filter if valid columns found, otherwise fallback to all
+      if (filteredColumns.length > 0) {
+        dataToExport = dataToExport.map(row => {
+          const filtered: Record<string, string | number> = {};
+          for (const col of filteredColumns) {
+            if (col in row) {
+              filtered[col] = row[col];
+            }
+          }
+          return filtered;
+        });
+      }
+    }
+
     // Generate file
     if (format === 'xlsx') {
       const { default: ExcelJS } = await import('exceljs');
@@ -118,30 +138,21 @@ export async function exportData(
         }));
         worksheet.columns = columns;
 
-        // Set column widths
-        worksheet.getColumn('Row').width = 8;
-        worksheet.getColumn('Company').width = 25;
-        worksheet.getColumn('DBD Sector').width = 15;
-        worksheet.getColumn('Industry').width = 20;
-        worksheet.getColumn('Juristic ID').width = 18;
-        worksheet.getColumn('Capital').width = 15;
-        worksheet.getColumn('Location').width = 20;
-        worksheet.getColumn('Full Address').width = 40;
-        worksheet.getColumn('Contact Name').width = 20;
-        worksheet.getColumn('Phone').width = 15;
-        worksheet.getColumn('Email').width = 25;
-        worksheet.getColumn('Job Title').width = 20;
-        worksheet.getColumn('Website').width = 30;
-        worksheet.getColumn('Lead Source').width = 15;
-        worksheet.getColumn('Status').width = 12;
-        worksheet.getColumn('Sales Owner').width = 20;
-        worksheet.getColumn('Campaign').width = 25;
-        worksheet.getColumn('Source').width = 15;
-        worksheet.getColumn('Talking Point').width = 30;
-        worksheet.getColumn('Created Date').width = 18;
-        worksheet.getColumn('Clicked At').width = 18;
-        worksheet.getColumn('Contacted At').width = 18;
-        worksheet.getColumn('Closed At').width = 18;
+        // Set column widths (safe: only for columns present in current export)
+        const columnWidthMap: Record<string, number> = {
+          'Row': 8, 'Company': 25, 'DBD Sector': 15, 'Industry': 20,
+          'Juristic ID': 18, 'Capital': 15, 'Location': 20, 'Full Address': 40,
+          'Contact Name': 20, 'Phone': 15, 'Email': 25, 'Job Title': 20,
+          'Website': 30, 'Lead Source': 15, 'Status': 12, 'Sales Owner': 20,
+          'Campaign': 25, 'Source': 15, 'Talking Point': 30, 'Created Date': 18,
+          'Clicked At': 18, 'Contacted At': 18, 'Closed At': 18,
+        };
+        const existingColumns = Object.keys(dataToExport[0]);
+        for (const col of existingColumns) {
+          if (columnWidthMap[col]) {
+            worksheet.getColumn(col).width = columnWidthMap[col];
+          }
+        }
 
         // Add data rows
         dataToExport.forEach(row => {
@@ -215,7 +226,7 @@ export async function exportData(
       logger.info('exportData completed', { type, format, rows: dataToExport.length });
     } else if (format === 'csv') {
       const { parse } = await import('json2csv');
-      const csv = parse(dataToExport);
+      const csv = parse(dataToExport, { eol: '\n' });
 
       // Add UTF-8 BOM (EF BB BF) for Excel compatibility
       const csvWithBOM = '\uFEFF' + csv;

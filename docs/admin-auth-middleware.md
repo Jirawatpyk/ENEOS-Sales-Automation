@@ -29,12 +29,18 @@ GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
 ## Role Hierarchy
 
 ```
-admin > manager > viewer
+admin > viewer
 ```
 
-- **admin**: สิทธิ์สูงสุด สามารถทำทุกอย่างได้
-- **manager**: สิทธิ์รองลงมา สามารถดูและจัดการข้อมูลได้
-- **viewer**: สิทธิ์ดูอย่างเดียว อ่านข้อมูลได้แต่แก้ไขไม่ได้
+- **admin**: สิทธิ์สูงสุด สามารถทำทุกอย่างได้ (export, team management, settings)
+- **viewer**: สิทธิ์ดูอย่างเดียว อ่านข้อมูลได้แต่แก้ไขไม่ได้ (mapped from 'sales' role in Sales_Team sheet)
+
+**Role Mapping from Sales_Team Sheet:**
+| Sheet Role | Dashboard Role | Access |
+|------------|----------------|--------|
+| `admin` | admin | Full access |
+| `sales` | viewer | Read-only |
+| (not found) | viewer | Default |
 
 ## การใช้งานพื้นฐาน
 
@@ -45,7 +51,6 @@ import {
   adminAuthMiddleware,
   requireRole,
   requireAdmin,
-  requireManager,
   requireViewer,
 } from './middleware/admin-auth.js';
 ```
@@ -66,16 +71,16 @@ router.get('/api/admin/dashboard',
   getDashboard
 );
 
-// ตัวอย่าง: endpoint สำหรับ manager และ admin เท่านั้น
-router.get('/api/admin/leads',
-  requireManager,
-  getLeads
+// ตัวอย่าง: endpoint สำหรับ admin เท่านั้น
+router.post('/api/admin/export',
+  requireAdmin,
+  exportData
 );
 
-// ตัวอย่าง: endpoint สำหรับ admin เท่านั้น
-router.post('/api/admin/settings',
+// ตัวอย่าง: endpoint สำหรับ admin เท่านั้น (team management)
+router.post('/api/admin/sales-team',
   requireAdmin,
-  updateSettings
+  createSalesTeamMember
 );
 ```
 
@@ -105,16 +110,17 @@ Middleware หลักสำหรับ authentication
 **Flow:**
 1. ดึง Bearer token จาก `Authorization` header
 2. Verify token กับ Google OAuth API
-3. ตรวจสอบว่า email domain เป็น `@eneos.co.th`
-4. Query role จาก Google Sheets (TODO: ยังไม่ได้ implement)
-5. Attach `req.user` object
+3. ตรวจสอบว่า email domain อยู่ใน `ALLOWED_DOMAINS` (default: `@eneos.co.th`)
+4. Query role จาก Google Sheets (Sales_Team sheet)
+5. ตรวจสอบ status (active/inactive) - reject ถ้า inactive
+6. Attach `req.user` object
 
 **req.user Type:**
 ```typescript
 interface AdminUser {
   email: string;
   name: string;
-  role: 'admin' | 'manager' | 'viewer';
+  role: 'admin' | 'viewer';
   googleId: string;
 }
 ```
@@ -172,28 +178,11 @@ router.delete('/api/admin/users/:id',
 
 ---
 
-### `requireManager`
-
-Shortcut middleware: อนุญาต admin และ manager
-
-เทียบเท่ากับ `requireRole(['admin', 'manager'])`
-
-**Example:**
-```typescript
-router.put('/api/admin/leads/:id',
-  adminAuthMiddleware,
-  requireManager,
-  updateLead
-);
-```
-
----
-
 ### `requireViewer`
 
-Shortcut middleware: อนุญาตทุก role (admin, manager, viewer)
+Shortcut middleware: อนุญาตทุก role (admin, viewer)
 
-เทียบเท่ากับ `requireRole(['admin', 'manager', 'viewer'])`
+เทียบเท่ากับ `requireRole(['admin', 'viewer'])`
 
 **Example:**
 ```typescript
@@ -359,77 +348,61 @@ export async function getDashboard() {
 }
 ```
 
-## TODO
+## Implementation Status
 
-### 1. Role Lookup from Google Sheets
+### ✅ Role Lookup from Google Sheets (Implemented)
 
-ปัจจุบัน role ถูก hardcode เป็น `'viewer'` ต้อง implement การ query จาก Google Sheets:
+Role lookup is fully implemented in `admin-auth.ts`:
 
 ```typescript
-// ใน admin-auth.ts
+// admin-auth.ts:302-373
 async function getUserRole(email: string): Promise<UserRole> {
-  // TODO: Query from Sales_Team sheet
-  // Structure: | LINE_User_ID | Name | Email | Phone | Role |
+  // Query from Sales_Team sheet
+  const user = await sheetsService.getUserByEmail(email);
 
-  const sheetsService = getSheetsService();
-  const rows = await sheetsService.getValues({
-    range: 'Sales_Team!A:E',
-  });
-
-  const userRow = rows.find(row => row[2] === email);
-
-  if (userRow && userRow[4]) {
-    const role = userRow[4].toLowerCase();
-    if (['admin', 'manager', 'viewer'].includes(role)) {
-      return role as UserRole;
+  if (user) {
+    // Check if user is inactive - reject login
+    if (user.status === 'inactive') {
+      throw new AppError('Account deactivated', 403, 'ACCOUNT_INACTIVE');
     }
+
+    // Map sheet role to dashboard role
+    if (user.role.toLowerCase() === 'admin') return 'admin';
+    return 'viewer';  // 'sales' or other → viewer
   }
 
-  return 'viewer'; // Default role
+  // Fallback: check ADMIN_EMAILS constant
+  if (ADMIN_EMAILS.includes(email.toLowerCase())) {
+    return 'admin';
+  }
+
+  return 'viewer'; // Default
 }
 ```
 
-### 2. Role Caching
+### ✅ Admin Endpoints (Implemented)
 
-เพิ่ม cache สำหรับ role lookup เพื่อลด Google Sheets API calls:
+All admin endpoints are implemented in `src/routes/admin.routes.ts`:
 
-```typescript
-import { RedisService } from '../services/redis.service.js';
+| Endpoint | Status | Description |
+|----------|--------|-------------|
+| `GET /api/admin/me` | ✅ | Current user info + role |
+| `GET /api/admin/dashboard` | ✅ | Dashboard summary |
+| `GET /api/admin/leads` | ✅ | List leads (paginated) |
+| `GET /api/admin/leads/:id` | ✅ | Lead detail |
+| `GET /api/admin/sales-performance` | ✅ | Sales team performance |
+| `GET /api/admin/campaigns` | ✅ | Campaign analytics |
+| `GET /api/admin/campaigns/stats` | ✅ | Campaign email stats |
+| `GET /api/admin/export` | ✅ | Export data (admin only) |
+| `GET /api/admin/sales-team` | ✅ | List team members |
+| `POST /api/admin/sales-team` | ✅ | Create member (admin only) |
+| `PATCH /api/admin/sales-team/:id` | ✅ | Update member (admin only) |
+| `GET /api/admin/activity-log` | ✅ | Status history log |
 
-const ROLE_CACHE_TTL = 300; // 5 minutes
+### 🔮 Future Improvements
 
-async function getUserRole(email: string): Promise<UserRole> {
-  const cacheKey = `user:role:${email}`;
-
-  // Check cache first
-  const cached = await RedisService.get(cacheKey);
-  if (cached) {
-    return cached as UserRole;
-  }
-
-  // Query from Sheets
-  const role = await queryRoleFromSheets(email);
-
-  // Cache result
-  await RedisService.set(cacheKey, role, ROLE_CACHE_TTL);
-
-  return role;
-}
-```
-
-### 3. Admin Endpoints
-
-สร้าง API endpoints สำหรับ Admin Dashboard (ตามที่ระบุใน `docs/admin-dashboard/CLAUDE-CONTEXT.md`):
-
-- `GET /api/admin/dashboard` - Dashboard summary
-- `GET /api/admin/leads` - List leads (paginated)
-- `GET /api/admin/leads/:id` - Lead detail
-- `GET /api/admin/leads/stats` - Leads statistics
-- `GET /api/admin/sales-performance` - Sales team performance
-- `GET /api/admin/sales-performance/:userId` - Individual performance
-- `GET /api/admin/campaigns` - Campaign analytics
-- `GET /api/admin/campaigns/:id` - Campaign detail
-- `GET /api/admin/export` - Export data
+1. **Role Caching** - Add Redis cache for role lookup to reduce Sheets API calls
+2. **Audit Log** - Log all admin actions for compliance
 
 ## Security Best Practices
 
@@ -493,6 +466,6 @@ router.get('/api/admin/leads', requireManager, getLeads);
 
 ---
 
-**Last Updated:** 2026-01-11
-**Version:** 1.0.0
+**Last Updated:** 2026-02-01
+**Version:** 1.1.0
 **Maintainer:** ENEOS Thailand Development Team

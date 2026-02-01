@@ -531,3 +531,444 @@ Requires `X-Line-Signature` header with valid HMAC-SHA256 signature.
 ```
 Signature = Base64(HMAC-SHA256(channel_secret, request_body))
 ```
+
+### Admin API
+Requires Google OAuth Bearer token in Authorization header.
+- Domain restricted to `@eneos.co.th`
+- Role-based access: `admin` (full) or `viewer` (read-only)
+
+```
+Authorization: Bearer <google_id_token>
+```
+
+---
+
+## Admin API Endpoints
+
+> All Admin endpoints require authentication via Google OAuth.
+> Base path: `/api/admin`
+
+### GET /api/admin/me
+
+Get current authenticated user info.
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "email": "user@eneos.co.th",
+    "name": "User Name",
+    "role": "admin"
+  }
+}
+```
+
+---
+
+### GET /api/admin/dashboard
+
+Get dashboard summary metrics.
+
+**Query Parameters**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| period | string | No | `today` \| `yesterday` \| `week` \| `month` \| `quarter` \| `year` \| `lastWeek` \| `lastMonth` \| `custom` |
+| startDate | string | For custom | ISO date (e.g., `2026-01-01`) |
+| endDate | string | For custom | ISO date (e.g., `2026-01-31`) |
+
+**Access:** viewer, admin
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "totalLeads": 100,
+    "newLeads": 25,
+    "contactedLeads": 50,
+    "closedLeads": 20,
+    "lostLeads": 5,
+    "unreachableLeads": 0,
+    "conversionRate": 20.0,
+    "avgResponseTime": 3600000,
+    "avgClosingTime": 86400000
+  }
+}
+```
+
+---
+
+### GET /api/admin/leads
+
+Get leads with pagination and filters.
+
+**Query Parameters**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| page | number | No | Page number (default: 1) |
+| limit | number | No | Items per page (default: 20, max: 100) |
+| status | string | No | `new` \| `contacted` \| `closed` \| `lost` \| `unreachable` |
+| owner | string | No | Sales owner LINE User ID |
+| campaign | string | No | Campaign ID |
+| search | string | No | Search in company, name, email |
+| startDate | string | No | ISO date |
+| endDate | string | No | ISO date |
+| sortBy | string | No | `date` \| `company` \| `status` (default: `date`) |
+| sortOrder | string | No | `asc` \| `desc` (default: `desc`) |
+
+**Access:** viewer, admin
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "leads": [ ... ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 100,
+      "totalPages": 5
+    }
+  }
+}
+```
+
+---
+
+### GET /api/admin/leads/:id
+
+Get lead detail by row number.
+
+**Parameters**
+| Param | Type | Description |
+|-------|------|-------------|
+| id | number | Row number in Google Sheets |
+
+**Access:** viewer, admin
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "lead": { ... },
+    "history": [ ... ]
+  }
+}
+```
+
+---
+
+### GET /api/admin/sales-team
+
+Get sales team list for dropdowns.
+
+**Access:** viewer, admin
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "team": [
+      { "id": "U123", "name": "John", "email": "john@eneos.co.th" }
+    ]
+  }
+}
+```
+
+---
+
+### GET /api/admin/sales-team/list
+
+Get detailed sales team list with filters.
+
+**Query Parameters**
+| Param | Type | Description |
+|-------|------|-------------|
+| status | string | `active` \| `inactive` \| `all` (default: `active`) |
+| role | string | `admin` \| `sales` \| `all` (default: `all`) |
+
+**Access:** admin only
+
+**Response**
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "total": 10
+}
+```
+
+---
+
+### POST /api/admin/sales-team
+
+Create new sales team member.
+
+**Request Body**
+```json
+{
+  "name": "New Member",
+  "email": "member@eneos.co.th",
+  "phone": "0812345678",
+  "role": "sales"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| name | string | Yes | Min 2 characters |
+| email | string | Yes | Must be @eneos.co.th |
+| phone | string | No | Thai format |
+| role | string | Yes | `admin` \| `sales` |
+
+**Access:** admin only
+
+**Response**
+```json
+{
+  "success": true,
+  "data": { ... }
+}
+```
+
+---
+
+### GET /api/admin/sales-team/unlinked-line-accounts
+
+Get LINE accounts not linked to dashboard members.
+
+**Access:** admin only
+
+**Response**
+```json
+{
+  "success": true,
+  "data": [
+    { "lineUserId": "U456", "name": "LINE User", "createdAt": "..." }
+  ],
+  "total": 5
+}
+```
+
+---
+
+### GET /api/admin/sales-team/unlinked-dashboard-members
+
+Get dashboard members without LINE accounts.
+
+**Access:** admin only
+
+**Response**
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "total": 3
+}
+```
+
+---
+
+### PATCH /api/admin/sales-team/email/:email/link
+
+Link LINE account to dashboard member.
+
+**Parameters**
+| Param | Type | Description |
+|-------|------|-------------|
+| email | string | Dashboard member's email |
+
+**Request Body**
+```json
+{
+  "targetLineUserId": "U789"
+}
+```
+
+**Access:** admin only
+
+---
+
+### GET /api/admin/sales-team/:lineUserId
+
+Get sales team member by LINE User ID.
+
+**Access:** admin only
+
+---
+
+### PATCH /api/admin/sales-team/:lineUserId
+
+Update sales team member.
+
+**Request Body** (all optional)
+```json
+{
+  "email": "new@eneos.co.th",
+  "phone": "0898765432",
+  "role": "admin",
+  "status": "inactive"
+}
+```
+
+**Access:** admin only
+
+---
+
+### GET /api/admin/activity-log
+
+Get status change history log.
+
+**Query Parameters**
+| Param | Type | Description |
+|-------|------|-------------|
+| page | number | Page number (default: 1) |
+| limit | number | Items per page (default: 20, max: 100) |
+| from | string | ISO date (start filter) |
+| to | string | ISO date (end filter) |
+| status | string | Comma-separated status values |
+| changedBy | string | LINE User ID or `System` |
+
+**Access:** admin only
+
+**Response**
+```json
+{
+  "success": true,
+  "data": {
+    "entries": [ ... ],
+    "pagination": { ... },
+    "filters": {
+      "changedByOptions": ["System", "U123"]
+    }
+  }
+}
+```
+
+---
+
+### GET /api/admin/sales-performance
+
+Get team performance metrics.
+
+**Query Parameters**
+| Param | Type | Description |
+|-------|------|-------------|
+| period | string | `today` \| `yesterday` \| `week` \| `month` \| `quarter` \| `year` \| `custom` |
+| startDate | string | ISO date (for custom) |
+| endDate | string | ISO date (for custom) |
+| sortBy | string | `claimed` \| `closed` \| `conversionRate` |
+| sortOrder | string | `asc` \| `desc` |
+
+**Access:** viewer, admin
+
+---
+
+### GET /api/admin/sales-performance/trend
+
+Get daily trend for individual salesperson.
+
+**Query Parameters**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| userId | string | Yes | Salesperson LINE User ID |
+| days | number | No | `7` \| `30` \| `90` (default: 30) |
+
+**Access:** viewer, admin
+
+---
+
+### GET /api/admin/campaigns/stats
+
+Get campaign email metrics (from Brevo events).
+
+**Query Parameters**
+| Param | Type | Description |
+|-------|------|-------------|
+| page | number | Page number |
+| limit | number | Items per page (max: 100) |
+| search | string | Search campaign name |
+| dateFrom | string | ISO date |
+| dateTo | string | ISO date |
+| sortBy | string | `Last_Updated` \| `First_Event` \| `Campaign_Name` \| `Delivered` \| `Opened` \| `Clicked` \| `Open_Rate` \| `Click_Rate` |
+| sortOrder | string | `asc` \| `desc` |
+
+**Access:** viewer, admin
+
+---
+
+### GET /api/admin/campaigns/:id/stats
+
+Get single campaign email metrics.
+
+**Access:** viewer, admin
+
+---
+
+### GET /api/admin/campaigns/:id/events
+
+Get campaign event log.
+
+**Query Parameters**
+| Param | Type | Description |
+|-------|------|-------------|
+| page | number | Page number |
+| limit | number | Items per page (max: 100) |
+| event | string | `delivered` \| `opened` \| `click` |
+| dateFrom | string | ISO date |
+| dateTo | string | ISO date |
+
+**Access:** viewer, admin
+
+---
+
+### GET /api/admin/campaigns
+
+Get campaign analytics (based on leads).
+
+**Query Parameters**
+| Param | Type | Description |
+|-------|------|-------------|
+| period | string | `today` \| `week` \| `month` \| `quarter` \| `year` \| `custom` |
+| startDate | string | ISO date |
+| endDate | string | ISO date |
+| sortBy | string | `leads` \| `closed` \| `conversionRate` |
+| sortOrder | string | `asc` \| `desc` |
+
+**Access:** viewer, admin
+
+---
+
+### GET /api/admin/campaigns/:campaignId
+
+Get campaign detail.
+
+**Access:** viewer, admin
+
+---
+
+### GET /api/admin/export
+
+Export data to file.
+
+**Query Parameters**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| type | string | Yes | `leads` \| `sales` \| `campaigns` \| `all` |
+| format | string | Yes | `xlsx` \| `csv` \| `pdf` |
+| startDate | string | No | ISO date |
+| endDate | string | No | ISO date |
+| status | string | No | Lead status filter |
+| owner | string | No | Sales owner filter |
+| campaign | string | No | Campaign filter |
+| fields | string | No | Comma-separated field names |
+
+**Access:** admin only
+
+**Rate Limit:** 10 requests per hour
+
+**Response:** File download with appropriate Content-Type

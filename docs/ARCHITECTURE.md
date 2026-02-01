@@ -21,11 +21,13 @@
 ระบบ Sales Automation ที่รับ Lead จาก Email Campaign (Brevo) วิเคราะห์ด้วย AI และแจ้งเตือนทีมขายผ่าน LINE OA พร้อมระบบป้องกัน Race Condition
 
 ### Key Features
-- **Webhook Integration** - รับ events จาก Brevo และ LINE
-- **AI Enrichment** - วิเคราะห์ข้อมูลบริษัทด้วย Gemini AI
+- **Webhook Integration** - รับ events จาก Brevo (Workflow + Campaign) และ LINE
+- **AI Enrichment** - วิเคราะห์ข้อมูลบริษัทด้วย Gemini AI + Google Search Grounding
 - **Real-time Notifications** - แจ้งเตือนผ่าน LINE Flex Message
 - **Race Condition Protection** - ป้องกันการแย่งงานระหว่างเซลล์
 - **Deduplication** - ป้องกัน Lead ซ้ำซ้อน
+- **Campaign Analytics** - Email metrics tracking (delivered/opened/click)
+- **Admin Dashboard API** - 21 REST endpoints with Google OAuth RBAC
 
 ### Tech Stack
 | Layer | Technology |
@@ -50,34 +52,45 @@ graph TB
         LINE[LINE Platform]
         Gemini[Google Gemini AI]
         Sheets[Google Sheets]
+        Google[Google OAuth]
     end
 
-    subgraph App["ENEOS Sales Automation"]
+    subgraph Dashboard["Admin Dashboard (Next.js)"]
+        NextJS[Next.js 16 + React 19]
+    end
+
+    subgraph App["ENEOS Sales Automation (Express.js)"]
         API[Express API Server]
 
         subgraph Controllers
-            WebhookCtrl[Webhook Controller]
+            WebhookCtrl[Workflow Webhook]
+            CampaignCtrl[Campaign Webhook]
             LineCtrl[LINE Controller]
+            AdminCtrl[Admin Controller]
         end
 
         subgraph Services
             SheetsService[Sheets Service]
-            GeminiService[Gemini Service]
+            GeminiService[Gemini + Grounding]
             LineService[LINE Service]
+            CampaignStats[Campaign Stats]
             DedupService[Dedup Service]
             DLQ[Dead Letter Queue]
         end
 
         subgraph Middleware
-            Auth[Auth Middleware]
+            AdminAuth[Admin Auth + RBAC]
             RateLimit[Rate Limiter]
             Metrics[Metrics Collector]
         end
     end
 
-    Brevo -->|Webhook| API
-    LINE -->|Webhook| API
-    API --> Controllers
+    Brevo -->|Workflow Webhook| WebhookCtrl
+    Brevo -->|Campaign Webhook| CampaignCtrl
+    LINE -->|Webhook| LineCtrl
+    NextJS -->|API + OAuth Token| AdminCtrl
+    AdminCtrl --> AdminAuth
+    AdminAuth --> Google
     Controllers --> Services
     Services --> Gemini
     Services --> Sheets
@@ -147,6 +160,30 @@ sequenceDiagram
     else Already Claimed
         API->>L: Reply "มีคนรับไปแล้ว"
         L-->>Sales: Show Already Claimed
+    end
+```
+
+### Scenario C: Campaign Email Events
+
+```mermaid
+sequenceDiagram
+    participant B as Brevo Campaign
+    participant API as API Server
+    participant CE as Campaign_Events
+    participant CS as Campaign_Stats
+
+    B->>API: POST /webhook/brevo/campaign
+    Note over B,API: {event: "click", camp_id: 123, id: 456}
+
+    API->>CE: Check Event_ID exists
+    alt Duplicate
+        API-->>B: 200 OK (duplicate)
+    else New Event
+        API->>CE: Write Event Row (source of truth)
+        API->>CE: COUNT unique emails for campaign
+        CE-->>API: uniqueCount
+        API->>CS: Update stats with accurate count
+        API-->>B: 200 OK (success)
     end
 ```
 
@@ -251,40 +288,54 @@ src/
 │   ├── index.ts          # Environment config with Zod validation
 │   └── swagger.ts        # OpenAPI specification
 ├── controllers/
-│   ├── webhook.controller.ts   # Brevo webhook handler
-│   ├── line.controller.ts      # LINE webhook handler
-│   └── status.controller.ts    # [v1.1.0] Status API handler
+│   ├── webhook.controller.ts        # Brevo Workflow webhook
+│   ├── campaign-webhook.controller.ts # Brevo Campaign webhook
+│   ├── line.controller.ts           # LINE webhook handler
+│   ├── admin.controller.ts          # Admin Dashboard API
+│   ├── admin/
+│   │   ├── campaign-stats.controller.ts # Campaign email metrics
+│   │   └── team-management.controller.ts # Team management
+│   └── status.controller.ts         # [v1.1.0] Status API handler
 ├── middleware/
-│   ├── error-handler.ts        # Centralized error handling
-│   ├── request-context.ts      # Request ID, timeout, timing
-│   ├── request-logger.ts       # HTTP request logging
-│   └── metrics.middleware.ts   # Prometheus metrics
+│   ├── admin-auth.ts              # Google OAuth + RBAC
+│   ├── error-handler.ts           # Centralized error handling
+│   ├── request-context.ts         # Request ID, timeout, timing
+│   ├── request-logger.ts          # HTTP request logging
+│   └── metrics.middleware.ts      # Prometheus metrics
 ├── routes/
-│   ├── webhook.routes.ts       # /webhook/brevo
-│   ├── line.routes.ts          # /webhook/line
-│   └── status.routes.ts        # [v1.1.0] /api/leads/status
+│   ├── webhook.routes.ts          # /webhook/brevo
+│   ├── campaign-webhook.routes.ts # /webhook/brevo/campaign
+│   ├── line.routes.ts             # /webhook/line
+│   ├── admin.routes.ts            # /api/admin/*
+│   └── status.routes.ts           # /api/leads/status
 ├── services/
-│   ├── sheets.service.ts       # Google Sheets CRUD
-│   ├── gemini.service.ts       # AI company analysis
-│   ├── line.service.ts         # LINE messaging
-│   ├── deduplication.service.ts # Prevent duplicates
+│   ├── sheets.service.ts          # Google Sheets CRUD
+│   ├── gemini.service.ts          # AI + Google Search Grounding
+│   ├── line.service.ts            # LINE messaging
+│   ├── campaign-stats.service.ts  # Campaign email metrics
+│   ├── deduplication.service.ts   # Prevent duplicates
 │   ├── dead-letter-queue.service.ts # Failed events
-│   ├── redis.service.ts        # Redis cache (optional)
-│   ├── background-processor.service.ts # [v1.1.0] Async lead processor
-│   └── processing-status.service.ts   # [v1.1.0] Status tracking
+│   ├── redis.service.ts           # Redis cache (optional)
+│   ├── background-processor.service.ts # Async lead processor
+│   └── processing-status.service.ts    # Status tracking
 ├── templates/
-│   └── flex-message.ts         # LINE Flex Message templates
+│   └── flex-message.ts            # LINE Flex Message templates
 ├── types/
-│   └── index.ts               # TypeScript interfaces
+│   ├── index.ts                   # Core TypeScript interfaces
+│   └── admin.types.ts             # Admin Dashboard types
 ├── utils/
-│   ├── logger.ts              # Winston logger
-│   ├── retry.ts               # Retry + Circuit Breaker
-│   ├── metrics.ts             # Prometheus metrics
-│   ├── phone-formatter.ts     # Thai phone formatting
-│   └── email-parser.ts        # Email domain extraction
-└── validators/
-    ├── brevo.validator.ts     # Brevo payload validation
-    └── line.validator.ts      # LINE payload validation
+│   ├── logger.ts                  # Winston logger
+│   ├── retry.ts                   # Retry + Circuit Breaker
+│   ├── metrics.ts                 # Prometheus metrics
+│   ├── phone-formatter.ts         # Thai phone formatting
+│   ├── email-parser.ts            # Email domain extraction
+│   └── date-formatter.ts          # ISO 8601 formatting
+├── validators/
+│   ├── brevo.validator.ts         # Brevo Workflow validation
+│   ├── campaign-event.validator.ts # Brevo Campaign validation
+│   └── line.validator.ts          # LINE payload validation
+└── constants/
+    └── campaign.constants.ts      # Campaign columns, events
 ```
 
 ### Service Dependencies
@@ -292,20 +343,23 @@ src/
 ```mermaid
 graph LR
     subgraph Controllers
-        WC[Webhook Controller]
+        WC[Workflow Webhook]
+        CC[Campaign Webhook]
         LC[LINE Controller]
-        SC[Status Controller v1.1.0]
+        AC[Admin Controller]
+        SC[Status Controller]
     end
 
-    subgraph Background Processing v1.1.0
+    subgraph Background Processing
         BP[Background Processor]
         PS[Processing Status]
     end
 
     subgraph Core Services
         SS[Sheets Service]
-        GS[Gemini Service]
+        GS[Gemini + Grounding]
         LS[LINE Service]
+        CS[Campaign Stats]
     end
 
     subgraph Support Services
@@ -314,9 +368,12 @@ graph LR
         RS[Redis Service]
     end
 
+    subgraph Auth
+        AA[Admin Auth + RBAC]
+    end
+
     WC --> DS
     WC --> BP
-    WC --> PS
     BP --> GS
     BP --> SS
     BP --> LS
@@ -324,31 +381,77 @@ graph LR
     SC --> PS
     WC --> DLQ
 
+    CC --> CS
+    CS --> SS
+
     LC --> SS
     LC --> LS
+
+    AC --> AA
+    AC --> SS
+    AC --> CS
 
     DS --> SS
     DS --> RS
 ```
 
+### Admin Dashboard API Architecture
+
+```mermaid
+graph TB
+    subgraph Dashboard["Next.js Dashboard"]
+        UI[React Components]
+        RQ[React Query]
+        Auth[NextAuth.js]
+    end
+
+    subgraph Backend["Express.js Backend"]
+        Routes[Admin Routes]
+        Middleware[Admin Auth Middleware]
+        Controller[Admin Controller]
+        Services[Services Layer]
+    end
+
+    subgraph Google
+        OAuth[Google OAuth]
+        Sheets[Google Sheets]
+    end
+
+    UI --> RQ
+    RQ --> Routes
+    Auth --> OAuth
+    OAuth --> Middleware
+    Routes --> Middleware
+    Middleware --> Controller
+    Controller --> Services
+    Services --> Sheets
+```
+
+**RBAC (Role-Based Access Control):**
+
+| Role | Sheet Value | Permissions |
+|------|-------------|-------------|
+| Admin | `admin` | Full access (export, team management) |
+| Viewer | `sales` | Read-only access |
+
 ---
 
 ## Database Schema
 
-### Google Sheets Structure
+### Google Sheets Structure (6 Sheets)
 
-#### Sheet 1: Leads (Main Database)
+#### Sheet 1: Leads (Main Database) - 34 Columns
 
 | Column | Field | Type | Description |
 |--------|-------|------|-------------|
 | A | Date | DateTime | วันที่สร้าง Lead |
-| B | Customer Name | String | ชื่อลูกค้า |
+| B | Customer_Name | String | ชื่อลูกค้า |
 | C | Email | String | อีเมล |
 | D | Phone | String | เบอร์โทร |
 | E | Company | String | ชื่อบริษัท |
 | F | Industry_AI | String | อุตสาหกรรม (จาก AI) |
 | G | Website | String | เว็บไซต์ |
-| H | Capital | String | ทุนจดทะเบียน |
+| H | Capital | String | ทุนจดทะเบียน (Grounding) |
 | I | Status | Enum | new/contacted/closed/lost/unreachable |
 | J | Sales_Owner_ID | String | LINE User ID ของเซลล์ |
 | K | Sales_Owner_Name | String | ชื่อเซลล์ |
@@ -356,7 +459,7 @@ graph LR
 | M | Campaign_Name | String | ชื่อแคมเปญ |
 | N | Email_Subject | String | หัวข้ออีเมล |
 | O | Source | String | แหล่งที่มา |
-| P | Lead_ID | String | Unique Lead ID |
+| P | Lead_ID | String | Brevo Contact ID |
 | Q | Event_ID | String | Brevo Event ID |
 | R | Clicked_At | DateTime | เวลาที่คลิก |
 | S | Talking_Point | String | จุดขาย (จาก AI) |
@@ -364,8 +467,42 @@ graph LR
 | U | Lost_At | DateTime | เวลา Lost |
 | V | Unreachable_At | DateTime | เวลาติดต่อไม่ได้ |
 | W | Version | Number | Optimistic Lock |
+| X | Lead_Source | String | Lead source categorization |
+| Y | Job_Title | String | Contact's job title |
+| Z | City | String | Contact's city |
+| AA | Lead_UUID | String | UUID for Supabase migration |
+| AB | Created_At | DateTime | ISO 8601 timestamp |
+| AC | Updated_At | DateTime | ISO 8601 timestamp |
+| AD | Contacted_At | DateTime | When sales claimed |
+| AE | Juristic_ID | String | เลขทะเบียนนิติบุคคล (Grounding) |
+| AF | DBD_Sector | String | DBD Sector code (Grounding) |
+| AG | Province | String | จังหวัด (Grounding) |
+| AH | Full_Address | String | ที่อยู่เต็ม (Grounding) |
 
-#### Sheet 2: Deduplication_Log
+#### Sheet 2: Sales_Team - 7 Columns
+
+| Column | Field | Type | Description |
+|--------|-------|------|-------------|
+| A | LINE_User_ID | String | LINE User ID (nullable for manual members) |
+| B | Name | String | ชื่อเซลล์ |
+| C | Email | String | @eneos.co.th email |
+| D | Phone | String | เบอร์โทร |
+| E | Role | String | admin or sales |
+| F | Created_At | DateTime | ISO 8601 timestamp |
+| G | Status | String | active or inactive |
+
+#### Sheet 3: Status_History (Audit Log) - 6 Columns
+
+| Column | Field | Type | Description |
+|--------|-------|------|-------------|
+| A | Lead_UUID | String | Reference to Leads.Lead_UUID |
+| B | Status | Enum | Status at this point |
+| C | Changed_By_ID | String | LINE User ID or "System" |
+| D | Changed_By_Name | String | Who made the change |
+| E | Timestamp | DateTime | ISO 8601 timestamp |
+| F | Notes | String | Optional notes |
+
+#### Sheet 4: Deduplication_Log - 4 Columns
 
 | Column | Field | Type | Description |
 |--------|-------|------|-------------|
@@ -374,14 +511,41 @@ graph LR
 | C | Campaign_ID | String | Campaign ID |
 | D | Processed_At | DateTime | เวลา process |
 
-#### Sheet 3: Sales_Team
+#### Sheet 5: Campaign_Events - 11 Columns
 
 | Column | Field | Type | Description |
 |--------|-------|------|-------------|
-| A | LINE_User_ID | String | LINE User ID |
-| B | Name | String | ชื่อเซลล์ |
-| C | Email | String | อีเมล |
-| D | Phone | String | เบอร์โทร |
+| A | Event_ID | Number | Unique event ID (PK) |
+| B | Campaign_ID | Number | Brevo campaign ID |
+| C | Campaign_Name | String | Campaign name |
+| D | Email | String | Recipient email |
+| E | Event | String | delivered/opened/click |
+| F | Event_At | DateTime | Event timestamp |
+| G | Sent_At | DateTime | Email sent timestamp |
+| H | URL | String | Clicked URL |
+| I | Tag | String | Brevo tag |
+| J | Segment_IDs | String | Brevo segment IDs |
+| K | Created_At | DateTime | Row creation time |
+
+#### Sheet 6: Campaign_Stats - 15 Columns
+
+| Column | Field | Type | Description |
+|--------|-------|------|-------------|
+| A | Campaign_ID | Number | Brevo campaign ID (PK) |
+| B | Campaign_Name | String | Campaign name |
+| C | Delivered | Number | Total delivered |
+| D | Opened | Number | Total opens |
+| E | Clicked | Number | Total clicks |
+| F | Unique_Opens | Number | Unique openers |
+| G | Unique_Clicks | Number | Unique clickers |
+| H | Open_Rate | Number | Unique_Opens / Delivered * 100 |
+| I | Click_Rate | Number | Unique_Clicks / Delivered * 100 |
+| J | Hard_Bounce | Number | (Future) |
+| K | Soft_Bounce | Number | (Future) |
+| L | Unsubscribe | Number | (Future) |
+| M | Spam | Number | (Future) |
+| N | First_Event | DateTime | First event timestamp |
+| O | Last_Updated | DateTime | Last update timestamp |
 
 ---
 

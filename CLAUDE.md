@@ -48,18 +48,42 @@ curl http://localhost:3000/health
 ทุกครั้งที่พัฒนา feature หรือ fix bug ต้องทำตาม flow นี้:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│  Amelia (Dev) ──→ Rex (Code Review) ──→ PASS? ─────→ Done
-│                         │                    │
-│                        FAIL                  │
-│                         │                    │
-│                         ▼                    │
-│                   Amelia (Fix) ──────────────┘
-│                   (loop until PASS)
-│                                                     │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│  1. Create Branch ──→ 2. Amelia (Dev) ──→ 3. Open PR        │
+│                                               │              │
+│                    4. Rex (Code Review) ◄──────┘              │
+│                         │                                    │
+│                    PASS? ──→ YES ──→ 5. Merge to main        │
+│                         │                                    │
+│                        FAIL                                  │
+│                         │                                    │
+│                         ▼                                    │
+│                   Amelia (Fix) ──→ Push ──→ Rex review again │
+│                   (loop until PASS)                          │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+### Branch & PR Convention
+
+| Step | Action | Command |
+|------|--------|---------|
+| **1. Create branch** | สร้าง feature branch จาก main | `git checkout -b feat/story-{epic}-{number}` |
+| **2. Implement** | Amelia implement story บน feature branch | `/bmad:bmm:agents:dev` → [DS] |
+| **3. Open PR** | เปิด PR ไปยัง main | `gh pr create --base main` |
+| **4. Code Review** | Rex review บน PR | `/bmad:bmm:agents:code-reviewer` → [RV] |
+| **5. Merge** | Merge เมื่อ Rex APPROVED | Merge PR on GitHub |
+
+**Branch Naming:**
+- Feature: `feat/story-{epic}-{number}` (e.g., `feat/story-6-5`)
+- Bugfix: `fix/{short-description}` (e.g., `fix/race-condition-sheets`)
+- Hotfix: `hotfix/{short-description}` (e.g., `hotfix/line-signature`)
+
+**PR Rules:**
+- ห้าม push ตรงไป `main` — ต้องผ่าน PR เสมอ
+- PR ต้องผ่าน CI (quality + test + burn-in) ก่อน merge
+- Rex APPROVED = ready to merge
 
 ### Agents
 
@@ -74,6 +98,7 @@ curl http://localhost:3000/health
 2. **Loop จนกว่า Rex PASS** - ถ้า Rex พบ issues ต้อง fix แล้ว review อีกรอบ
 3. **ใช้ Full Review [RV]** - ตรวจครบทั้ง Code + Tests + Acceptance Criteria
 4. **No Human Review Required** - Rex เป็น quality gate สุดท้าย (Lead skip ได้)
+5. **ห้าม push ตรงไป main** - ต้องผ่าน feature branch + PR เสมอ
 
 > **Note:** ใช้ [AR] Adversarial Review สำหรับ security-sensitive code (auth, payment)
 
@@ -81,22 +106,30 @@ curl http://localhost:3000/health
 
 | Verdict | Action |
 |---------|--------|
-| ✅ **APPROVED** | Done - merge/deploy ได้ |
-| ⚠️ **CHANGES_REQUESTED** | Amelia fix แล้ว Rex review อีกรอบ |
+| ✅ **APPROVED** | Merge PR to main ได้ |
+| ⚠️ **CHANGES_REQUESTED** | Amelia fix + push ไป branch เดิม → Rex review อีกรอบ |
 | ❌ **BLOCKED** | มี Critical issue ต้องแก้ก่อน |
 
 ### Quick Start
 
 ```bash
-# 1. Implement story
+# 1. Create feature branch
+git checkout -b feat/story-6-5
+
+# 2. Implement story
 /bmad:bmm:agents:dev
 # เลือก [DS] Dev Story
 
-# 2. Code review (after implementation done)
+# 3. Open PR (after implementation done)
+git add <files> && git commit -m "feat: story description"
+gh pr create --base main --title "feat: story title" --body "## Summary ..."
+
+# 4. Code review on PR
 /bmad:bmm:agents:code-reviewer
 # เลือก [RV] Full Review (หรือ [AR] สำหรับ security code)
 
-# 3. If issues found → fix → review again (loop)
+# 5. If issues found → fix → push → review again (loop)
+# 6. Rex APPROVED → Merge PR
 ```
 
 ## Architecture

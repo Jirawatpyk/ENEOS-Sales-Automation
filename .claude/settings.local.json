@@ -59,7 +59,32 @@
       "Bash(Select-String -Pattern \"failed|FAIL\")",
       "Bash(Select-Object -First 10)",
       "WebFetch(domain:datawarehouse.dbd.go.th)",
-      "WebFetch(domain:kb.dga.or.th)"
+      "WebFetch(domain:kb.dga.or.th)",
+      "Bash(ls:*)",
+      "Bash(Select-String -Pattern \"\\(Test Files|Tests |FAIL|✓ 8\\\\.|× 8\\\\.\\)\" -Context 0,1)",
+      "Bash(npx playwright test:*)",
+      "Bash(npx tsx:*)",
+      "Bash(ren:*)",
+      "Bash(sort:*)",
+      "Bash(if not exist \"C:\\\\Users\\\\Jiraw\\\\OneDrive\\\\Documents\\\\Eneos\\\\eneos-sales-automation\\\\_bmad-output\" mkdir \"C:\\\\Users\\\\Jiraw\\\\OneDrive\\\\Documents\\\\Eneos\\\\eneos-sales-automation\\\\_bmad-output\")",
+      "Bash(npm info:*)",
+      "Bash(wc:*)",
+      "Bash(where:*)",
+      "Bash(node --import tsx -e:*)",
+      "Bash(find:*)",
+      "Bash(while read f)",
+      "Bash(done)",
+      "Bash(grep:*)",
+      "Bash(epic \")",
+      "Bash(winget install:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" --version)",
+      "Bash(export PATH=\"/c/Program Files/GitHub CLI:$PATH\")",
+      "Bash(gh --version:*)",
+      "Bash(gh auth:*)",
+      "Bash(export GH_CONFIG_DIR=\"$APPDATA/GitHub CLI\")",
+      "Bash(gh api repos/Jirawatpyk/ENEOS-Sales-Automation/branches/main/protection --method PUT --input - 2)",
+      "Bash(1 <<'EOF'\n{\n  \"required_status_checks\": {\n    \"strict\": true,\n    \"contexts\": [\"Lint & Type Check\", \"Test & Coverage\"]\n  },\n  \"enforce_admins\": false,\n  \"required_pull_request_reviews\": {\n    \"required_approving_review_count\": 0\n  },\n  \"restrictions\": null\n}\nEOF)",
+      "Bash(git status:*)"
     ]
   }
 }

@@ -1011,6 +1011,185 @@ describe('Admin Controller', () => {
       expect(response.data.history.length).toBeGreaterThan(0);
     });
 
+    // Story 0-12: Status History - Controller-level coverage
+    it('should return history from Status_History sheet when entries exist', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        status: 'closed',
+        salesOwnerId: 'sales-001',
+        salesOwnerName: 'Sales Person',
+        leadUUID: 'lead_abc-123',
+      });
+      mockGetRow.mockResolvedValue(lead);
+
+      mockGetStatusHistory.mockResolvedValue([
+        {
+          leadUUID: 'lead_abc-123',
+          status: 'new',
+          changedById: 'system',
+          changedByName: 'System',
+          timestamp: '2024-01-15T10:00:00.000Z',
+        },
+        {
+          leadUUID: 'lead_abc-123',
+          status: 'contacted',
+          changedById: 'sales-001',
+          changedByName: 'Sales Person',
+          timestamp: '2024-01-15T11:00:00.000Z',
+        },
+        {
+          leadUUID: 'lead_abc-123',
+          status: 'closed',
+          changedById: 'sales-001',
+          changedByName: 'Sales Person',
+          timestamp: '2024-01-16T10:00:00.000Z',
+        },
+      ]);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(mockGetStatusHistory).toHaveBeenCalledWith('lead_abc-123');
+      expect(response.data.history).toHaveLength(3);
+      // Verify mapped fields (status, by, timestamp)
+      expect(response.data.history[0]).toEqual({
+        status: 'closed',
+        by: 'Sales Person',
+        timestamp: '2024-01-16T10:00:00.000Z',
+      });
+      expect(response.data.history[2]).toEqual({
+        status: 'new',
+        by: 'System',
+        timestamp: '2024-01-15T10:00:00.000Z',
+      });
+    });
+
+    it('should sort history newest first', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        status: 'contacted',
+        salesOwnerId: 'sales-001',
+        leadUUID: 'lead_sort-test',
+      });
+      mockGetRow.mockResolvedValue(lead);
+
+      // Return entries in ascending order (oldest first)
+      mockGetStatusHistory.mockResolvedValue([
+        {
+          leadUUID: 'lead_sort-test',
+          status: 'new',
+          changedById: 'system',
+          changedByName: 'System',
+          timestamp: '2024-01-10T08:00:00.000Z',
+        },
+        {
+          leadUUID: 'lead_sort-test',
+          status: 'contacted',
+          changedById: 'sales-001',
+          changedByName: 'Sales A',
+          timestamp: '2024-01-12T14:30:00.000Z',
+        },
+      ]);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // Should be newest first
+      expect(response.data.history[0].status).toBe('contacted');
+      expect(response.data.history[1].status).toBe('new');
+    });
+
+    it('should use fallback history when lead has no UUID', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        status: 'closed',
+        salesOwnerId: 'sales-001',
+        salesOwnerName: 'Sales Person',
+        leadUUID: null, // Legacy lead without UUID
+        date: '2024-01-14T09:00:00.000Z',
+        contactedAt: '2024-01-15T10:00:00.000Z',
+        closedAt: '2024-01-16T10:00:00.000Z',
+      });
+      mockGetRow.mockResolvedValue(lead);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // Should NOT call getStatusHistory for leads without UUID
+      expect(mockGetStatusHistory).not.toHaveBeenCalled();
+      // Fallback reconstructs from timestamps
+      expect(response.data.history).toHaveLength(3); // closed + contacted + new
+      expect(response.data.history[0].status).toBe('closed');
+      expect(response.data.history[0].by).toBe('Sales Person');
+      expect(response.data.history[1].status).toBe('contacted');
+      expect(response.data.history[2].status).toBe('new');
+      expect(response.data.history[2].by).toBe('System');
+    });
+
+    it('should include all status types in fallback history', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        status: 'lost',
+        salesOwnerId: 'sales-001',
+        salesOwnerName: 'Sales Person',
+        leadUUID: null,
+        date: '2024-01-10T08:00:00.000Z',
+        contactedAt: '2024-01-11T09:00:00.000Z',
+        closedAt: '2024-01-12T10:00:00.000Z',
+        lostAt: '2024-01-13T11:00:00.000Z',
+        unreachableAt: '2024-01-14T12:00:00.000Z',
+      });
+      mockGetRow.mockResolvedValue(lead);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // All 5 statuses: unreachable, lost, closed, contacted, new (newest first)
+      expect(response.data.history).toHaveLength(5);
+      const statuses = response.data.history.map((h: { status: string }) => h.status);
+      expect(statuses).toEqual(['unreachable', 'lost', 'closed', 'contacted', 'new']);
+    });
+
+    it('should use "Unknown" when salesOwnerName is missing in fallback mode', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        status: 'contacted',
+        salesOwnerId: 'sales-001',
+        salesOwnerName: null, // Missing name
+        leadUUID: null,
+        date: '2024-01-10T08:00:00.000Z',
+        contactedAt: '2024-01-11T09:00:00.000Z',
+      });
+      mockGetRow.mockResolvedValue(lead);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.history[0].by).toBe('Unknown');
+      // 'new' entry is always by 'System'
+      expect(response.data.history[1].by).toBe('System');
+    });
+
     it('should calculate metrics in minutes', async () => {
       const req = createMockRequest({ params: { id: '5' } });
       const res = createMockResponse();

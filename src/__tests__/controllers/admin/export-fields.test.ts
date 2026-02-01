@@ -142,6 +142,9 @@ const parseCSVRow = (csvOutput: string, rowIndex: number): Record<string, string
   return record;
 };
 
+// Backend exports 23 columns for leads - update if backend adds/removes columns
+const BACKEND_LEAD_COLUMN_COUNT = 23;
+
 // ===========================================
 // Tests
 // ===========================================
@@ -241,7 +244,7 @@ describe('Story 6-5: Backend Column Filtering', () => {
       const csvOutput = res.getBody();
       const headers = parseCSVHeaders(csvOutput);
 
-      expect(headers.length).toBe(23);
+      expect(headers.length).toBe(BACKEND_LEAD_COLUMN_COUNT);
       expect(headers).toContain('Company');
       expect(headers).toContain('Email');
       expect(headers).toContain('Status');
@@ -290,7 +293,7 @@ describe('Story 6-5: Backend Column Filtering', () => {
       const csvOutput = res.getBody();
       const headers = parseCSVHeaders(csvOutput);
 
-      expect(headers.length).toBe(23);
+      expect(headers.length).toBe(BACKEND_LEAD_COLUMN_COUNT);
     });
   });
 

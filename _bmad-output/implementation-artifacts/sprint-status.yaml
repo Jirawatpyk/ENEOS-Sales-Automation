@@ -156,7 +156,7 @@ development_status:
   6-2-export-to-pdf: done  # Code review APPROVED 2026-01-31 - PDF preview modal, viewer, 9 review fixes + TEA guardrails (72 tests total)
   6-3-quick-reports: done  # Code review APPROVED 2026-01-31 - Quick report presets (Daily/Weekly/Monthly), 43 tests, all review fixes applied
   6-4-custom-date-range: done  # Code review APPROVED 2026-02-01 - 57 tests, all review fixes applied (M1 useDeferredValue, M2 act(), L3 negative range)
-  6-5-select-data-fields: review  # Implementation complete 2026-02-01 - 36 ATDD tests pass, ready for code review
+  6-5-select-data-fields: done  # Code review APPROVED 2026-02-01 - 4 fixes applied (ARIA, console.error, constant, file list)
   6-6-export-history: backlog
   6-7-scheduled-reports: backlog
   6-8-export-to-csv: ready-for-dev  # Story created 2026-02-01 + ATDD tests (13 backend GREEN, 11 frontend pending) - CSV export verification, format descriptions UI

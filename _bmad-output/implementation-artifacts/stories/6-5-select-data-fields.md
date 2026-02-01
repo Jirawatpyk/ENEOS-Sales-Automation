@@ -1,6 +1,6 @@
 # Story 6.5: Select Data Fields
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -727,8 +727,8 @@ if (dataToExport.length > 0) {
 - [x] Backward compatible: no `fields` param = all columns exported
 - [x] PDF format disables field selector with explanation
 - [x] Responsive design verified on Desktop, Tablet, Mobile
-- [ ] Code review approved by Rex (Code Reviewer)
-- [ ] Sprint status updated: `6-5-select-data-fields: done`
+- [x] Code review approved by Rex (Code Reviewer)
+- [x] Sprint status updated: `6-5-select-data-fields: done`
 
 ---
 
@@ -780,9 +780,9 @@ Claude Opus 4.5 (claude-opus-4-5-20251101)
 **Backend (eneos-sales-automation):**
 - `src/controllers/admin/export.controller.ts` - MODIFIED
 
-**Tests (pre-written ATDD):**
+**Tests (ATDD):**
 - `eneos-admin-dashboard/src/__tests__/components/export/export-field-selector.test.tsx` - 12 tests
-- `eneos-admin-dashboard/src/__tests__/components/export/export-form-fields.test.tsx` - 8 tests
-- `eneos-admin-dashboard/src/__tests__/hooks/use-export-fields.test.ts` - 4 tests
-- `eneos-admin-dashboard/src/__tests__/lib/export-leads-fields.test.ts` - 4 tests
+- `eneos-admin-dashboard/src/__tests__/components/export/export-form-csv.test.tsx` - 10 tests (2 skipped)
+- `eneos-admin-dashboard/src/__tests__/hooks/use-export-fields.test.tsx` - 4 tests
+- `eneos-admin-dashboard/src/__tests__/lib/export-leads-fields.test.ts` - 7 tests
 - `eneos-sales-automation/src/__tests__/controllers/admin/export-fields.test.ts` - 8 tests

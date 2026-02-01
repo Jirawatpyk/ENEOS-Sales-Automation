@@ -1,6 +1,11 @@
 # ===========================================
 # ENEOS Sales Automation - CI/CD Pipeline
-# GitHub Actions workflow for testing and deployment
+# GitHub Actions workflow for quality gates, testing, and deployment
+#
+# Pipeline: quality -> test -> burn-in (PR only)
+#                   -> build-docker -> deploy-railway
+#
+# Knowledge base: ci-burn-in.md, selective-testing.md, test-quality.md
 # ===========================================
 
 name: CI/CD Pipeline
@@ -10,17 +15,26 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  schedule:
+    # Weekly full regression - Sunday 03:00 UTC
+    - cron: '0 3 * * 0'
 
 env:
   NODE_VERSION: '20'
 
+# Cancel in-progress runs for the same PR/branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ===========================================
-  # Test Job
+  # Quality Gate: Lint + Type Check (fail fast)
   # ===========================================
-  test:
-    name: Test & Lint
+  quality:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Checkout code
@@ -41,8 +55,30 @@ jobs:
       - name: Run type check
         run: npm run typecheck
 
-      - name: Run tests
-        run: npm run test
+  # ===========================================
+  # Test Job: Coverage Enforcement + Artifacts
+  # ===========================================
+  test:
+    name: Test & Coverage
+    runs-on: ubuntu-latest
+    needs: quality
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
         env:
           NODE_ENV: test
           BREVO_WEBHOOK_SECRET: test-secret
@@ -56,6 +92,119 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/
+          retention-days: 14
+
+  # ===========================================
+  # Burn-In: Flaky Test Detection (PR only)
+  # ===========================================
+  burn-in:
+    name: Burn-In (Flaky Detection)
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Detect changed test files
+        id: changed-tests
+        run: |
+          CHANGED_SPECS=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'src/__tests__/**/*.test.ts' || echo "")
+          echo "specs=${CHANGED_SPECS}" >> $GITHUB_OUTPUT
+          if [ -n "$CHANGED_SPECS" ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changed test files:"
+            echo "$CHANGED_SPECS" | sed 's/^/  - /'
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No test files changed - skipping burn-in"
+          fi
+
+      - name: Run burn-in (5 iterations on changed tests)
+        if: steps.changed-tests.outputs.has_changes == 'true'
+        run: |
+          SPECS="${{ steps.changed-tests.outputs.specs }}"
+          echo "Running burn-in: 5 iterations on changed test files"
+          echo ""
+          for i in 1 2 3 4 5; do
+            echo "============================================"
+            echo "Burn-in iteration $i/5"
+            echo "============================================"
+            npx vitest run $SPECS || {
+              echo ""
+              echo "BURN-IN FAILED on iteration $i"
+              echo "Tests are flaky - fix before merging"
+              exit 1
+            }
+            echo "Iteration $i passed"
+            echo ""
+          done
+          echo "============================================"
+          echo "BURN-IN PASSED: 5/5 iterations successful"
+          echo "Changed tests are stable and ready to merge"
+          echo "============================================"
+        env:
+          NODE_ENV: test
+          BREVO_WEBHOOK_SECRET: test-secret
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: test@test.iam.gserviceaccount.com
+          GOOGLE_PRIVATE_KEY: test-key
+          GOOGLE_SHEET_ID: test-sheet-id
+          GEMINI_API_KEY: test-api-key
+          LINE_CHANNEL_ACCESS_TOKEN: test-token
+          LINE_CHANNEL_SECRET: test-secret
+          LINE_GROUP_ID: test-group-id
+
+      - name: Run full burn-in (no changed tests - run full suite 3x)
+        if: steps.changed-tests.outputs.has_changes == 'false'
+        run: |
+          echo "No specific test changes - running full suite burn-in (3 iterations)"
+          echo ""
+          for i in 1 2 3; do
+            echo "============================================"
+            echo "Full burn-in iteration $i/3"
+            echo "============================================"
+            npm run test || {
+              echo ""
+              echo "BURN-IN FAILED on iteration $i"
+              exit 1
+            }
+            echo "Iteration $i passed"
+            echo ""
+          done
+          echo "============================================"
+          echo "FULL BURN-IN PASSED: 3/3 iterations successful"
+          echo "============================================"
+        env:
+          NODE_ENV: test
+          BREVO_WEBHOOK_SECRET: test-secret
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: test@test.iam.gserviceaccount.com
+          GOOGLE_PRIVATE_KEY: test-key
+          GOOGLE_SHEET_ID: test-sheet-id
+          GEMINI_API_KEY: test-api-key
+          LINE_CHANNEL_ACCESS_TOKEN: test-token
+          LINE_CHANNEL_SECRET: test-secret
+          LINE_GROUP_ID: test-group-id
 
   # ===========================================
   # Build Docker Image Job
@@ -103,6 +252,31 @@ jobs:
         run: railway up --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  # ===========================================
+  # Future: Parallel Sharding (uncomment when test suite > 3 min)
+  # ===========================================
+  # test-sharded:
+  #   name: Test Shard ${{ matrix.shard }}/4
+  #   runs-on: ubuntu-latest
+  #   needs: quality
+  #   timeout-minutes: 10
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       shard: [1, 2, 3, 4]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'npm'
+  #     - run: npm ci
+  #     - name: Run tests (shard ${{ matrix.shard }}/4)
+  #       run: npx vitest run --shard=${{ matrix.shard }}/4
+  #       env:
+  #         NODE_ENV: test
+  #         # ... env vars ...
 
   # ===========================================
   # Deploy to Render (Alternative)

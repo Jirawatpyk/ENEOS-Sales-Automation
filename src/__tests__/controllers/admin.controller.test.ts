@@ -91,6 +91,11 @@ const createSampleLead = (overrides: Partial<LeadRow> = {}): LeadRow => ({
   unreachableAt: null,
   version: 1,
   contactedAt: null, // When sales claimed the lead
+  // Google Search Grounding fields (2026-01-26)
+  juristicId: null,
+  dbdSector: null,
+  province: null,
+  fullAddress: null,
   ...overrides,
 });
 

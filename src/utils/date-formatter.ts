@@ -65,8 +65,9 @@ export function parseDateFromSheets(dateStr: string): Date {
   const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2}):(\d{2})$/);
   if (match) {
     const [, day, month, year, hours, minutes, seconds] = match;
-    // Create date in Thai timezone, then convert to UTC
-    const thaiDate = new Date(
+    // Use Date.UTC for timezone-independent parsing
+    // Input is Thai time (UTC+7), so treat as UTC first, then subtract 7 hours
+    const utcTimestamp = Date.UTC(
       parseInt(year),
       parseInt(month) - 1,
       parseInt(day),
@@ -74,8 +75,8 @@ export function parseDateFromSheets(dateStr: string): Date {
       parseInt(minutes),
       parseInt(seconds)
     );
-    // Subtract 7 hours to get UTC (since the stored time is Thai time)
-    return new Date(thaiDate.getTime() - 7 * 60 * 60 * 1000);
+    // Subtract 7 hours to get actual UTC (since the stored time is Thai time)
+    return new Date(utcTimestamp - 7 * 60 * 60 * 1000);
   }
 
   // Fallback: try native Date parsing

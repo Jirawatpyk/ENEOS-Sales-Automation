@@ -181,10 +181,10 @@ describe('parseDateFromSheets', () => {
     });
 
     it('should subtract 7 hours from parsed Thai time', () => {
-      // This tests the timezone conversion logic
-      // Create a reference date using the same logic
-      const thaiDate = new Date(2026, 0, 15, 14, 0, 0); // Jan 15, 2026 14:00 local
-      const expectedUtc = new Date(thaiDate.getTime() - 7 * 60 * 60 * 1000);
+      // Thai time 15/01/2026 14:00:00 = UTC 15/01/2026 07:00:00
+      // Use Date.UTC for timezone-independent calculation (same as implementation)
+      const utcTimestamp = Date.UTC(2026, 0, 15, 14, 0, 0);
+      const expectedUtc = new Date(utcTimestamp - 7 * 60 * 60 * 1000);
 
       const result = parseDateFromSheets('15/01/2026 14:00:00');
 
@@ -226,13 +226,13 @@ describe('parseDateFromSheets', () => {
 
   describe('timezone conversion', () => {
     it('should convert Thai time using 7-hour offset', () => {
-      // The function subtracts 7 hours from the local-time-interpreted value
+      // Thai time 15/01/2026 12:00:00 = UTC 15/01/2026 05:00:00
       const thaiDateStr = '15/01/2026 12:00:00';
       const result = parseDateFromSheets(thaiDateStr);
 
-      // Create expected result using same logic
-      const localDate = new Date(2026, 0, 15, 12, 0, 0);
-      const expected = new Date(localDate.getTime() - 7 * 60 * 60 * 1000);
+      // Use Date.UTC for timezone-independent calculation (same as implementation)
+      const utcTimestamp = Date.UTC(2026, 0, 15, 12, 0, 0);
+      const expected = new Date(utcTimestamp - 7 * 60 * 60 * 1000);
 
       expect(result.getTime()).toBe(expected.getTime());
     });
@@ -247,12 +247,12 @@ describe('parseDateFromSheets', () => {
     });
 
     it('should handle date boundary crossing', () => {
-      // When subtracting 7 hours crosses date boundary
+      // Thai time 01/01/2026 03:00:00 = UTC 31/12/2025 20:00:00 (crosses date boundary)
       const result = parseDateFromSheets('01/01/2026 03:00:00');
 
-      // 03:00 - 7 hours = previous day 20:00
-      const localDate = new Date(2026, 0, 1, 3, 0, 0);
-      const expected = new Date(localDate.getTime() - 7 * 60 * 60 * 1000);
+      // Use Date.UTC for timezone-independent calculation
+      const utcTimestamp = Date.UTC(2026, 0, 1, 3, 0, 0);
+      const expected = new Date(utcTimestamp - 7 * 60 * 60 * 1000);
 
       expect(result.getTime()).toBe(expected.getTime());
     });
@@ -289,16 +289,14 @@ describe('extractDateKey', () => {
 
   it('should handle date crossing midnight after timezone conversion', () => {
     // Thai time 00:00 on Jan 15 = Jan 14 17:00 UTC
+    // extractDateKey converts back to Thai timezone, so result should be Jan 15
     const thaiTime = '15/01/2026 00:00:00';
-    const date = parseDateFromSheets(thaiTime);
-    const expectedYear = date.getFullYear();
-    const expectedMonth = String(date.getMonth() + 1).padStart(2, '0');
-    const expectedDay = String(date.getDate()).padStart(2, '0');
-    const expected = `${expectedYear}-${expectedMonth}-${expectedDay}`;
 
     const result = extractDateKey(thaiTime);
 
-    expect(result).toBe(expected);
+    // extractDateKey always returns Thai date (UTC+7), not local date
+    // Thai time 00:00 on Jan 15 → UTC Jan 14 17:00 → Thai Jan 15
+    expect(result).toBe('2026-01-15');
   });
 
   it('should pad month and day with zeros', () => {

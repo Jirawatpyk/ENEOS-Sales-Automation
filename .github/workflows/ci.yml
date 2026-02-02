@@ -236,25 +236,27 @@ jobs:
 
   # ===========================================
   # Deploy to Railway (Production)
+  # DISABLED: Railway auto-deploys on push via GitHub integration
+  # Uncomment if you disable Railway auto-deploy and want CI-controlled deploys
   # ===========================================
-  deploy-railway:
-    name: Deploy to Railway
-    runs-on: ubuntu-latest
-    needs: [test, build-docker]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        run: railway up --detach --service eneos-sales-automation
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  # deploy-railway:
+  #   name: Deploy to Railway
+  #   runs-on: ubuntu-latest
+  #   needs: [test, build-docker]
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   environment: production
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Install Railway CLI
+  #       run: npm install -g @railway/cli
+  #
+  #     - name: Deploy to Railway
+  #       run: railway up --detach --service eneos-sales-automation
+  #       env:
+  #         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   # ===========================================
   # Future: Parallel Sharding (uncomment when test suite > 3 min)

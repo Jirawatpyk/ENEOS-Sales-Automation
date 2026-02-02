@@ -97,11 +97,12 @@ export class CampaignStatsService {
     });
 
     try {
-      // Step 1: Check for duplicate event
-      const isDuplicate = await this.checkDuplicateEvent(event.eventId);
+      // Step 1: Check for duplicate event (composite key: Event_ID + Event_Type)
+      const isDuplicate = await this.checkDuplicateEvent(event.eventId, event.event);
       if (isDuplicate) {
         logger.info('Duplicate event detected, returning success', {
           eventId: event.eventId,
+          eventType: event.event,
         });
         return {
           success: true,
@@ -174,25 +175,39 @@ export class CampaignStatsService {
   // ===========================================
 
   /**
-   * Check if Event_ID already exists in Campaign_Events
-   * Implements AC5: Duplicate Event Prevention
+   * Check if Event_ID + Event_Type combination already exists in Campaign_Events
+   *
+   * Story 5-10 Fix: Changed from Event_ID only to Event_ID + Event_Type composite key.
+   * This allows same eventId with different event types (delivered, opened, click).
+   *
+   * @param eventId - The unique event identifier from Brevo (maps to 'id' in webhook payload)
+   * @param eventType - The event type: 'delivered', 'opened', or 'click'
+   * @returns true if exact combination already exists (duplicate), false if new
    */
-  async checkDuplicateEvent(eventId: number): Promise<boolean> {
-    logger.debug('Checking duplicate event', { eventId });
+  async checkDuplicateEvent(eventId: number, eventType: string): Promise<boolean> {
+    logger.debug('Checking duplicate event', { eventId, eventType });
 
     return circuitBreaker.execute(async () => {
       return withRetry(async () => {
+        // Fetch A:E because Google Sheets API doesn't support non-contiguous ranges (A:A,E:E).
+        // We only use col A (Event_ID) and col E (Event) but must fetch B-D as well.
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
-          range: this.getSheetRange(this.eventsSheet, 'A:A'), // Event_ID column
+          range: this.getSheetRange(this.eventsSheet, 'A:E'),
         });
 
         const values = response.data.values || [];
 
-        // Check if eventId exists (skip header row)
+        // Check if eventId + eventType combination exists (skip header row)
+        // Column A (index 0) = Event_ID, Column E (index 4) = Event
         for (let i = 1; i < values.length; i++) {
           const row = values[i];
-          if (row && row[0] && Number(row[0]) === eventId) {
+          if (
+            row &&
+            row[0] &&
+            Number(row[0]) === eventId &&
+            row[4] === eventType
+          ) {
             return true;
           }
         }

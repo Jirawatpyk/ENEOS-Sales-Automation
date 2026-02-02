@@ -90,20 +90,33 @@ describe('CampaignStatsService', () => {
 
   describe('checkDuplicateEvent', () => {
     it('should return false when event does not exist', async () => {
+      // Sheet now returns Event_ID and Event columns
       mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
-        data: { values: [['header'], ['11111'], ['22222']] },
+        data: {
+          values: [
+            ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event'], // header
+            ['11111', '100', 'Test', 'a@b.com', 'click'],
+            ['22222', '100', 'Test', 'a@b.com', 'delivered'],
+          ],
+        },
       });
 
-      const result = await campaignStatsService.checkDuplicateEvent(99999);
+      const result = await campaignStatsService.checkDuplicateEvent(99999, 'click');
       expect(result).toBe(false);
     });
 
     it('should return true when event already exists', async () => {
       mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
-        data: { values: [['header'], ['12345'], ['67890']] },
+        data: {
+          values: [
+            ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event'], // header
+            ['12345', '100', 'Test', 'a@b.com', 'click'],
+            ['67890', '100', 'Test', 'a@b.com', 'delivered'],
+          ],
+        },
       });
 
-      const result = await campaignStatsService.checkDuplicateEvent(12345);
+      const result = await campaignStatsService.checkDuplicateEvent(12345, 'click');
       expect(result).toBe(true);
     });
 
@@ -112,7 +125,7 @@ describe('CampaignStatsService', () => {
         data: { values: [] },
       });
 
-      const result = await campaignStatsService.checkDuplicateEvent(12345);
+      const result = await campaignStatsService.checkDuplicateEvent(12345, 'click');
       expect(result).toBe(false);
     });
 
@@ -121,8 +134,77 @@ describe('CampaignStatsService', () => {
         data: { values: null },
       });
 
-      const result = await campaignStatsService.checkDuplicateEvent(12345);
+      const result = await campaignStatsService.checkDuplicateEvent(12345, 'click');
       expect(result).toBe(false);
+    });
+
+    // Story 5-10: Composite key deduplication (Event_ID + Event_Type)
+    it('should return false when same eventId but different eventType (AC#1)', async () => {
+      // GIVEN: Event 12345 exists with type 'click'
+      // Sheet data: [Event_ID, Campaign_ID, Campaign_Name, Email, Event]
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event'], // header
+            ['12345', '100', 'Test', 'a@b.com', 'click'], // existing click event
+          ],
+        },
+      });
+
+      // WHEN: Checking for same eventId but 'delivered' type
+      const result = await campaignStatsService.checkDuplicateEvent(12345, 'delivered');
+
+      // THEN: Should NOT be duplicate (different event type)
+      expect(result).toBe(false);
+    });
+
+    it('should return true when same eventId AND same eventType (AC#3)', async () => {
+      // GIVEN: Event 12345 exists with type 'click'
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event'], // header
+            ['12345', '100', 'Test', 'a@b.com', 'click'], // existing click event
+          ],
+        },
+      });
+
+      // WHEN: Checking for same eventId AND same type
+      const result = await campaignStatsService.checkDuplicateEvent(12345, 'click');
+
+      // THEN: Should be duplicate
+      expect(result).toBe(true);
+    });
+
+    it('should allow all event types for same eventId (AC#2)', async () => {
+      // GIVEN: Event 12345 exists with 'delivered' type only
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event'], // header
+            ['12345', '100', 'Test', 'a@b.com', 'delivered'],
+          ],
+        },
+      });
+
+      // WHEN: Checking 'opened' and 'click' for same eventId
+      const openedResult = await campaignStatsService.checkDuplicateEvent(12345, 'opened');
+
+      // Reset mock for next call with updated data (simulating opened was added)
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event'],
+            ['12345', '100', 'Test', 'a@b.com', 'delivered'],
+            ['12345', '100', 'Test', 'a@b.com', 'opened'],
+          ],
+        },
+      });
+      const clickResult = await campaignStatsService.checkDuplicateEvent(12345, 'click');
+
+      // THEN: Both should NOT be duplicates
+      expect(openedResult).toBe(false);
+      expect(clickResult).toBe(false);
     });
   });
 
@@ -193,12 +275,17 @@ describe('CampaignStatsService', () => {
 
   describe('recordCampaignEvent', () => {
     it('should return duplicate status for existing event', async () => {
-      // checkDuplicateEvent returns true
+      // checkDuplicateEvent returns true (same eventId + same eventType)
       mockSheetsClient.spreadsheets.values.get.mockResolvedValueOnce({
-        data: { values: [['header'], ['12345']] },
+        data: {
+          values: [
+            ['Event_ID', 'Campaign_ID', 'Campaign_Name', 'Email', 'Event'], // header
+            ['12345', '100', 'Test', 'a@b.com', 'click'], // existing event with 'click' type
+          ],
+        },
       });
 
-      const event = createMockEvent({ eventId: 12345 });
+      const event = createMockEvent({ eventId: 12345, event: 'click' });
       const result = await campaignStatsService.recordCampaignEvent(event);
 
       expect(result.success).toBe(true);

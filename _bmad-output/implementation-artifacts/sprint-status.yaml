@@ -133,7 +133,7 @@ development_status:
   # Updated: 2026-01-30 - New structure with Backend webhook first
   # Data Source: Brevo Campaign Events webhook (NOT from Leads sheet)
   # ============================================================
-  epic-5: done  # All 9 stories completed 2026-01-31
+  epic-5: in-progress  # Reopened for bug fix story 5-10
   # Backend Features (Prerequisite)
   5-1-campaign-webhook-backend: done  # POST /webhook/brevo/campaign + Sheets storage - Code review APPROVED (2026-01-30), TEA guardrails +40 tests + 3 source fixes (2026-01-31)
   5-2-campaign-stats-api: done                 # GET /api/admin/campaigns/stats + /campaigns/:id/events - Code review APPROVED (2026-01-30), TEA guardrails +41 tests (175 total) 2026-01-31
@@ -145,6 +145,7 @@ development_status:
   5-7-campaign-detail-sheet: done               # F-05.F5: Event log per campaign - Code review APPROVED + TEA guardrails (125 tests, 12 files) 2026-01-31
   5-8-campaign-date-filter: done                  # F-05.F6: Date range filter - Code review APPROVED + fixes applied (2026-01-31)
   5-9-campaign-export: done                       # F-05.F7: Export campaign data - Code review APPROVED + TEA guardrails (58 tests) 2026-01-31
+  5-10-campaign-event-dedup-fix: done  # Bug fix: Composite dedup key (Event_ID + Event_Type) - Code review APPROVED 2026-02-02
   epic-5-retrospective: done  # Completed 2026-01-31
 
   # ============================================================

@@ -445,6 +445,43 @@ When external services fail, use these defaults:
 
 ---
 
+## Export Patterns
+
+### UTF-8 BOM for Thai CSV Files (CRITICAL)
+
+When exporting CSV files with Thai characters, Excel requires a **Byte Order Mark (BOM)** to display correctly.
+
+**Problem:**
+```
+Without BOM: à¸šà¸£à¸´à¸©à¸±à¸—  (garbled Thai text in Excel)
+With BOM:    บริษัท ทดสอบ จำกัด  (correct display)
+```
+
+**Solution Pattern:**
+```typescript
+// src/controllers/admin/export.controller.ts
+const { parse } = await import('json2csv');
+const csv = parse(dataToExport);
+const csvWithBOM = '\uFEFF' + csv;  // ← Add BOM prefix
+res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+res.setHeader('Content-Disposition', 'attachment; filename="export.csv"');
+res.send(csvWithBOM);
+```
+
+**Key Points:**
+- `\uFEFF` is the UTF-8 BOM character (U+FEFF)
+- Must be the FIRST character in the file
+- Required for Excel Thai compatibility on Windows
+- Google Sheets and Numbers handle UTF-8 without BOM, but BOM doesn't hurt
+- `json2csv` library handles escaping (commas, quotes, newlines) automatically
+
+**When to Use:**
+- CSV exports containing Thai text
+- Any CSV that users may open in Excel
+- NOT needed for JSON, XLSX (ExcelJS handles it), or PDF exports
+
+---
+
 ## Usage Guidelines
 
 **For AI Agents:**
@@ -461,5 +498,5 @@ When external services fail, use these defaults:
 
 ---
 
-*Last Updated: 2026-01-30*
+*Last Updated: 2026-02-02*
 

@@ -159,7 +159,7 @@ development_status:
   6-5-select-data-fields: done  # Code review APPROVED 2026-02-01 - 4 fixes applied (ARIA, console.error, constant, file list)
   6-6-export-history: backlog
   6-7-scheduled-reports: backlog
-  6-8-export-to-csv: ready-for-dev  # Story created 2026-02-01 + ATDD tests (13 backend GREEN, 11 frontend pending) - CSV export verification, format descriptions UI
+  6-8-export-to-csv: done  # Code review APPROVED 2026-02-02 - All ACs pass, 33 tests (16 backend + 17 frontend)
   epic-6-retrospective: optional
 
   # ============================================================

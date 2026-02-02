@@ -387,4 +387,86 @@ describe('Export CSV - Story 6.8', () => {
       expect(res.send).toHaveBeenCalled();
     });
   });
+
+  // AC#5: Field Selection Integration
+  describe('AC#5: Field Selection', () => {
+    it('should export only selected columns when fields param provided', async () => {
+      // GIVEN: Lead data and request with fields param
+      mockGetAllLeads.mockResolvedValue([createMockLead()]);
+      const req = createMockRequest({
+        query: {
+          type: 'leads',
+          format: 'csv',
+          fields: 'Company,Email,Status',
+        },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // WHEN: Exporting with field selection
+      await exportData(req, res, next);
+
+      // THEN: Only selected columns are included
+      expect(mockParse).toHaveBeenCalled();
+      const calledData = mockParse.mock.calls[0][0];
+      expect(calledData.length).toBe(1);
+      const columns = Object.keys(calledData[0]);
+      expect(columns).toEqual(['Company', 'Email', 'Status']);
+      expect(columns).not.toContain('Phone');
+      expect(columns).not.toContain('Industry');
+    });
+
+    it('should export all columns when no fields param provided (backward compatibility)', async () => {
+      // GIVEN: Lead data and request without fields param
+      mockGetAllLeads.mockResolvedValue([createMockLead()]);
+      const req = createMockRequest({
+        query: {
+          type: 'leads',
+          format: 'csv',
+        },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // WHEN: Exporting without field selection
+      await exportData(req, res, next);
+
+      // THEN: All columns are included
+      expect(mockParse).toHaveBeenCalled();
+      const calledData = mockParse.mock.calls[0][0];
+      const columns = Object.keys(calledData[0]);
+      // Verify it has more columns than just 3
+      expect(columns.length).toBeGreaterThan(10);
+      expect(columns).toContain('Company');
+      expect(columns).toContain('Email');
+      expect(columns).toContain('Phone');
+      expect(columns).toContain('Status');
+      expect(columns).toContain('Industry');
+    });
+
+    it('should handle invalid field names gracefully', async () => {
+      // GIVEN: Request with some invalid field names
+      mockGetAllLeads.mockResolvedValue([createMockLead()]);
+      const req = createMockRequest({
+        query: {
+          type: 'leads',
+          format: 'csv',
+          fields: 'Company,InvalidColumn,Email',
+        },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      // WHEN: Exporting with invalid field
+      await exportData(req, res, next);
+
+      // THEN: Only valid columns are included
+      expect(mockParse).toHaveBeenCalled();
+      const calledData = mockParse.mock.calls[0][0];
+      const columns = Object.keys(calledData[0]);
+      expect(columns).toContain('Company');
+      expect(columns).toContain('Email');
+      expect(columns).not.toContain('InvalidColumn');
+    });
+  });
 });

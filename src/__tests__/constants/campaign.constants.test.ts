@@ -9,6 +9,9 @@ import {
   isEventEnabled,
   CAMPAIGN_EVENTS_COLUMNS,
   CAMPAIGN_STATS_COLUMNS,
+  CAMPAIGN_CONTACTS_COLUMNS,
+  CAMPAIGN_CONTACTS_RANGE,
+  CAMPAIGN_CONTACTS_SHEET_NAME,
   CAMPAIGN_SHEETS,
   createDefaultStatsRow,
   type CampaignEventType,
@@ -114,10 +117,47 @@ describe('Campaign Constants', () => {
     });
   });
 
+  describe('CAMPAIGN_CONTACTS_COLUMNS', () => {
+    it('should have correct column indices', () => {
+      expect(CAMPAIGN_CONTACTS_COLUMNS.EMAIL).toBe(0);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.FIRSTNAME).toBe(1);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.LASTNAME).toBe(2);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.PHONE).toBe(3);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.COMPANY).toBe(4);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.JOB_TITLE).toBe(5);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.CITY).toBe(6);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.WEBSITE).toBe(7);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.CAMPAIGN_ID).toBe(8);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.CAMPAIGN_NAME).toBe(9);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.EVENT_AT).toBe(10);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.URL).toBe(11);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.LEAD_SOURCE).toBe(12);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.CREATED_AT).toBe(13);
+      expect(CAMPAIGN_CONTACTS_COLUMNS.UPDATED_AT).toBe(14);
+    });
+
+    it('should have 15 columns total', () => {
+      expect(Object.keys(CAMPAIGN_CONTACTS_COLUMNS)).toHaveLength(15);
+    });
+  });
+
+  describe('CAMPAIGN_CONTACTS_RANGE', () => {
+    it('should cover 15 columns (A:O)', () => {
+      expect(CAMPAIGN_CONTACTS_RANGE).toBe('A:O');
+    });
+  });
+
+  describe('CAMPAIGN_CONTACTS_SHEET_NAME', () => {
+    it('should be Campaign_Contacts', () => {
+      expect(CAMPAIGN_CONTACTS_SHEET_NAME).toBe('Campaign_Contacts');
+    });
+  });
+
   describe('CAMPAIGN_SHEETS', () => {
     it('should define correct sheet names', () => {
       expect(CAMPAIGN_SHEETS.EVENTS).toBe('Campaign_Events');
       expect(CAMPAIGN_SHEETS.STATS).toBe('Campaign_Stats');
+      expect(CAMPAIGN_SHEETS.CONTACTS).toBe('Campaign_Contacts');
     });
   });
 

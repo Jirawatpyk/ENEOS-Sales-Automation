@@ -10,7 +10,7 @@ import type { NormalizedCampaignEvent } from '../../validators/campaign-event.va
 // Mock Setup (Hoisted)
 // ===========================================
 
-const { mockSheetsClient } = vi.hoisted(() => ({
+const { mockSheetsClient, mockGetContactsForCampaign } = vi.hoisted(() => ({
   mockSheetsClient: {
     spreadsheets: {
       values: {
@@ -20,6 +20,7 @@ const { mockSheetsClient } = vi.hoisted(() => ({
       },
     },
   },
+  mockGetContactsForCampaign: vi.fn().mockResolvedValue(new Map()),
 }));
 
 vi.mock('googleapis', () => ({
@@ -28,6 +29,12 @@ vi.mock('googleapis', () => ({
       GoogleAuth: vi.fn().mockImplementation(() => ({})),
     },
     sheets: vi.fn(() => mockSheetsClient),
+  },
+}));
+
+vi.mock('../../services/campaign-contacts.service.js', () => ({
+  campaignContactsService: {
+    getContactsForCampaign: mockGetContactsForCampaign,
   },
 }));
 
@@ -44,6 +51,7 @@ vi.mock('../../config/index.js', () => ({
         statusHistory: 'Status_History',
         campaignEvents: 'Campaign_Events',
         campaignStats: 'Campaign_Stats',
+        campaignContacts: 'Campaign_Contacts',
       },
     },
     logLevel: 'error',
@@ -844,6 +852,76 @@ describe('CampaignStatsService', () => {
       const deliveredEvent = result.data.find((e) => e.event === 'delivered');
 
       expect(deliveredEvent?.url).toBeNull();
+    });
+
+    // Story 5-11 AC6: Contact data join tests
+    it('AC6: should include contact data from Campaign_Contacts', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      // Mock contacts for campaign 100
+      const contactsMap = new Map([
+        ['user1@example.com', {
+          email: 'user1@example.com',
+          firstname: 'John',
+          lastname: 'Doe',
+          company: 'Acme Corp',
+          phone: '', jobTitle: '', city: '', website: '',
+          campaignId: '100', campaignName: 'BMF2026',
+          eventAt: '', url: '', leadSource: '',
+          createdAt: '', updatedAt: '',
+        }],
+      ]);
+      mockGetContactsForCampaign.mockResolvedValue(contactsMap);
+
+      const result = await campaignStatsService.getCampaignEvents(100);
+
+      // Events by user1 should have contact data
+      const user1Events = result.data.filter((e) => e.email === 'user1@example.com');
+      expect(user1Events.length).toBeGreaterThan(0);
+      for (const event of user1Events) {
+        expect(event.firstname).toBe('John');
+        expect(event.lastname).toBe('Doe');
+        expect(event.company).toBe('Acme Corp');
+      }
+
+      // Events by user2 should have empty contact data
+      const user2Events = result.data.filter((e) => e.email === 'user2@example.com');
+      for (const event of user2Events) {
+        expect(event.firstname).toBe('');
+        expect(event.lastname).toBe('');
+        expect(event.company).toBe('');
+      }
+    });
+
+    it('AC6: should return empty contact fields when no contacts exist', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+      mockGetContactsForCampaign.mockResolvedValue(new Map());
+
+      const result = await campaignStatsService.getCampaignEvents(100);
+
+      for (const event of result.data) {
+        expect(event.firstname).toBe('');
+        expect(event.lastname).toBe('');
+        expect(event.company).toBe('');
+      }
+    });
+
+    it('AC6: should include firstname, lastname, company in all event items', async () => {
+      mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
+        data: { values: mockEventsData },
+      });
+
+      const result = await campaignStatsService.getCampaignEvents(100);
+
+      for (const event of result.data) {
+        expect(event).toHaveProperty('firstname');
+        expect(event).toHaveProperty('lastname');
+        expect(event).toHaveProperty('company');
+      }
     });
   });
 

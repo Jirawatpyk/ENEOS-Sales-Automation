@@ -21,6 +21,7 @@ import {
   CAMPAIGN_EVENTS_COLUMNS,
   createDefaultStatsRow,
 } from '../constants/campaign.constants.js';
+import { campaignContactsService } from './campaign-contacts.service.js';
 
 // ===========================================
 // Google Sheets Client Setup
@@ -687,6 +688,22 @@ export class CampaignStatsService {
         const endIndex = startIndex + limit;
         const paginatedData = events.slice(startIndex, endIndex);
 
+        // Story 5-11 AC6: Join contact data from Campaign_Contacts
+        // TODO: getContactsForCampaign reads ALL rows from Campaign_Contacts (full table scan)
+        // and filters in-memory. Acceptable at current scale but consider caching or
+        // query-level filtering if Campaign_Contacts grows beyond 10,000 rows.
+        // NOTE: campaignId is number (from events), contacts store it as string.
+        // String(number) conversion matches the stored format from brevo validator.
+        const contactsMap = await campaignContactsService.getContactsForCampaign(String(campaignId));
+        for (const event of paginatedData) {
+          const contact = contactsMap.get(event.email.toLowerCase());
+          if (contact) {
+            event.firstname = contact.firstname;
+            event.lastname = contact.lastname;
+            event.company = contact.company;
+          }
+        }
+
         logger.info('Campaign events retrieved', { campaignId, total, returned: paginatedData.length });
 
         return {
@@ -799,6 +816,8 @@ export class CampaignStatsService {
 
   /**
    * Convert sheet row to CampaignEventItem
+   * Contact fields (firstname, lastname, company) default to empty strings,
+   * populated later via Campaign_Contacts join in getCampaignEvents()
    */
   private rowToCampaignEventItem(row: (string | number)[]): CampaignEventItem {
     return {
@@ -809,6 +828,10 @@ export class CampaignStatsService {
       url: row[CAMPAIGN_EVENTS_COLUMNS.URL]
         ? String(row[CAMPAIGN_EVENTS_COLUMNS.URL])
         : null,
+      // Story 5-11: Contact data defaults (populated via join)
+      firstname: '',
+      lastname: '',
+      company: '',
     };
   }
 

@@ -922,6 +922,10 @@ export interface CampaignEventItem {
   event: string;                 // delivered | opened | click
   eventAt: string;               // ISO 8601
   url: string | null;            // URL for click events
+  // Contact data from Campaign_Contacts (Story 5-11)
+  firstname: string;             // From Campaign_Contacts join
+  lastname: string;              // From Campaign_Contacts join
+  company: string;               // From Campaign_Contacts join
 }
 
 /**

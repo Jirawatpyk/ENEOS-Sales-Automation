@@ -132,7 +132,12 @@ jobs:
         id: changed-tests
         run: |
           CHANGED_SPECS=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'src/__tests__/**/*.test.ts' || echo "")
-          echo "specs=${CHANGED_SPECS}" >> $GITHUB_OUTPUT
+          # Use multiline output format for GITHUB_OUTPUT (newlines in value)
+          {
+            echo "specs<<SPECS_EOF"
+            echo "$CHANGED_SPECS"
+            echo "SPECS_EOF"
+          } >> $GITHUB_OUTPUT
           if [ -n "$CHANGED_SPECS" ]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
             echo "Changed test files:"

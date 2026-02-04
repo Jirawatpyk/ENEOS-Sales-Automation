@@ -688,13 +688,11 @@ export class CampaignStatsService {
         const endIndex = startIndex + limit;
         const paginatedData = events.slice(startIndex, endIndex);
 
-        // Story 5-11 AC6: Join contact data from Campaign_Contacts
-        // TODO: getContactsForCampaign reads ALL rows from Campaign_Contacts (full table scan)
-        // and filters in-memory. Acceptable at current scale but consider caching or
-        // query-level filtering if Campaign_Contacts grows beyond 10,000 rows.
-        // NOTE: campaignId is number (from events), contacts store it as string.
-        // String(number) conversion matches the stored format from brevo validator.
-        const contactsMap = await campaignContactsService.getContactsForCampaign(String(campaignId));
+        // Story 5-11 AC6: Join contact data from Campaign_Contacts by email.
+        // Looks up by email only (not campaign_id) because Automation payloads
+        // use workflow_id which doesn't match Campaign Events' campaign_id.
+        // TODO: Full table scan — consider caching if Campaign_Contacts > 10,000 rows.
+        const contactsMap = await campaignContactsService.getAllContactsByEmail();
         for (const event of paginatedData) {
           const contact = contactsMap.get(event.email.toLowerCase());
           if (contact) {

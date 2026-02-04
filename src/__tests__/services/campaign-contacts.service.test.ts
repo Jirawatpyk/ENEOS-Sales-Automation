@@ -252,8 +252,8 @@ describe('CampaignContactsService', () => {
     });
   });
 
-  describe('getContactsForCampaign', () => {
-    it('should return contacts map for a campaign', async () => {
+  describe('getAllContactsByEmail', () => {
+    it('should return all contacts as map keyed by email', async () => {
       mockSheets.spreadsheets.values.get.mockResolvedValue({
         data: {
           values: [
@@ -265,9 +265,10 @@ describe('CampaignContactsService', () => {
         },
       });
 
-      const contacts = await campaignContactsService.getContactsForCampaign('100');
+      const contacts = await campaignContactsService.getAllContactsByEmail();
 
-      expect(contacts.size).toBe(2);
+      // All contacts returned (no campaign_id filter)
+      expect(contacts.size).toBe(3);
       expect(contacts.get('john@example.com')).toEqual(
         expect.objectContaining({
           firstname: 'John',
@@ -282,8 +283,13 @@ describe('CampaignContactsService', () => {
           company: 'Beta Corp',
         })
       );
-      // other@example.com belongs to campaign 200, should not be included
-      expect(contacts.has('other@example.com')).toBe(false);
+      expect(contacts.get('other@example.com')).toEqual(
+        expect.objectContaining({
+          firstname: 'Other',
+          lastname: 'Person',
+          company: 'Gamma',
+        })
+      );
     });
 
     it('should return empty map when no contacts exist', async () => {
@@ -291,7 +297,7 @@ describe('CampaignContactsService', () => {
         data: { values: [['Email', 'Firstname']] },
       });
 
-      const contacts = await campaignContactsService.getContactsForCampaign('100');
+      const contacts = await campaignContactsService.getAllContactsByEmail();
 
       expect(contacts.size).toBe(0);
     });
@@ -299,7 +305,7 @@ describe('CampaignContactsService', () => {
     it('should return empty map on sheet read error', async () => {
       mockSheets.spreadsheets.values.get.mockRejectedValue(new Error('API error'));
 
-      const contacts = await campaignContactsService.getContactsForCampaign('100');
+      const contacts = await campaignContactsService.getAllContactsByEmail();
 
       expect(contacts.size).toBe(0);
     });

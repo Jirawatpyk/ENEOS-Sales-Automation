@@ -217,14 +217,18 @@ export class CampaignContactsService {
   }
 
   // ===========================================
-  // Get Contacts for Campaign (Batch Lookup)
+  // Get Contacts by Email (Batch Lookup)
   // ===========================================
 
   /**
-   * Get all contacts for a campaign as a Map<email, contact>
-   * Used by getCampaignEvents() to join contact data with events
+   * Get all contacts as a Map<email, contact>
+   * Used by getCampaignEvents() to join contact data with events.
+   *
+   * Looks up by email only (not campaign_id) because Brevo Automation
+   * payloads use workflow_id which doesn't match Campaign Events' campaign_id.
+   * Contact info (name, company) is per-person and doesn't vary by campaign.
    */
-  async getContactsForCampaign(campaignId: string): Promise<Map<string, CampaignContact>> {
+  async getAllContactsByEmail(): Promise<Map<string, CampaignContact>> {
     const contacts = new Map<string, CampaignContact>();
 
     try {
@@ -241,9 +245,6 @@ export class CampaignContactsService {
             const row = values[i];
             if (!row) { continue; }
 
-            const rowCampaignId = String(row[CAMPAIGN_CONTACTS_COLUMNS.CAMPAIGN_ID] || '');
-            if (rowCampaignId !== campaignId) { continue; }
-
             const email = (String(row[CAMPAIGN_CONTACTS_COLUMNS.EMAIL] || '')).toLowerCase().trim();
             if (!email) { continue; }
 
@@ -256,7 +257,7 @@ export class CampaignContactsService {
               jobTitle: String(row[CAMPAIGN_CONTACTS_COLUMNS.JOB_TITLE] || ''),
               city: String(row[CAMPAIGN_CONTACTS_COLUMNS.CITY] || ''),
               website: String(row[CAMPAIGN_CONTACTS_COLUMNS.WEBSITE] || ''),
-              campaignId: rowCampaignId,
+              campaignId: String(row[CAMPAIGN_CONTACTS_COLUMNS.CAMPAIGN_ID] || ''),
               campaignName: String(row[CAMPAIGN_CONTACTS_COLUMNS.CAMPAIGN_NAME] || ''),
               eventAt: String(row[CAMPAIGN_CONTACTS_COLUMNS.EVENT_AT] || ''),
               url: String(row[CAMPAIGN_CONTACTS_COLUMNS.URL] || ''),
@@ -270,8 +271,7 @@ export class CampaignContactsService {
         });
       });
     } catch (error) {
-      logger.warn('Failed to get contacts for campaign, returning empty map', {
-        campaignId,
+      logger.warn('Failed to get contacts, returning empty map', {
         error: error instanceof Error ? error.message : String(error),
       });
       return contacts;

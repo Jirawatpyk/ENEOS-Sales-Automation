@@ -10,7 +10,7 @@ import type { NormalizedCampaignEvent } from '../../validators/campaign-event.va
 // Mock Setup (Hoisted)
 // ===========================================
 
-const { mockSheetsClient, mockGetContactsForCampaign } = vi.hoisted(() => ({
+const { mockSheetsClient, mockGetAllContactsByEmail } = vi.hoisted(() => ({
   mockSheetsClient: {
     spreadsheets: {
       values: {
@@ -20,7 +20,7 @@ const { mockSheetsClient, mockGetContactsForCampaign } = vi.hoisted(() => ({
       },
     },
   },
-  mockGetContactsForCampaign: vi.fn().mockResolvedValue(new Map()),
+  mockGetAllContactsByEmail: vi.fn().mockResolvedValue(new Map()),
 }));
 
 vi.mock('googleapis', () => ({
@@ -34,7 +34,7 @@ vi.mock('googleapis', () => ({
 
 vi.mock('../../services/campaign-contacts.service.js', () => ({
   campaignContactsService: {
-    getContactsForCampaign: mockGetContactsForCampaign,
+    getAllContactsByEmail: mockGetAllContactsByEmail,
   },
 }));
 
@@ -873,7 +873,7 @@ describe('CampaignStatsService', () => {
           createdAt: '', updatedAt: '',
         }],
       ]);
-      mockGetContactsForCampaign.mockResolvedValue(contactsMap);
+      mockGetAllContactsByEmail.mockResolvedValue(contactsMap);
 
       const result = await campaignStatsService.getCampaignEvents(100);
 
@@ -899,7 +899,7 @@ describe('CampaignStatsService', () => {
       mockSheetsClient.spreadsheets.values.get.mockResolvedValue({
         data: { values: mockEventsData },
       });
-      mockGetContactsForCampaign.mockResolvedValue(new Map());
+      mockGetAllContactsByEmail.mockResolvedValue(new Map());
 
       const result = await campaignStatsService.getCampaignEvents(100);
 

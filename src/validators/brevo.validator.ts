@@ -34,7 +34,11 @@ const contactSchema = z.object({
 }).optional();
 
 export const brevoWebhookSchema = z.object({
-  // event is optional - defaults to 'click' for Automation outbound webhooks
+  // event is optional - defaults to 'click' for original Brevo lead webhook (Scenario A).
+  // WARNING: This default means Automation payloads (no event) get event:'click' after validation.
+  // campaign-webhook.controller.ts detects Automation payloads via raw payload ('event' in req.body)
+  // BEFORE calling this validator, so the default doesn't affect routing. Do NOT refactor to
+  // validate before routing without addressing this default.
   event: z.string().optional().default('click'),
   email: z.string().email('Invalid email format'),
   id: z.number().optional(),

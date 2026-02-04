@@ -88,6 +88,32 @@ export interface StatusHistoryEntry {
 }
 
 // ===========================================
+// Campaign Contact Types (Story 5-11)
+// ===========================================
+
+/**
+ * Campaign Contact stored in Campaign_Contacts sheet
+ * Populated from Brevo Automation webhook payloads
+ */
+export interface CampaignContact {
+  email: string;
+  firstname: string;
+  lastname: string;
+  phone: string;
+  company: string;
+  jobTitle: string;
+  city: string;
+  website: string;
+  campaignId: string;
+  campaignName: string;
+  eventAt: string;
+  url: string;
+  leadSource: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ===========================================
 // Brevo Webhook Types
 // ===========================================
 

@@ -18,9 +18,19 @@ const { mockAddFailedCampaignWebhook } = vi.hoisted(() => ({
   mockAddFailedCampaignWebhook: vi.fn(),
 }));
 
+const { mockStoreCampaignContact } = vi.hoisted(() => ({
+  mockStoreCampaignContact: vi.fn(),
+}));
+
 vi.mock('../../services/campaign-stats.service.js', () => ({
   campaignStatsService: {
     recordCampaignEvent: mockRecordCampaignEvent,
+  },
+}));
+
+vi.mock('../../services/campaign-contacts.service.js', () => ({
+  campaignContactsService: {
+    storeCampaignContact: mockStoreCampaignContact,
   },
 }));
 
@@ -624,6 +634,290 @@ describe('Campaign Webhook Controller', () => {
         expect(statusMock).toHaveBeenCalledWith(200);
         expect(mockRecordCampaignEvent).not.toHaveBeenCalled();
       }
+    });
+  });
+
+  // ===========================================
+  // Story 5-11: Automation Contact Tests
+  // ===========================================
+
+  describe('handleAutomationContact (Story 5-11)', () => {
+    const automationPayload = {
+      email: 'john@example.com',
+      attributes: {
+        FIRSTNAME: 'John',
+        LASTNAME: 'Doe',
+        PHONE: '0812345678',
+        COMPANY: 'Acme Corp',
+        JOB_TITLE: 'Manager',
+        CITY: 'Bangkok',
+        WEBSITE: 'https://acme.com',
+        LEAD_SOURCE: 'Brevo Automation',
+      },
+      workflow_id: 100,
+      step_id: 1,
+    };
+
+    it('AC1: should route to Automation handler when payload has no event field', async () => {
+      mockStoreCampaignContact.mockResolvedValue({ success: true, isUpdate: false });
+
+      const req = createMockRequest(automationPayload);
+      const { res, statusMock, jsonMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(200);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Automation contact received',
+        })
+      );
+      // Should NOT call campaign event processing
+      expect(mockRecordCampaignEvent).not.toHaveBeenCalled();
+    });
+
+    it('AC1: should route to Campaign handler when payload has event field', async () => {
+      mockRecordCampaignEvent.mockResolvedValue({
+        success: true,
+        duplicate: false,
+        eventId: 456,
+        campaignId: 123,
+      });
+
+      const req = createMockRequest(validPayload);
+      const { res, statusMock, jsonMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(200);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Event received',
+        })
+      );
+      expect(mockStoreCampaignContact).not.toHaveBeenCalled();
+
+      await vi.runAllTimersAsync();
+    });
+
+    it('AC4: should NOT call AI enrichment or LINE notifications for Automation payload', async () => {
+      mockStoreCampaignContact.mockResolvedValue({ success: true, isUpdate: false });
+
+      const req = createMockRequest(automationPayload);
+      const { res } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      // Only storeCampaignContact should be called, not recordCampaignEvent
+      expect(mockRecordCampaignEvent).not.toHaveBeenCalled();
+    });
+
+    it('AC4: should respond 200 OK immediately for Automation payload', async () => {
+      mockStoreCampaignContact.mockResolvedValue({ success: true, isUpdate: false });
+
+      const req = createMockRequest(automationPayload);
+      const { res, statusMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(200);
+    });
+
+    it('AC5: should return 400 for Automation payload with missing email', async () => {
+      const noEmailPayload = {
+        attributes: {
+          FIRSTNAME: 'John',
+        },
+        workflow_id: 100,
+      };
+
+      const req = createMockRequest(noEmailPayload);
+      const { res, statusMock, jsonMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: 'Invalid payload',
+        })
+      );
+    });
+
+    it('AC5: should store contact with email only when no other attributes', async () => {
+      mockStoreCampaignContact.mockResolvedValue({ success: true, isUpdate: false });
+
+      const emailOnlyPayload = {
+        email: 'minimal@example.com',
+        workflow_id: 100,
+      };
+
+      const req = createMockRequest(emailOnlyPayload);
+      const { res, statusMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(200);
+
+      await vi.runAllTimersAsync();
+
+      // storeCampaignContact should have been called (fire-and-forget)
+      expect(mockStoreCampaignContact).toHaveBeenCalled();
+    });
+
+    it('AC5: should not throw when storeCampaignContact rejects (fire-and-forget)', async () => {
+      mockStoreCampaignContact.mockRejectedValue(new Error('Sheets API error'));
+
+      const req = createMockRequest(automationPayload);
+      const { res, statusMock } = createMockResponse();
+      const next = vi.fn();
+
+      // Should not throw
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(200);
+
+      await vi.runAllTimersAsync();
+
+      // DLQ should be called for unexpected rejections
+      expect(mockAddFailedCampaignWebhook).toHaveBeenCalled();
+    });
+
+    it('AC5: should add to DLQ when storeCampaignContact returns success:false', async () => {
+      mockStoreCampaignContact.mockResolvedValue({
+        success: false,
+        isUpdate: false,
+        error: 'Sheets API timeout',
+      });
+
+      const req = createMockRequest(automationPayload);
+      const { res, statusMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(200);
+
+      await flushPromises();
+
+      // DLQ should be called because service returned success: false
+      expect(mockAddFailedCampaignWebhook).toHaveBeenCalledWith(
+        automationPayload,
+        expect.any(Error),
+        'test-request-id'
+      );
+    });
+
+    // H3: Edge cases for 'event' in rawPayload detection
+    it('AC1: should route to Campaign handler when event is null (key exists)', async () => {
+      const nullEventPayload = {
+        camp_id: 1,
+        email: 'test@example.com',
+        event: null,
+        id: 100,
+      };
+
+      const req = createMockRequest(nullEventPayload);
+      const { res, statusMock, jsonMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      // 'event' key exists (value is null), so routes to Campaign handler (not Automation)
+      // Validator rejects null → 400
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(mockStoreCampaignContact).not.toHaveBeenCalled();
+    });
+
+    it('AC1: should route to Campaign handler when event is 0 (key exists)', async () => {
+      const zeroEventPayload = {
+        camp_id: 1,
+        email: 'test@example.com',
+        event: 0,
+        id: 100,
+      };
+
+      const req = createMockRequest(zeroEventPayload);
+      const { res, statusMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      // 'event' key exists (value is 0), so routes to Campaign handler
+      // Validator rejects 0 (not a string) → 400
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(mockStoreCampaignContact).not.toHaveBeenCalled();
+    });
+
+    it('AC1: should route to Campaign handler when event is false (key exists)', async () => {
+      const falseEventPayload = {
+        camp_id: 1,
+        email: 'test@example.com',
+        event: false,
+        id: 100,
+      };
+
+      const req = createMockRequest(falseEventPayload);
+      const { res, statusMock } = createMockResponse();
+      const next = vi.fn();
+
+      await handleCampaignWebhook(
+        req as Request,
+        res as Response,
+        next as NextFunction
+      );
+
+      // 'event' key exists (value is false), so routes to Campaign handler
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(mockStoreCampaignContact).not.toHaveBeenCalled();
     });
   });
 });

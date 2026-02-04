@@ -146,6 +146,7 @@ development_status:
   5-8-campaign-date-filter: done                  # F-05.F6: Date range filter - Code review APPROVED + fixes applied (2026-01-31)
   5-9-campaign-export: done                       # F-05.F7: Export campaign data - Code review APPROVED + TEA guardrails (58 tests) 2026-01-31
   5-10-campaign-event-dedup-fix: done  # Bug fix: Composite dedup key (Event_ID + Event_Type) - Code review APPROVED 2026-02-02
+  5-11-campaign-contacts: done  # Store contact attributes from Automation webhook in Campaign_Contacts sheet + show in Detail Sheet - Code review APPROVED 2026-02-04 (7 fixes, +4 tests)
   epic-5-retrospective: done  # Completed 2026-01-31
 
   # ============================================================

@@ -1,16 +1,16 @@
 /**
  * ENEOS Sales Automation - Campaign Webhook Controller
  * Handles Brevo Campaign Events webhook (delivered, opened, click)
- * and Brevo Automation Contact webhook (contact attributes storage)
+ * and Brevo Automation Contact webhook (acknowledged, no processing)
+ *
+ * Story 9-2: Removed Campaign_Contacts dependency (ADR-001 cleanup)
  */
 
 import { Request, Response, NextFunction } from 'express';
 import { campaignLogger as logger } from '../utils/logger.js';
 import { campaignStatsService } from '../services/campaign-stats.service.js';
-import { campaignContactsService } from '../services/campaign-contacts.service.js';
 import { addFailedBrevoWebhook } from '../services/dead-letter-queue.service.js';
 import { validateCampaignEvent } from '../validators/campaign-event.validator.js';
-import { validateBrevoWebhook } from '../validators/brevo.validator.js';
 import { isEventEnabled } from '../constants/campaign.constants.js';
 
 // ===========================================
@@ -20,7 +20,7 @@ import { isEventEnabled } from '../constants/campaign.constants.js';
 /**
  * Handle Brevo Campaign/Automation webhook
  * Detection: payload has `event` field → Campaign Event (existing flow)
- *            payload has NO `event` field → Automation Contact (new flow, Story 5-11)
+ *            payload has NO `event` field → Automation Contact (acknowledged, AC #4)
  */
 export async function handleCampaignWebhook(
   req: Request,
@@ -31,12 +31,10 @@ export async function handleCampaignWebhook(
 
   // Story 5-11 AC1: Detect webhook source
   // Campaign payloads have `event` field (delivered/opened/click)
-  // Automation payloads have no `event` key at all (but may have `attributes`)
-  // CRITICAL: Must check raw payload BEFORE validation — brevoWebhookSchema.event has
-  // .default('click') which injects event:'click' into payloads that lack it.
-  // Use 'in' operator to check key existence (not truthiness — empty string, null, 0 are still campaign events)
+  // Automation payloads have no `event` key at all
+  // CRITICAL: Must check raw payload BEFORE validation
   if (!('event' in rawPayload)) {
-    // Automation webhook → store contact data (no AI, no LINE)
+    // Automation webhook → acknowledge immediately (AC #4)
     return handleAutomationContact(req, res, next);
   }
 
@@ -45,69 +43,23 @@ export async function handleCampaignWebhook(
 }
 
 // ===========================================
-// Automation Contact Handler (Story 5-11)
+// Automation Contact Handler (AC #4)
 // ===========================================
 
 /**
- * Handle Brevo Automation webhook — store contact data in Campaign_Contacts
- * AC4: No AI enrichment, no LINE notifications, no Lead creation
- * AC5: Validate email, store with defaults, DLQ on error
+ * Handle Brevo Automation webhook — simply acknowledge
+ * AC4: Return 200 OK + { success: true, message: "Acknowledged" }
+ * No storeCampaignContact(), no DLQ, no background processing
  */
 async function handleAutomationContact(
   req: Request,
   res: Response,
   _next: NextFunction
 ): Promise<void> {
-  const rawPayload = req.body;
-  const requestId = req.requestId;
-
-  logger.info('Received automation contact webhook', {
-    email: rawPayload?.email,
-    hasAttributes: !!rawPayload?.attributes,
+  logger.info('Received automation contact webhook (acknowledged)', {
+    email: req.body?.email,
   });
-
-  // Validate payload using existing brevo validator
-  const validation = validateBrevoWebhook(rawPayload);
-  if (!validation.success || !validation.data) {
-    logger.warn('Invalid automation contact payload', { error: validation.error });
-    res.status(400).json({
-      success: false,
-      error: 'Invalid payload',
-      details: validation.error,
-    });
-    return;
-  }
-
-  // AC4: Respond 200 OK immediately
-  res.status(200).json({
-    success: true,
-    message: 'Automation contact received',
-  });
-
-  // Store contact in background (fire-and-forget)
-  // NOTE: storeCampaignContact catches errors internally and resolves with { success: false },
-  // so we must check result.success in .then() — .catch() only handles unexpected rejections.
-  const contact = validation.data;
-  campaignContactsService.storeCampaignContact(contact).then((result) => {
-    if (!result.success) {
-      logger.error('Failed to store automation contact, adding to DLQ', {
-        email: contact.email,
-        error: result.error,
-        requestId,
-      });
-      // AC5: Add to DLQ on error
-      addFailedBrevoWebhook(rawPayload, new Error(result.error || 'Unknown error'), requestId);
-    }
-  }).catch((error) => {
-    // Safety net for unexpected rejections (should not normally happen)
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error('Unexpected error storing automation contact, adding to DLQ', {
-      email: contact.email,
-      error: errorMessage,
-      requestId,
-    });
-    addFailedBrevoWebhook(rawPayload, error instanceof Error ? error : new Error(errorMessage), requestId);
-  });
+  res.status(200).json({ success: true, message: 'Acknowledged' });
 }
 
 // ===========================================

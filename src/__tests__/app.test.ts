@@ -62,6 +62,10 @@ vi.mock('../config/index.js', () => ({
       deduplication: true,
       lineNotifications: true,
     },
+    supabase: {
+      url: 'https://test.supabase.co',
+      serviceRoleKey: 'test-service-role-key',
+    },
     sentry: {
       dsn: '',
     },

@@ -177,7 +177,8 @@ describe('Campaign Routes Integration', () => {
     });
 
     it('should return 400 for invalid payload', async () => {
-      const invalidPayload = { foo: 'bar' };
+      // Must have `event` key to enter campaign event flow (otherwise → automation handler → 200)
+      const invalidPayload = { event: 'click', foo: 'bar' };
 
       const response = await request(app)
         .post('/webhook/brevo/campaign')

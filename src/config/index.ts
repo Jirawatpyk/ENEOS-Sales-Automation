@@ -32,7 +32,6 @@ const envSchema = z.object({
   STATUS_HISTORY_SHEET_NAME: z.string().default('Status_History'),
   CAMPAIGN_EVENTS_SHEET_NAME: z.string().default('Campaign_Events'),
   CAMPAIGN_STATS_SHEET_NAME: z.string().default('Campaign_Stats'),
-  CAMPAIGN_CONTACTS_SHEET_NAME: z.string().default('Campaign_Contacts'),
 
   // Gemini
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
@@ -144,7 +143,6 @@ export const config = {
       statusHistory: env.STATUS_HISTORY_SHEET_NAME,
       campaignEvents: env.CAMPAIGN_EVENTS_SHEET_NAME,
       campaignStats: env.CAMPAIGN_STATS_SHEET_NAME,
-      campaignContacts: env.CAMPAIGN_CONTACTS_SHEET_NAME,
     },
   },
 

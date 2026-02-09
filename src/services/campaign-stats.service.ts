@@ -98,8 +98,8 @@ export class CampaignStatsService {
     });
 
     try {
-      // Step 1: Check for duplicate event (composite key: Event_ID + Event_Type)
-      const isDuplicate = await this.checkDuplicateEvent(event.eventId, event.event);
+      // Step 1: Check for duplicate event (composite key: Event_ID + Campaign_ID + Event_Type)
+      const isDuplicate = await this.checkDuplicateEvent(event.eventId, event.event, event.campaignId);
       if (isDuplicate) {
         logger.info('Duplicate event detected, returning success', {
           eventId: event.eventId,
@@ -176,22 +176,23 @@ export class CampaignStatsService {
   // ===========================================
 
   /**
-   * Check if Event_ID + Event_Type combination already exists in Campaign_Events
+   * Check if Event_ID + Campaign_ID + Event_Type combination already exists
    *
-   * Story 5-10 Fix: Changed from Event_ID only to Event_ID + Event_Type composite key.
-   * This allows same eventId with different event types (delivered, opened, click).
+   * Composite key: eventId + campaignId + eventType
+   * - Story 5-10: Changed from Event_ID only to Event_ID + Event_Type
+   * - Fix: Added Campaign_ID because Brevo reuses eventId across campaigns
    *
    * @param eventId - The unique event identifier from Brevo (maps to 'id' in webhook payload)
    * @param eventType - The event type: 'delivered', 'opened', or 'click'
+   * @param campaignId - The campaign ID (ensures cross-campaign events are not blocked)
    * @returns true if exact combination already exists (duplicate), false if new
    */
-  async checkDuplicateEvent(eventId: number, eventType: string): Promise<boolean> {
-    logger.debug('Checking duplicate event', { eventId, eventType });
+  async checkDuplicateEvent(eventId: number, eventType: string, campaignId: number): Promise<boolean> {
+    logger.debug('Checking duplicate event', { eventId, eventType, campaignId });
 
     return circuitBreaker.execute(async () => {
       return withRetry(async () => {
-        // Fetch A:E because Google Sheets API doesn't support non-contiguous ranges (A:A,E:E).
-        // We only use col A (Event_ID) and col E (Event) but must fetch B-D as well.
+        // Fetch A:E — col A (Event_ID), col B (Campaign_ID), col E (Event)
         const response = await sheets.spreadsheets.values.get({
           spreadsheetId: this.spreadsheetId,
           range: this.getSheetRange(this.eventsSheet, 'A:E'),
@@ -199,14 +200,15 @@ export class CampaignStatsService {
 
         const values = response.data.values || [];
 
-        // Check if eventId + eventType combination exists (skip header row)
-        // Column A (index 0) = Event_ID, Column E (index 4) = Event
+        // Check if eventId + campaignId + eventType combination exists (skip header row)
+        // Column A (index 0) = Event_ID, Column B (index 1) = Campaign_ID, Column E (index 4) = Event
         for (let i = 1; i < values.length; i++) {
           const row = values[i];
           if (
             row &&
             row[0] &&
             Number(row[0]) === eventId &&
+            Number(row[1]) === campaignId &&
             row[4] === eventType
           ) {
             return true;

@@ -61,6 +61,10 @@ const envSchema = z.object({
   REDIS_URL: z.string().optional(),
   REDIS_ENABLED: z.string().default('false').transform((v) => v === 'true'),
 
+  // Supabase
+  SUPABASE_URL: z.string().url('Invalid Supabase URL'),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
+
   // Sentry (optional - error tracking)
   SENTRY_DSN: z.string().optional(),
   SENTRY_ENVIRONMENT: z.string().optional(),
@@ -183,6 +187,12 @@ export const config = {
   redis: {
     enabled: env.REDIS_ENABLED,
     url: env.REDIS_URL || 'redis://localhost:6379',
+  },
+
+  // Supabase
+  supabase: {
+    url: env.SUPABASE_URL,
+    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
   },
 
   // Sentry (Error Tracking)

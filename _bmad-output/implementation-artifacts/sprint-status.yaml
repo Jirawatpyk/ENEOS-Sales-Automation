@@ -180,6 +180,29 @@ development_status:
   epic-7-retrospective: optional
 
   # ============================================================
+  # EPIC-08: Lead-Campaign Unification (ADR-001)
+  # SUPERSEDED by EPIC-09 (ADR-002 Supabase Migration)
+  # All ADR-001 objectives absorbed into EPIC-09
+  # ============================================================
+  epic-8: superseded  # Never started — ADR-001 superseded by ADR-002
+
+  # ============================================================
+  # EPIC-09: Supabase Migration (ADR-002)
+  # Source: ADR-002-supabase-migration.md
+  # Scope: Backend API only (Admin Dashboard unchanged)
+  # ============================================================
+  epic-9: in-progress
+  9-0-supabase-setup-schema-client: done    # Setup + Schema + Client — prerequisite for all - Code review APPROVED (2026-02-09)
+  9-1a-migrate-leads-dedup-data-layer: ready-for-dev   # Leads + Dedup Service (Data Layer) — Story created 2026-02-09
+  9-1b-migrate-controllers-line-postback: backlog     # Controllers + LINE Postback (Integration Layer)
+  9-2-migrate-campaign-services: backlog              # Campaign Events + Stats + delete Campaign_Contacts
+  9-3-migrate-sales-team-status-history: backlog      # Sales_Team + Status_History services
+  9-4-cleanup-google-sheets-docs: backlog             # Remove Google Sheets + update docs
+  9-5-lead-detail-campaign-timeline: backlog          # Lead Detail + Campaign Engagement Timeline
+  9-6-frontend-type-updates: backlog                  # Dashboard TypeScript type updates for UUID
+  epic-9-retrospective: optional
+
+  # ============================================================
   # TECH DEBT
   # Non-critical improvements to address when time permits
   # ============================================================
@@ -189,8 +212,8 @@ development_status:
 # ============================================================
 # SPRINT SUMMARY
 # ============================================================
-# Total Epics: 8
-# Total Stories: 64
+# Total Epics: 9 (EPIC-00 to EPIC-09, EPIC-08 superseded)
+# Total Stories: 72 (64 existing + 8 new from EPIC-09)
 #
 # EPIC-00 Status: ✅ COMPLETED (All 10 stories)
 #   - 0-1 to 0-10: All done (2026-01-12)
@@ -238,6 +261,19 @@ development_status:
 #   - 5-7 Campaign Detail Sheet: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (125 tests, 12 files)
 #   - 5-8 Campaign Date Filter: ✅ done (2026-01-31) - Code review APPROVED + 6 fixes applied
 #   - 5-9 Campaign Export: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (58 tests)
+#
+# EPIC-08 Status: ⛔ SUPERSEDED (by ADR-002 / EPIC-09)
+#   - ADR-001 objectives absorbed into Supabase migration
+#
+# EPIC-09 Status: 🚧 IN-PROGRESS (8 stories)
+#   - 9-0 Supabase Setup + Schema + Client: ✅ done (Code review APPROVED 2026-02-09)
+#   - 9-1a Migrate Leads + Dedup (Data Layer): 📝 ready-for-dev (2026-02-09)
+#   - 9-1b Migrate Controllers + LINE Postback: 📋 backlog
+#   - 9-2 Migrate Campaign Services: 📋 backlog
+#   - 9-3 Migrate Sales_Team + Status_History: 📋 backlog
+#   - 9-4 Cleanup Google Sheets + Docs: 📋 backlog
+#   - 9-5 Lead Detail + Campaign Timeline: 📋 backlog
+#   - 9-6 Frontend Type Updates: 📋 backlog
 #
 # RECOMMENDED MVP (Phase 1):
 # - EPIC-01: Authentication (5 stories) - ✅ COMPLETED

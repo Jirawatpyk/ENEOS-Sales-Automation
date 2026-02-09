@@ -193,8 +193,8 @@ development_status:
   # ============================================================
   epic-9: in-progress
   9-0-supabase-setup-schema-client: done    # Setup + Schema + Client — prerequisite for all - Code review APPROVED (2026-02-09)
-  9-1a-migrate-leads-dedup-data-layer: ready-for-dev   # Leads + Dedup Service (Data Layer) — Story created 2026-02-09
-  9-1b-migrate-controllers-line-postback: backlog     # Controllers + LINE Postback (Integration Layer)
+  9-1a-migrate-leads-dedup-data-layer: done      # Leads + Dedup Service (Data Layer) — Code review APPROVED + 5 fixes applied (2026-02-09)
+  9-1b-migrate-controllers-line-postback: done  # Controllers + LINE Postback (Integration Layer) — Code review APPROVED (2026-02-09)
   9-2-migrate-campaign-services: backlog              # Campaign Events + Stats + delete Campaign_Contacts
   9-3-migrate-sales-team-status-history: backlog      # Sales_Team + Status_History services
   9-4-cleanup-google-sheets-docs: backlog             # Remove Google Sheets + update docs
@@ -267,8 +267,8 @@ development_status:
 #
 # EPIC-09 Status: 🚧 IN-PROGRESS (8 stories)
 #   - 9-0 Supabase Setup + Schema + Client: ✅ done (Code review APPROVED 2026-02-09)
-#   - 9-1a Migrate Leads + Dedup (Data Layer): 📝 ready-for-dev (2026-02-09)
-#   - 9-1b Migrate Controllers + LINE Postback: 📋 backlog
+#   - 9-1a Migrate Leads + Dedup (Data Layer): ✅ done (Code review APPROVED 2026-02-09) — 1512 tests, 5 review fixes
+#   - 9-1b Migrate Controllers + LINE Postback: ✅ done (Code review APPROVED 2026-02-09) — 1550 tests, 6 review fixes
 #   - 9-2 Migrate Campaign Services: 📋 backlog
 #   - 9-3 Migrate Sales_Team + Status_History: 📋 backlog
 #   - 9-4 Cleanup Google Sheets + Docs: 📋 backlog

@@ -32,7 +32,7 @@ describe('Flex Message Templates', () => {
 
   describe('createLeadFlexMessage', () => {
     const mockLead: LeadRow = {
-      rowNumber: 42,
+      rowNumber: 0,
       version: 1,
       email: 'test@example.com',
       company: 'Test Company',
@@ -46,6 +46,8 @@ describe('Flex Message Templates', () => {
       salesOwnerId: null,
       salesOwnerName: null,
       campaignId: '12345',
+      workflowId: '12345',
+      brevoCampaignId: null,
       campaignName: 'Test Campaign',
       emailSubject: 'Test Subject',
       source: 'Brevo',
@@ -56,10 +58,16 @@ describe('Flex Message Templates', () => {
       closedAt: null,
       lostAt: null,
       unreachableAt: null,
+      contactedAt: null,
       // New Brevo Contact Attributes fields
       leadSource: null,
       jobTitle: null,
       city: null,
+      // Google Search Grounding fields
+      juristicId: null,
+      dbdSector: null,
+      province: null,
+      fullAddress: null,
       // UUID Migration fields
       leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
       createdAt: '2026-01-15T08:00:00.000Z',
@@ -172,7 +180,7 @@ describe('Flex Message Templates', () => {
       expect(result.type).toBe('flex');
     });
 
-    it('should include lead_id in postback data when leadUUID is present', () => {
+    it('should include lead_id in postback data when leadUUID is present (no row_id)', () => {
       const result = createLeadFlexMessage(mockLead, mockAiAnalysis);
 
       // Check footer buttons contain lead_id in postback data
@@ -193,12 +201,12 @@ describe('Flex Message Templates', () => {
       if (firstButton?.action?.type === 'postback' && firstButton.action.data) {
         const params = new URLSearchParams(firstButton.action.data);
         expect(params.get('lead_id')).toBe('lead_550e8400-e29b-41d4-a716-446655440000');
-        expect(params.get('row_id')).toBe('42');
+        expect(params.get('row_id')).toBeNull(); // No row_id after Supabase migration
         expect(params.get('action')).toBe('contacted');
       }
     });
 
-    it('should include only row_id when leadUUID is not present', () => {
+    it('should have action only when leadUUID is not present (no lead_id, no row_id)', () => {
       const leadWithoutUUID: LeadRow = {
         ...mockLead,
         leadUUID: null,
@@ -217,9 +225,50 @@ describe('Flex Message Templates', () => {
       const firstButton = bubble.footer?.contents[0];
       if (firstButton?.action?.type === 'postback' && firstButton.action.data) {
         const params = new URLSearchParams(firstButton.action.data);
+        expect(params.get('action')).toBe('contacted');
         expect(params.get('lead_id')).toBeNull();
-        expect(params.get('row_id')).toBe('42');
+        expect(params.get('row_id')).toBeNull();
       }
+    });
+
+    it('should include UUID in all 4 button actions', () => {
+      const result = createLeadFlexMessage(mockLead, mockAiAnalysis);
+
+      const bubble = result.contents as {
+        footer?: {
+          contents: Array<{
+            type: string;
+            action?: { type: string; data?: string };
+            contents?: Array<{ action?: { type: string; data?: string } }>;
+          }>;
+        };
+      };
+
+      const actions: string[] = [];
+      // Collect postback data from all buttons (including nested in horizontal box)
+      for (const item of bubble.footer?.contents ?? []) {
+        if (item.action?.type === 'postback' && item.action.data) {
+          actions.push(item.action.data);
+        }
+        if (item.contents) {
+          for (const nested of item.contents) {
+            if (nested.action?.type === 'postback' && nested.action.data) {
+              actions.push(nested.action.data);
+            }
+          }
+        }
+      }
+
+      expect(actions).toHaveLength(4);
+      for (const data of actions) {
+        const params = new URLSearchParams(data);
+        expect(params.get('lead_id')).toBe('lead_550e8400-e29b-41d4-a716-446655440000');
+        expect(params.get('row_id')).toBeNull();
+      }
+
+      // Verify all 4 action types
+      const actionValues = actions.map(d => new URLSearchParams(d).get('action'));
+      expect(actionValues).toEqual(expect.arrayContaining(['contacted', 'unreachable', 'closed', 'lost']));
     });
   });
 

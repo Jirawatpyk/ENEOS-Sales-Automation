@@ -41,7 +41,7 @@ export async function processLeadInBackground(
     const domain = extractDomain(payload.email);
     let aiAnalysis: CompanyAnalysis = {
       industry: 'Unknown',
-      talkingPoint: 'ENEOS มีน้ำมันหล่อลื่นคุณภาะสูงจากญี่ปุ่น',
+      talkingPoint: 'ENEOS มีน้ำมันหล่อลื่นคุณภาพสูงจากญี่ปุ่น',
       website: null,
       registeredCapital: null,
       keywords: ['B2B'],
@@ -59,25 +59,36 @@ export async function processLeadInBackground(
       },
     };
 
-    if (config.features.aiEnrichment) {
-      const aiStartTime = Date.now();
-      try {
-        aiAnalysis = await geminiService.analyzeCompany(domain, payload.company);
-        logger.info('AI analysis completed', {
+    // Step 1b: Run AI enrichment + campaign lookup in parallel
+    const parallelStartTime = Date.now();
+    const [aiResult, brevoCampaignId] = await Promise.all([
+      config.features.aiEnrichment
+        ? geminiService.analyzeCompany(domain, payload.company).catch((aiError) => {
+            logger.warn('AI analysis failed, using defaults', {
+              correlationId,
+              error: aiError instanceof Error ? aiError.message : 'Unknown error',
+            });
+            return aiAnalysis; // Return default CompanyAnalysis
+          })
+        : Promise.resolve(aiAnalysis),
+      leadsService.lookupCampaignId(payload.email).catch((err) => {
+        logger.warn('Campaign ID lookup failed', {
           correlationId,
-          email: payload.email,
-          industry: aiAnalysis.industry,
-          confidence: aiAnalysis.confidence,
-          duration: Date.now() - aiStartTime,
+          error: err instanceof Error ? err.message : 'Unknown error',
         });
-      } catch (aiError) {
-        logger.warn('AI analysis failed, using defaults', {
-          correlationId,
-          error: aiError instanceof Error ? aiError.message : 'Unknown error',
-        });
-        // Continue with defaults - not critical
-      }
-    }
+        return null;
+      }),
+    ]);
+    aiAnalysis = aiResult;
+
+    logger.info('Parallel enrichment completed', {
+      correlationId,
+      email: payload.email,
+      industry: aiAnalysis.industry,
+      confidence: aiAnalysis.confidence,
+      brevoCampaignId,
+      duration: Date.now() - parallelStartTime,
+    });
 
     // Step 2: Save to Supabase
     const lead: Partial<Lead> = {
@@ -90,7 +101,9 @@ export async function processLeadInBackground(
       website: payload.website || aiAnalysis.website,
       capital: aiAnalysis.registeredCapital,
       status: 'new',
+      workflowId: payload.campaignId,
       campaignId: payload.campaignId,
+      brevoCampaignId: brevoCampaignId,
       campaignName: payload.campaignName,
       emailSubject: payload.subject,
       source: 'Brevo',

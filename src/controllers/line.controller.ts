@@ -162,7 +162,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
     logger.info('Resolved leadId via Supabase', { leadId });
   } else if (rowId !== undefined) {
     // Legacy row-based postback — not supported after Supabase migration
-    // Story 9-1b will update templates to always use leadId
+    // Templates now send UUID only (updated in Story 9-1b)
     logger.warn('Legacy rowId postback received — not supported in Supabase', { rowId });
     await lineService.replyError(replyToken, 'กรุณากดปุ่มจากข้อความใหม่');
     return;

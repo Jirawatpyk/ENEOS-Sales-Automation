@@ -12,11 +12,13 @@ import { processingStatusService } from '../../services/processing-status.servic
 const {
   mockAnalyzeCompany,
   mockAddLead,
+  mockLookupCampaignId,
   mockPushLeadNotification,
   mockCheckOrThrow,
 } = vi.hoisted(() => ({
   mockAnalyzeCompany: vi.fn(),
   mockAddLead: vi.fn(),
+  mockLookupCampaignId: vi.fn(),
   mockPushLeadNotification: vi.fn(),
   mockCheckOrThrow: vi.fn(),
 }));
@@ -29,6 +31,7 @@ vi.mock('../../services/gemini.service.js', () => ({
 
 vi.mock('../../services/leads.service.js', () => ({
   addLead: mockAddLead,
+  lookupCampaignId: mockLookupCampaignId,
 }));
 
 vi.mock('../../services/line.service.js', () => ({
@@ -127,7 +130,7 @@ describe('Background Processing Integration Tests', () => {
     industry: 'Technology',
     talkingPoint: 'Tech innovation company',
     website: 'https://test.com',
-    registeredCapital: 5000000,
+    registeredCapital: '5,000,000 บาท',
     keywords: ['B2B', 'Tech'],
     juristicId: '0123456789012',
     dbdSector: 'Software',
@@ -164,6 +167,7 @@ describe('Background Processing Integration Tests', () => {
     // Setup default mocks
     mockCheckOrThrow.mockResolvedValue(undefined);
     mockAnalyzeCompany.mockResolvedValue(mockAIAnalysis);
+    mockLookupCampaignId.mockResolvedValue(null);
     mockAddLead.mockResolvedValue({ id: 'lead-uuid-integration', version: 1, created_at: '2024-01-15T10:00:00Z', updated_at: '2024-01-15T10:00:00Z' });
     mockPushLeadNotification.mockResolvedValue(undefined);
   });

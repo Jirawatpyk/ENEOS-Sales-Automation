@@ -13,6 +13,7 @@ const mockFail = vi.fn();
 
 const mockAnalyzeCompany = vi.fn();
 const mockAddLead = vi.fn();
+const mockLookupCampaignId = vi.fn();
 const mockPushLeadNotification = vi.fn();
 const mockDLQAdd = vi.fn();
 
@@ -32,6 +33,7 @@ vi.mock('../../services/gemini.service.js', () => ({
 
 vi.mock('../../services/leads.service.js', () => ({
   addLead: mockAddLead,
+  lookupCampaignId: mockLookupCampaignId,
 }));
 
 vi.mock('../../services/line.service.js', () => ({
@@ -87,7 +89,7 @@ describe('Background Processor Service', () => {
     lastname: 'Doe',
     phone: '0812345678',
     company: 'Test Corp',
-    campaignId: 12345,
+    campaignId: '12345',
     campaignName: 'Test Campaign',
     subject: 'Test Subject',
     contactId: 'contact-123',
@@ -99,7 +101,7 @@ describe('Background Processor Service', () => {
     industry: 'Technology',
     talkingPoint: 'Tech company focusing on innovation',
     website: 'https://example.com',
-    registeredCapital: 10000000,
+    registeredCapital: '10,000,000 บาท',
     keywords: ['B2B', 'Tech'],
     juristicId: '0123456789012',
     dbdSector: 'Software Development',
@@ -125,6 +127,7 @@ describe('Background Processor Service', () => {
 
     // Setup default mock responses
     mockAnalyzeCompany.mockResolvedValue(mockAIAnalysis);
+    mockLookupCampaignId.mockResolvedValue('campaign-abc-123');
     mockAddLead.mockResolvedValue({
       id: 'lead-uuid-123',
       version: 1,
@@ -222,6 +225,10 @@ describe('Background Processor Service', () => {
         callOrder.push('analyzeCompany');
         return mockAIAnalysis;
       });
+      mockLookupCampaignId.mockImplementation(async () => {
+        callOrder.push('lookupCampaignId');
+        return 'campaign-abc-123';
+      });
       mockAddLead.mockImplementation(async () => {
         callOrder.push('addLead');
         return { id: 'lead-uuid-123', version: 1, created_at: '2024-01-15T10:00:00Z', updated_at: '2024-01-15T10:00:00Z' };
@@ -233,13 +240,16 @@ describe('Background Processor Service', () => {
 
       await processLeadInBackground(mockPayload, correlationId);
 
-      expect(callOrder).toEqual([
-        'startProcessing',
-        'analyzeCompany',
-        'addLead',
-        'pushLeadNotification',
-        'complete',
-      ]);
+      // startProcessing must come first, addLead after parallel enrichment, LINE after save
+      expect(callOrder[0]).toBe('startProcessing');
+      // analyzeCompany and lookupCampaignId run in parallel — both before addLead
+      expect(callOrder).toContain('analyzeCompany');
+      expect(callOrder).toContain('lookupCampaignId');
+      const addLeadIndex = callOrder.indexOf('addLead');
+      expect(addLeadIndex).toBeGreaterThan(callOrder.indexOf('analyzeCompany'));
+      expect(addLeadIndex).toBeGreaterThan(callOrder.indexOf('lookupCampaignId'));
+      expect(callOrder.indexOf('pushLeadNotification')).toBeGreaterThan(addLeadIndex);
+      expect(callOrder[callOrder.length - 1]).toBe('complete');
     });
 
     it('should format lead data correctly', async () => {
@@ -255,7 +265,9 @@ describe('Background Processor Service', () => {
           company: 'Test Corp',
           industryAI: 'Technology',
           status: 'new',
-          campaignId: 12345,
+          workflowId: '12345',
+          campaignId: '12345',
+          brevoCampaignId: 'campaign-abc-123',
           campaignName: 'Test Campaign',
           source: 'Brevo',
         })
@@ -271,7 +283,7 @@ describe('Background Processor Service', () => {
         lastname: '',
         phone: '',
         company: '',
-        campaignId: 12345,
+        campaignId: '12345',
         campaignName: 'Test Campaign',
         subject: 'Test Subject',
         contactId: 'contact-123',
@@ -431,6 +443,98 @@ describe('Background Processor Service', () => {
         correlationId,
         expect.any(String),
         expect.any(Number) // duration
+      );
+    });
+  });
+
+  describe('parallel enrichment (Gemini + lookupCampaignId)', () => {
+    it('should run Gemini and lookupCampaignId in parallel', async () => {
+      const correlationId = '550e8400-e29b-41d4-a716-446655440000';
+      mockAnalyzeCompany.mockResolvedValue(mockAIAnalysis);
+      mockLookupCampaignId.mockResolvedValue('campaign-123');
+
+      await processLeadInBackground(mockPayload, correlationId);
+
+      // Both should be called
+      expect(mockAnalyzeCompany).toHaveBeenCalledWith('example.com', 'Test Corp');
+      expect(mockLookupCampaignId).toHaveBeenCalledWith(mockPayload.email);
+
+      // Lead should have workflowId, campaignId (backward compat), and brevoCampaignId
+      expect(mockAddLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflowId: mockPayload.campaignId,
+          campaignId: mockPayload.campaignId,
+          brevoCampaignId: 'campaign-123',
+        })
+      );
+    });
+
+    it('should save lead even if lookupCampaignId fails', async () => {
+      const correlationId = '550e8400-e29b-41d4-a716-446655440000';
+      mockLookupCampaignId.mockRejectedValue(new Error('DB error'));
+
+      await processLeadInBackground(mockPayload, correlationId);
+
+      expect(mockAddLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          brevoCampaignId: null,
+        })
+      );
+      // Should still complete successfully
+      expect(mockComplete).toHaveBeenCalled();
+    });
+
+    it('should save lead even if both Gemini and lookupCampaignId fail', async () => {
+      const correlationId = '550e8400-e29b-41d4-a716-446655440000';
+      mockAnalyzeCompany.mockRejectedValue(new Error('Gemini timeout'));
+      mockLookupCampaignId.mockRejectedValue(new Error('DB error'));
+
+      await processLeadInBackground(mockPayload, correlationId);
+
+      expect(mockAddLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          industryAI: 'Unknown', // default
+          brevoCampaignId: null,
+        })
+      );
+      expect(mockComplete).toHaveBeenCalled();
+    });
+
+    it('should run only lookupCampaignId when AI is disabled', async () => {
+      const { config } = await import('../../config/index.js');
+      config.features.aiEnrichment = false;
+
+      const correlationId = '550e8400-e29b-41d4-a716-446655440000';
+      mockLookupCampaignId.mockResolvedValue('campaign-456');
+
+      await processLeadInBackground(mockPayload, correlationId);
+
+      // AI should NOT be called
+      expect(mockAnalyzeCompany).not.toHaveBeenCalled();
+      // Lookup should still be called
+      expect(mockLookupCampaignId).toHaveBeenCalledWith(mockPayload.email);
+
+      expect(mockAddLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          industryAI: 'Unknown', // default (no AI)
+          brevoCampaignId: 'campaign-456',
+        })
+      );
+
+      // Reset
+      config.features.aiEnrichment = true;
+    });
+
+    it('should set brevoCampaignId to null when lookup returns null', async () => {
+      const correlationId = '550e8400-e29b-41d4-a716-446655440000';
+      mockLookupCampaignId.mockResolvedValue(null);
+
+      await processLeadInBackground(mockPayload, correlationId);
+
+      expect(mockAddLead).toHaveBeenCalledWith(
+        expect.objectContaining({
+          brevoCampaignId: null,
+        })
       );
     });
   });

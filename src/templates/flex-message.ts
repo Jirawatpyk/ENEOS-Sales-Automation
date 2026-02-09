@@ -453,20 +453,18 @@ export function createErrorReplyMessage(errorMessage?: string): TextMessage {
 
 /**
  * Create postback data string with lead identification
- * Includes both lead_id (UUID) and row_id for backward compatibility
- * Format: "action=<action>&lead_id=<uuid>&row_id=<number>"
+ * UUID only after Supabase migration — no row_id
+ * Format: "action=<action>&lead_id=<uuid>"
  */
 function createPostbackData(action: string, lead: LeadRow): string {
   const params = new URLSearchParams();
   params.set('action', action);
 
-  // Prioritize UUID-based identification (future-proof)
   if (lead.leadUUID) {
     params.set('lead_id', lead.leadUUID);
   }
-
-  // Always include row_id for backward compatibility
-  params.set('row_id', lead.rowNumber.toString());
+  // No row_id — UUID only after Supabase migration
+  // If leadUUID is missing, postback will only have action (validator will reject it)
 
   return params.toString();
 }

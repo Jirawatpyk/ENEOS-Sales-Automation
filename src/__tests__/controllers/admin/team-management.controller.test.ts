@@ -7,9 +7,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 
 // Hoisted mocks
-const { mockSheetsService } = vi.hoisted(() => {
+const { mockSalesTeamService } = vi.hoisted(() => {
   return {
-    mockSheetsService: {
+    mockSalesTeamService: {
       getAllSalesTeamMembers: vi.fn(),
       getSalesTeamMemberById: vi.fn(),
       updateSalesTeamMember: vi.fn(),
@@ -20,8 +20,8 @@ const { mockSheetsService } = vi.hoisted(() => {
   };
 });
 
-vi.mock('../../../services/sheets.service.js', () => ({
-  sheetsService: mockSheetsService,
+vi.mock('../../../services/sales-team.service.js', () => ({
+  salesTeamService: mockSalesTeamService,
 }));
 
 import {
@@ -90,11 +90,11 @@ describe('Team Management Controller', () => {
   describe('GET /api/admin/sales-team (getSalesTeamList)', () => {
     it('should return all active members by default', async () => {
       const activeMembers = mockTeamMembers.filter((m) => m.status === 'active');
-      mockSheetsService.getAllSalesTeamMembers.mockResolvedValue(activeMembers);
+      mockSalesTeamService.getAllSalesTeamMembers.mockResolvedValue(activeMembers);
 
       await getSalesTeamList(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllSalesTeamMembers).toHaveBeenCalledWith({
+      expect(mockSalesTeamService.getAllSalesTeamMembers).toHaveBeenCalledWith({
         status: 'active',
         role: undefined,
       });
@@ -109,11 +109,11 @@ describe('Team Management Controller', () => {
     it('should filter by status when provided', async () => {
       mockReq.query = { status: 'inactive' };
       const inactiveMembers = mockTeamMembers.filter((m) => m.status === 'inactive');
-      mockSheetsService.getAllSalesTeamMembers.mockResolvedValue(inactiveMembers);
+      mockSalesTeamService.getAllSalesTeamMembers.mockResolvedValue(inactiveMembers);
 
       await getSalesTeamList(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllSalesTeamMembers).toHaveBeenCalledWith({
+      expect(mockSalesTeamService.getAllSalesTeamMembers).toHaveBeenCalledWith({
         status: 'inactive',
         role: undefined,
       });
@@ -127,11 +127,11 @@ describe('Team Management Controller', () => {
     it('should filter by role when provided', async () => {
       mockReq.query = { role: 'admin' };
       const adminMembers = mockTeamMembers.filter((m) => m.role === 'admin' && m.status === 'active');
-      mockSheetsService.getAllSalesTeamMembers.mockResolvedValue(adminMembers);
+      mockSalesTeamService.getAllSalesTeamMembers.mockResolvedValue(adminMembers);
 
       await getSalesTeamList(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllSalesTeamMembers).toHaveBeenCalledWith({
+      expect(mockSalesTeamService.getAllSalesTeamMembers).toHaveBeenCalledWith({
         status: 'active',
         role: 'admin',
       });
@@ -139,11 +139,11 @@ describe('Team Management Controller', () => {
 
     it('should return all members when status=all', async () => {
       mockReq.query = { status: 'all' };
-      mockSheetsService.getAllSalesTeamMembers.mockResolvedValue(mockTeamMembers);
+      mockSalesTeamService.getAllSalesTeamMembers.mockResolvedValue(mockTeamMembers);
 
       await getSalesTeamList(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllSalesTeamMembers).toHaveBeenCalledWith({
+      expect(mockSalesTeamService.getAllSalesTeamMembers).toHaveBeenCalledWith({
         status: 'all',
         role: undefined,
       });
@@ -155,8 +155,8 @@ describe('Team Management Controller', () => {
     });
 
     it('should pass errors to next middleware', async () => {
-      const error = new Error('Sheets API error');
-      mockSheetsService.getAllSalesTeamMembers.mockRejectedValue(error);
+      const error = new Error('Database error');
+      mockSalesTeamService.getAllSalesTeamMembers.mockRejectedValue(error);
 
       await getSalesTeamList(mockReq as Request, mockRes as Response, mockNext);
 
@@ -167,11 +167,11 @@ describe('Team Management Controller', () => {
   describe('GET /api/admin/sales-team/:lineUserId (getSalesTeamMemberById)', () => {
     it('should return a single member by lineUserId', async () => {
       mockReq.params = { lineUserId: 'Uabc123xyz' };
-      mockSheetsService.getSalesTeamMemberById.mockResolvedValue(mockTeamMembers[0]);
+      mockSalesTeamService.getSalesTeamMemberById.mockResolvedValue(mockTeamMembers[0]);
 
       await getSalesTeamMemberById(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getSalesTeamMemberById).toHaveBeenCalledWith('Uabc123xyz');
+      expect(mockSalesTeamService.getSalesTeamMemberById).toHaveBeenCalledWith('Uabc123xyz');
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
@@ -181,7 +181,7 @@ describe('Team Management Controller', () => {
 
     it('should return 404 when member not found', async () => {
       mockReq.params = { lineUserId: 'Unotfound' };
-      mockSheetsService.getSalesTeamMemberById.mockResolvedValue(null);
+      mockSalesTeamService.getSalesTeamMemberById.mockResolvedValue(null);
 
       await getSalesTeamMemberById(mockReq as Request, mockRes as Response, mockNext);
 
@@ -198,11 +198,11 @@ describe('Team Management Controller', () => {
       mockReq.params = { lineUserId: 'Uabc123xyz' };
       mockReq.body = { email: 'newemail@eneos.co.th' };
       const updatedMember = { ...mockTeamMembers[0], email: 'newemail@eneos.co.th' };
-      mockSheetsService.updateSalesTeamMember.mockResolvedValue(updatedMember);
+      mockSalesTeamService.updateSalesTeamMember.mockResolvedValue(updatedMember);
 
       await updateSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
+      expect(mockSalesTeamService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
         email: 'newemail@eneos.co.th',
       });
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -231,11 +231,11 @@ describe('Team Management Controller', () => {
       mockReq.params = { lineUserId: 'Uabc123xyz' };
       mockReq.body = { role: 'admin' };
       const updatedMember = { ...mockTeamMembers[0], role: 'admin' };
-      mockSheetsService.updateSalesTeamMember.mockResolvedValue(updatedMember);
+      mockSalesTeamService.updateSalesTeamMember.mockResolvedValue(updatedMember);
 
       await updateSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
+      expect(mockSalesTeamService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
         role: 'admin',
       });
     });
@@ -244,11 +244,11 @@ describe('Team Management Controller', () => {
       mockReq.params = { lineUserId: 'Uabc123xyz' };
       mockReq.body = { status: 'inactive' };
       const updatedMember = { ...mockTeamMembers[0], status: 'inactive' };
-      mockSheetsService.updateSalesTeamMember.mockResolvedValue(updatedMember);
+      mockSalesTeamService.updateSalesTeamMember.mockResolvedValue(updatedMember);
 
       await updateSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
+      expect(mockSalesTeamService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
         status: 'inactive',
       });
     });
@@ -257,11 +257,11 @@ describe('Team Management Controller', () => {
       mockReq.params = { lineUserId: 'Uabc123xyz' };
       mockReq.body = { email: null };
       const updatedMember = { ...mockTeamMembers[0], email: null };
-      mockSheetsService.updateSalesTeamMember.mockResolvedValue(updatedMember);
+      mockSalesTeamService.updateSalesTeamMember.mockResolvedValue(updatedMember);
 
       await updateSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
+      expect(mockSalesTeamService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
         email: null,
       });
     });
@@ -269,7 +269,7 @@ describe('Team Management Controller', () => {
     it('should return 404 when member not found', async () => {
       mockReq.params = { lineUserId: 'Unotfound' };
       mockReq.body = { email: 'test@eneos.co.th' };
-      mockSheetsService.updateSalesTeamMember.mockResolvedValue(null);
+      mockSalesTeamService.updateSalesTeamMember.mockResolvedValue(null);
 
       await updateSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
@@ -307,11 +307,11 @@ describe('Team Management Controller', () => {
       mockReq.params = { lineUserId: 'Uabc123xyz' };
       mockReq.body = { phone: '0891112222' };
       const updatedMember = { ...mockTeamMembers[0], phone: '0891112222' };
-      mockSheetsService.updateSalesTeamMember.mockResolvedValue(updatedMember);
+      mockSalesTeamService.updateSalesTeamMember.mockResolvedValue(updatedMember);
 
       await updateSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
+      expect(mockSalesTeamService.updateSalesTeamMember).toHaveBeenCalledWith('Uabc123xyz', {
         phone: '0891112222',
       });
     });
@@ -336,11 +336,11 @@ describe('Team Management Controller', () => {
         createdAt: '2026-01-27T10:00:00Z',
       };
 
-      mockSheetsService.createSalesTeamMember.mockResolvedValue(createdMember);
+      mockSalesTeamService.createSalesTeamMember.mockResolvedValue(createdMember);
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.createSalesTeamMember).toHaveBeenCalledWith({
+      expect(mockSalesTeamService.createSalesTeamMember).toHaveBeenCalledWith({
         name: 'สมชาย ทดสอบ',
         email: 'somchai.test@eneos.co.th',
         phone: '0812345678',
@@ -441,7 +441,7 @@ describe('Team Management Controller', () => {
         createdAt: '2026-01-27T10:00:00Z',
       };
 
-      mockSheetsService.createSalesTeamMember.mockResolvedValue(createdMember);
+      mockSalesTeamService.createSalesTeamMember.mockResolvedValue(createdMember);
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
@@ -461,7 +461,7 @@ describe('Team Management Controller', () => {
 
       const error = new Error('Email already exists');
       error.name = 'DUPLICATE_EMAIL';
-      mockSheetsService.createSalesTeamMember.mockRejectedValue(error);
+      mockSalesTeamService.createSalesTeamMember.mockRejectedValue(error);
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
@@ -490,7 +490,7 @@ describe('Team Management Controller', () => {
         createdAt: '2026-01-27T10:00:00Z',
       };
 
-      mockSheetsService.createSalesTeamMember.mockResolvedValue(createdMember);
+      mockSalesTeamService.createSalesTeamMember.mockResolvedValue(createdMember);
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
@@ -536,7 +536,7 @@ describe('Team Management Controller', () => {
         createdAt: '2026-01-27T10:00:00Z',
       };
 
-      mockSheetsService.createSalesTeamMember.mockResolvedValue(createdMember);
+      mockSalesTeamService.createSalesTeamMember.mockResolvedValue(createdMember);
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
 
@@ -563,11 +563,11 @@ describe('Team Management Controller', () => {
         },
       ];
 
-      mockSheetsService.getUnlinkedLINEAccounts.mockResolvedValue(unlinkedAccounts);
+      mockSalesTeamService.getUnlinkedLINEAccounts.mockResolvedValue(unlinkedAccounts);
 
       await getUnlinkedLINEAccounts(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getUnlinkedLINEAccounts).toHaveBeenCalled();
+      expect(mockSalesTeamService.getUnlinkedLINEAccounts).toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
@@ -577,7 +577,7 @@ describe('Team Management Controller', () => {
     });
 
     it('should return empty array when no unlinked accounts (AC10)', async () => {
-      mockSheetsService.getUnlinkedLINEAccounts.mockResolvedValue([]);
+      mockSalesTeamService.getUnlinkedLINEAccounts.mockResolvedValue([]);
 
       await getUnlinkedLINEAccounts(mockReq as Request, mockRes as Response, mockNext);
 
@@ -590,8 +590,8 @@ describe('Team Management Controller', () => {
     });
 
     it('should pass errors to next middleware', async () => {
-      const error = new Error('Sheets API error');
-      mockSheetsService.getUnlinkedLINEAccounts.mockRejectedValue(error);
+      const error = new Error('Database error');
+      mockSalesTeamService.getUnlinkedLINEAccounts.mockRejectedValue(error);
 
       await getUnlinkedLINEAccounts(mockReq as Request, mockRes as Response, mockNext);
 
@@ -614,11 +614,11 @@ describe('Team Management Controller', () => {
         status: 'active' as const,
       };
 
-      mockSheetsService.linkLINEAccount.mockResolvedValue(linkedMember);
+      mockSalesTeamService.linkLINEAccount.mockResolvedValue(linkedMember);
 
       await linkLINEAccount(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.linkLINEAccount).toHaveBeenCalledWith(
+      expect(mockSalesTeamService.linkLINEAccount).toHaveBeenCalledWith(
         'test@eneos.co.th',
         'Uabc123xyz'
       );
@@ -648,7 +648,7 @@ describe('Team Management Controller', () => {
       mockReq.params = { email: 'notfound@eneos.co.th' };
       mockReq.body = { targetLineUserId: 'Uabc123xyz' };
 
-      mockSheetsService.linkLINEAccount.mockResolvedValue(null);
+      mockSalesTeamService.linkLINEAccount.mockResolvedValue(null);
 
       await linkLINEAccount(mockReq as Request, mockRes as Response, mockNext);
 
@@ -665,7 +665,7 @@ describe('Team Management Controller', () => {
 
       const error = new Error('LINE account already linked to Another User');
       error.name = 'ALREADY_LINKED';
-      mockSheetsService.linkLINEAccount.mockRejectedValue(error);
+      mockSalesTeamService.linkLINEAccount.mockRejectedValue(error);
 
       await linkLINEAccount(mockReq as Request, mockRes as Response, mockNext);
 
@@ -677,20 +677,20 @@ describe('Team Management Controller', () => {
       expect(mockNext).not.toHaveBeenCalled();
     });
 
-    it('should return 404 for LINE account not found', async () => {
+    it('should return 409 for LINK_FAILED (race condition)', async () => {
       mockReq.params = { email: 'test@eneos.co.th' };
-      mockReq.body = { targetLineUserId: 'Unonexistent' };
+      mockReq.body = { targetLineUserId: 'Uabc123xyz' };
 
-      const error = new Error('LINE account not found: Unonexistent');
-      error.name = 'LINE_ACCOUNT_NOT_FOUND';
-      mockSheetsService.linkLINEAccount.mockRejectedValue(error);
+      const error = new Error('Member not found or already linked');
+      error.name = 'LINK_FAILED';
+      mockSalesTeamService.linkLINEAccount.mockRejectedValue(error);
 
       await linkLINEAccount(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.status).toHaveBeenCalledWith(409);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: false,
-        error: 'LINE account not found: Unonexistent',
+        error: 'Member not found or already linked',
       });
       expect(mockNext).not.toHaveBeenCalled();
     });
@@ -699,8 +699,8 @@ describe('Team Management Controller', () => {
       mockReq.params = { email: 'test@eneos.co.th' };
       mockReq.body = { targetLineUserId: 'Uabc123xyz' };
 
-      const error = new Error('Sheets API error');
-      mockSheetsService.linkLINEAccount.mockRejectedValue(error);
+      const error = new Error('Database error');
+      mockSalesTeamService.linkLINEAccount.mockRejectedValue(error);
 
       await linkLINEAccount(mockReq as Request, mockRes as Response, mockNext);
 

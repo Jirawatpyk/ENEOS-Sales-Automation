@@ -44,13 +44,10 @@ vi.mock('../../lib/supabase.js', () => ({
   supabase: mockSupabase,
 }));
 
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
+vi.mock('../../services/status-history.service.js', () => ({
+  statusHistoryService: {
     addStatusHistory: vi.fn().mockResolvedValue(undefined),
-    getStatusHistory: vi.fn().mockResolvedValue([]),
-    getSalesTeamMember: vi.fn().mockResolvedValue(null),
   },
-  SheetsService: vi.fn(),
 }));
 
 vi.mock('../../utils/logger.js', () => ({

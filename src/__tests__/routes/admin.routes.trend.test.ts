@@ -15,14 +15,14 @@ import type { LeadRow } from '../../types/index.js';
 // ===========================================
 
 // Use vi.hoisted for proper mock hoisting
-const { mockSheetsService, mockLeadsService } = vi.hoisted(() => {
-  const mockSheetsService = {
+const { mockSalesTeamService, mockLeadsService } = vi.hoisted(() => {
+  const mockSalesTeamService = {
     getSalesTeamMember: vi.fn().mockResolvedValue(null),
   };
   const mockLeadsService = {
     getAllLeads: vi.fn().mockResolvedValue([]),
   };
-  return { mockSheetsService, mockLeadsService };
+  return { mockSalesTeamService, mockLeadsService };
 });
 
 // Mock logger first (including createModuleLogger used by leads.service)
@@ -41,9 +41,9 @@ vi.mock('../../utils/logger.js', () => ({
   })),
 }));
 
-// Mock sheetsService with hoisted mocks
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: mockSheetsService,
+// Mock salesTeamService (extracted from sheets.service)
+vi.mock('../../services/sales-team.service.js', () => ({
+  salesTeamService: mockSalesTeamService,
 }));
 
 // Mock leadsService (getAllLeads moved from sheetsService)
@@ -137,7 +137,7 @@ describe('GET /api/admin/sales-performance/trend (Integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLeadsService.getAllLeads.mockResolvedValue([]);
-    mockSheetsService.getSalesTeamMember.mockResolvedValue(null);
+    mockSalesTeamService.getSalesTeamMember.mockResolvedValue(null);
     app = createTestApp();
   });
 
@@ -177,7 +177,7 @@ describe('GET /api/admin/sales-performance/trend (Integration)', () => {
 
   describe('Response Structure', () => {
     it('should return correct response structure', async () => {
-      mockSheetsService.getSalesTeamMember.mockResolvedValue({
+      mockSalesTeamService.getSalesTeamMember.mockResolvedValue({
         name: 'John Smith',
         email: 'john@eneos.co.th',
       });
@@ -208,7 +208,7 @@ describe('GET /api/admin/sales-performance/trend (Integration)', () => {
     });
 
     it('should return "Unknown" name when sales member not found', async () => {
-      mockSheetsService.getSalesTeamMember.mockResolvedValue(null);
+      mockSalesTeamService.getSalesTeamMember.mockResolvedValue(null);
 
       const response = await request(app)
         .get('/api/admin/sales-performance/trend')

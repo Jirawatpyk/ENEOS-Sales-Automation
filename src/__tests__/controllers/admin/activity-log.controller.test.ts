@@ -9,16 +9,16 @@ import type { AdminApiResponse } from '../../../types/admin.types.js';
 import type { ActivityLogResponse } from '../../../types/admin.types.js';
 
 // Hoisted mocks
-const { mockSheetsService } = vi.hoisted(() => {
+const { mockStatusHistoryService } = vi.hoisted(() => {
   return {
-    mockSheetsService: {
+    mockStatusHistoryService: {
       getAllStatusHistory: vi.fn(),
     },
   };
 });
 
-vi.mock('../../../services/sheets.service.js', () => ({
-  sheetsService: mockSheetsService,
+vi.mock('../../../services/status-history.service.js', () => ({
+  statusHistoryService: mockStatusHistoryService,
 }));
 
 import { getActivityLog } from '../../../controllers/admin/activity-log.controller.js';
@@ -209,7 +209,7 @@ describe('Activity Log Controller', () => {
 
   describe('GET /api/admin/activity-log (getActivityLog)', () => {
     it('should return activity log with default pagination', async () => {
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: mockActivityEntries,
         total: 3,
         changedByOptions: mockChangedByOptions,
@@ -217,7 +217,7 @@ describe('Activity Log Controller', () => {
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllStatusHistory).toHaveBeenCalledWith({
+      expect(mockStatusHistoryService.getAllStatusHistory).toHaveBeenCalledWith({
         page: 1,
         limit: 20,
         from: undefined,
@@ -268,7 +268,7 @@ describe('Activity Log Controller', () => {
 
     it('should handle custom pagination params', async () => {
       mockReq.query = { page: '2', limit: '10' };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: mockActivityEntries,
         total: 25,
         changedByOptions: mockChangedByOptions,
@@ -276,7 +276,7 @@ describe('Activity Log Controller', () => {
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllStatusHistory).toHaveBeenCalledWith({
+      expect(mockStatusHistoryService.getAllStatusHistory).toHaveBeenCalledWith({
         page: 2,
         limit: 10,
         from: undefined,
@@ -306,7 +306,7 @@ describe('Activity Log Controller', () => {
         from: '2026-01-18',
         to: '2026-01-19',
       };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: mockActivityEntries,
         total: 3,
         changedByOptions: mockChangedByOptions,
@@ -314,7 +314,7 @@ describe('Activity Log Controller', () => {
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllStatusHistory).toHaveBeenCalledWith({
+      expect(mockStatusHistoryService.getAllStatusHistory).toHaveBeenCalledWith({
         page: 1,
         limit: 20,
         from: '2026-01-18',
@@ -326,7 +326,7 @@ describe('Activity Log Controller', () => {
 
     it('should filter by single status', async () => {
       mockReq.query = { status: 'contacted' };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: [mockActivityEntries[0]],
         total: 1,
         changedByOptions: mockChangedByOptions,
@@ -334,7 +334,7 @@ describe('Activity Log Controller', () => {
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllStatusHistory).toHaveBeenCalledWith({
+      expect(mockStatusHistoryService.getAllStatusHistory).toHaveBeenCalledWith({
         page: 1,
         limit: 20,
         from: undefined,
@@ -346,7 +346,7 @@ describe('Activity Log Controller', () => {
 
     it('should filter by multiple statuses', async () => {
       mockReq.query = { status: 'contacted,closed' };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: mockActivityEntries.slice(0, 2),
         total: 2,
         changedByOptions: mockChangedByOptions,
@@ -354,7 +354,7 @@ describe('Activity Log Controller', () => {
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllStatusHistory).toHaveBeenCalledWith({
+      expect(mockStatusHistoryService.getAllStatusHistory).toHaveBeenCalledWith({
         page: 1,
         limit: 20,
         from: undefined,
@@ -366,7 +366,7 @@ describe('Activity Log Controller', () => {
 
     it('should filter by changedBy (sales person)', async () => {
       mockReq.query = { changedBy: 'Uabc123xyz' };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: [mockActivityEntries[0]],
         total: 1,
         changedByOptions: mockChangedByOptions,
@@ -374,7 +374,7 @@ describe('Activity Log Controller', () => {
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllStatusHistory).toHaveBeenCalledWith({
+      expect(mockStatusHistoryService.getAllStatusHistory).toHaveBeenCalledWith({
         page: 1,
         limit: 20,
         from: undefined,
@@ -386,7 +386,7 @@ describe('Activity Log Controller', () => {
 
     it('should filter by changedBy=System', async () => {
       mockReq.query = { changedBy: 'System' };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: [mockActivityEntries[2]],
         total: 1,
         changedByOptions: mockChangedByOptions,
@@ -394,7 +394,7 @@ describe('Activity Log Controller', () => {
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllStatusHistory).toHaveBeenCalledWith({
+      expect(mockStatusHistoryService.getAllStatusHistory).toHaveBeenCalledWith({
         page: 1,
         limit: 20,
         from: undefined,
@@ -413,7 +413,7 @@ describe('Activity Log Controller', () => {
         status: 'contacted,closed',
         changedBy: 'Uabc123xyz',
       };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: [mockActivityEntries[0]],
         total: 1,
         changedByOptions: mockChangedByOptions,
@@ -421,7 +421,7 @@ describe('Activity Log Controller', () => {
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockSheetsService.getAllStatusHistory).toHaveBeenCalledWith({
+      expect(mockStatusHistoryService.getAllStatusHistory).toHaveBeenCalledWith({
         page: 1,
         limit: 50,
         from: '2026-01-18',
@@ -465,7 +465,7 @@ describe('Activity Log Controller', () => {
     });
 
     it('should return empty entries when no matching data', async () => {
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: [],
         total: 0,
         changedByOptions: mockChangedByOptions,
@@ -495,7 +495,7 @@ describe('Activity Log Controller', () => {
 
     it('should pass errors to next middleware', async () => {
       const error = new Error('Sheets API error');
-      mockSheetsService.getAllStatusHistory.mockRejectedValue(error);
+      mockStatusHistoryService.getAllStatusHistory.mockRejectedValue(error);
 
       await getActivityLog(mockReq as Request, mockRes as Response, mockNext);
 
@@ -503,7 +503,7 @@ describe('Activity Log Controller', () => {
     });
 
     it('should transform LeadRow to LeadItem in ALL entries', async () => {
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: mockActivityEntries,
         total: 3,
         changedByOptions: mockChangedByOptions,
@@ -548,7 +548,7 @@ describe('Activity Log Controller', () => {
     it('should include pagination metadata correctly', async () => {
       // Test with 50 total items, page 2, limit 20
       mockReq.query = { page: '2', limit: '20' };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: mockActivityEntries,
         total: 50,
         changedByOptions: mockChangedByOptions,
@@ -574,7 +574,7 @@ describe('Activity Log Controller', () => {
 
     it('should return hasNext=false on last page', async () => {
       mockReq.query = { page: '3', limit: '20' };
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: mockActivityEntries,
         total: 50,
         changedByOptions: mockChangedByOptions,
@@ -595,7 +595,7 @@ describe('Activity Log Controller', () => {
     });
 
     it('should include changedByOptions in response for filter dropdown', async () => {
-      mockSheetsService.getAllStatusHistory.mockResolvedValue({
+      mockStatusHistoryService.getAllStatusHistory.mockResolvedValue({
         entries: mockActivityEntries,
         total: 3,
         changedByOptions: mockChangedByOptions,

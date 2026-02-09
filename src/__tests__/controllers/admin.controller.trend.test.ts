@@ -10,15 +10,14 @@ import { Request, Response, NextFunction } from 'express';
 import type { LeadRow } from '../../types/index.js';
 
 // Use vi.hoisted for proper mock hoisting
-const { mockSheetsService, mockLeadsService } = vi.hoisted(() => {
-  const mockSheetsService = {
+const { mockSalesTeamService, mockLeadsService } = vi.hoisted(() => {
+  const mockSalesTeamService = {
     getSalesTeamMember: vi.fn().mockResolvedValue(null),
-    getStatusHistory: vi.fn().mockResolvedValue([]),
   };
   const mockLeadsService = {
     getAllLeads: vi.fn().mockResolvedValue([]),
   };
-  return { mockSheetsService, mockLeadsService };
+  return { mockSalesTeamService, mockLeadsService };
 });
 
 // Mock logger first (before any other imports that might use it)
@@ -29,11 +28,26 @@ vi.mock('../../utils/logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+  createModuleLogger: vi.fn(() => ({
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  })),
 }));
 
-// Mock sheetsService (still needed for getSalesTeamMember)
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: mockSheetsService,
+// Mock salesTeamService (extracted from sheets.service)
+vi.mock('../../services/sales-team.service.js', () => ({
+  salesTeamService: mockSalesTeamService,
+}));
+
+// Mock statusHistoryService (extracted from sheets.service)
+vi.mock('../../services/status-history.service.js', () => ({
+  statusHistoryService: {
+    getStatusHistory: vi.fn().mockResolvedValue([]),
+    addStatusHistory: vi.fn().mockResolvedValue(undefined),
+    getAllStatusHistory: vi.fn().mockResolvedValue({ entries: [], total: 0, changedByOptions: [] }),
+  },
 }));
 
 // Mock leadsService (getAllLeads moved from sheetsService)
@@ -125,7 +139,7 @@ describe('getSalesPerformanceTrend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLeadsService.getAllLeads.mockResolvedValue([]);
-    mockSheetsService.getSalesTeamMember.mockResolvedValue(null);
+    mockSalesTeamService.getSalesTeamMember.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -179,7 +193,7 @@ describe('getSalesPerformanceTrend', () => {
         createSampleLead({ rowNumber: 3, salesOwnerId: userId, status: 'closed', date: getDateISO(-1), closedAt: getDateISO(-1) }),
         createSampleLead({ rowNumber: 4, salesOwnerId: 'sales-002', status: 'claimed', date: getDateISO(-1) }),
       ]);
-      mockSheetsService.getSalesTeamMember.mockResolvedValue({ name: 'Test Sales', email: 'test@eneos.co.th' });
+      mockSalesTeamService.getSalesTeamMember.mockResolvedValue({ name: 'Test Sales', email: 'test@eneos.co.th' });
 
       const req = createMockRequest({ query: { userId, days: '7' } });
       const res = createMockResponse();
@@ -373,7 +387,7 @@ describe('getSalesPerformanceTrend', () => {
 
   describe('Sales Member Info', () => {
     it('should include sales member name when found', async () => {
-      mockSheetsService.getSalesTeamMember.mockResolvedValue({
+      mockSalesTeamService.getSalesTeamMember.mockResolvedValue({
         name: 'John Smith',
         email: 'john@eneos.co.th',
         phone: '0891234567',
@@ -390,7 +404,7 @@ describe('getSalesPerformanceTrend', () => {
     });
 
     it('should return "Unknown" when sales member not found', async () => {
-      mockSheetsService.getSalesTeamMember.mockResolvedValue(null);
+      mockSalesTeamService.getSalesTeamMember.mockResolvedValue(null);
 
       const req = createMockRequest({ query: { userId: 'nonexistent-user', days: '7' } });
       const res = createMockResponse();

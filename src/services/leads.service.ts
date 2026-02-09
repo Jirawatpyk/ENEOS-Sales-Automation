@@ -5,7 +5,7 @@
  */
 
 import { supabase } from '../lib/supabase.js';
-import { sheetsService } from './sheets.service.js';
+import { statusHistoryService } from './status-history.service.js';
 import { createModuleLogger } from '../utils/logger.js';
 import { normalizeEmail } from '../utils/email-parser.js';
 import {
@@ -49,8 +49,8 @@ export async function addLead(lead: Partial<Lead>): Promise<SupabaseLead> {
     );
   }
 
-  // Fire-and-forget: write status history to Google Sheets (until Story 9-3)
-  sheetsService.addStatusHistory({
+  // Fire-and-forget: write status history to Supabase
+  statusHistoryService.addStatusHistory({
     leadUUID: data.id,
     status: 'new',
     changedById: 'System',
@@ -191,8 +191,8 @@ export async function claimLead(
     .single();
 
   if (updated && !error) {
-    // Fire-and-forget: write status history (until Story 9-3)
-    sheetsService.addStatusHistory({
+    // Fire-and-forget: write status history to Supabase
+    statusHistoryService.addStatusHistory({
       leadUUID: id,
       status,
       changedById: salesUserId,
@@ -263,8 +263,8 @@ export async function updateLeadStatus(
     current.version
   );
 
-  // Fire-and-forget: write status history (until Story 9-3)
-  sheetsService.addStatusHistory({
+  // Fire-and-forget: write status history to Supabase
+  statusHistoryService.addStatusHistory({
     leadUUID: id,
     status: newStatus,
     changedById: salesUserId,

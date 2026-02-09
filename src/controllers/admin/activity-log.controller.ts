@@ -9,7 +9,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
-import { sheetsService } from '../../services/sheets.service.js';
+import { statusHistoryService } from '../../services/status-history.service.js';
 import { VALID_LEAD_STATUSES } from '../../types/index.js';
 import { leadRowToLeadItem } from './helpers/transform.helpers.js';
 
@@ -90,8 +90,8 @@ export async function getActivityLog(
       }
     }
 
-    // Fetch activity log from sheets service
-    const result = await sheetsService.getAllStatusHistory({
+    // Fetch activity log from status history service
+    const result = await statusHistoryService.getAllStatusHistory({
       page,
       limit,
       from,
@@ -106,7 +106,7 @@ export async function getActivityLog(
     // Transform LeadRow to LeadItem for each entry
     const transformedEntries = result.entries.map((entry) => ({
       ...entry,
-      lead: leadRowToLeadItem(entry.lead),
+      lead: entry.lead ? leadRowToLeadItem(entry.lead) : undefined,
     }));
 
     res.status(200).json({

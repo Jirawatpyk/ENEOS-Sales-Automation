@@ -14,28 +14,6 @@ const { mockRecordCampaignEvent } = vi.hoisted(() => ({
   mockRecordCampaignEvent: vi.fn(),
 }));
 
-const { mockSheetsClient } = vi.hoisted(() => ({
-  mockSheetsClient: {
-    spreadsheets: {
-      values: {
-        get: vi.fn().mockResolvedValue({ data: { values: [] } }),
-        append: vi.fn().mockResolvedValue({ data: { updates: { updatedRange: 'A1' } } }),
-        update: vi.fn().mockResolvedValue({}),
-      },
-      get: vi.fn().mockResolvedValue({ data: { spreadsheetId: 'test' } }),
-    },
-  },
-}));
-
-vi.mock('googleapis', () => ({
-  google: {
-    auth: {
-      GoogleAuth: vi.fn().mockImplementation(() => ({})),
-    },
-    sheets: vi.fn(() => mockSheetsClient),
-  },
-}));
-
 const { mockGetAllCampaignStats, mockGetCampaignStatsById, mockGetCampaignEvents } = vi.hoisted(() => ({
   mockGetAllCampaignStats: vi.fn(),
   mockGetCampaignStatsById: vi.fn(),
@@ -57,14 +35,11 @@ const { mockGetUserByEmail } = vi.hoisted(() => ({
   mockGetUserByEmail: vi.fn().mockResolvedValue({ role: 'admin', status: 'active' }),
 }));
 
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
-    healthCheck: vi.fn().mockResolvedValue({ healthy: true, latency: 10 }),
-    getAllLeads: vi.fn().mockResolvedValue([]),
+vi.mock('../../services/sales-team.service.js', () => ({
+  salesTeamService: {
     getSalesTeamMember: vi.fn().mockResolvedValue(null),
     getUserByEmail: mockGetUserByEmail,
   },
-  SheetsService: vi.fn(),
 }));
 
 // Mock Google Auth for admin routes
@@ -123,6 +98,11 @@ vi.mock('../../services/deduplication.service.js', () => ({
     getStats: vi.fn().mockReturnValue({ total: 0 }),
     checkOrThrow: vi.fn().mockResolvedValue(undefined),
   },
+}));
+
+vi.mock('../../lib/supabase.js', () => ({
+  supabase: {},
+  checkSupabaseHealth: vi.fn().mockResolvedValue(true),
 }));
 
 // ===========================================

@@ -29,7 +29,7 @@ import lineRoutes from './routes/line.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import statusRoutes from './routes/status.routes.js';
 import campaignRoutes from './routes/campaign.routes.js';
-import { sheetsService } from './services/sheets.service.js';
+import { checkSupabaseHealth } from './lib/supabase.js';
 import { geminiService } from './services/gemini.service.js';
 import { lineService } from './services/line.service.js';
 import { deduplicationService } from './services/deduplication.service.js';
@@ -124,6 +124,12 @@ interface HealthCacheEntry {
 const HEALTH_CACHE_TTL_MS = 30000; // 30 seconds
 let healthCache: HealthCacheEntry | null = null;
 
+async function supabaseHealthCheck(): Promise<{ healthy: boolean; latency: number }> {
+  const start = Date.now();
+  const healthy = await checkSupabaseHealth();
+  return { healthy, latency: Date.now() - start };
+}
+
 async function getHealthCheckWithCache(): Promise<HealthCheckResponse> {
   const now = Date.now();
 
@@ -137,23 +143,23 @@ async function getHealthCheckWithCache(): Promise<HealthCheckResponse> {
   }
 
   // Fetch fresh health data
-  const [sheetsHealth, geminiHealth, lineHealth] = await Promise.all([
-    sheetsService.healthCheck(),
+  const [supabaseHealth, geminiHealth, lineHealth] = await Promise.all([
+    supabaseHealthCheck(),
     geminiService.healthCheck(),
     lineService.healthCheck(),
   ]);
 
-  const allHealthy = sheetsHealth.healthy && geminiHealth.healthy && lineHealth.healthy;
-  const anyDegraded = !sheetsHealth.healthy || !geminiHealth.healthy || !lineHealth.healthy;
+  const allHealthy = supabaseHealth.healthy && geminiHealth.healthy && lineHealth.healthy;
+  const anyDegraded = !supabaseHealth.healthy || !geminiHealth.healthy || !lineHealth.healthy;
 
   const response: HealthCheckResponse = {
     status: allHealthy ? 'healthy' : anyDegraded ? 'degraded' : 'unhealthy',
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
     services: {
-      googleSheets: {
-        status: sheetsHealth.healthy ? 'up' : 'down',
-        latency: sheetsHealth.latency,
+      supabase: {
+        status: supabaseHealth.healthy ? 'up' : 'down',
+        latency: supabaseHealth.latency,
       },
       geminiAI: {
         status: geminiHealth.healthy ? 'up' : 'down',
@@ -195,22 +201,22 @@ app.get('/health', async (_req, res) => {
 // Force refresh health (bypass cache) - useful for monitoring
 app.get('/health/refresh', async (_req, res) => {
   healthCache = null; // Clear cache
-  const [sheetsHealth, geminiHealth, lineHealth] = await Promise.all([
-    sheetsService.healthCheck(),
+  const [supabaseHealth, geminiHealth, lineHealth] = await Promise.all([
+    supabaseHealthCheck(),
     geminiService.healthCheck(),
     lineService.healthCheck(),
   ]);
 
-  const allHealthy = sheetsHealth.healthy && geminiHealth.healthy && lineHealth.healthy;
+  const allHealthy = supabaseHealth.healthy && geminiHealth.healthy && lineHealth.healthy;
 
   const response: HealthCheckResponse = {
     status: allHealthy ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     version: process.env.npm_package_version || '1.0.0',
     services: {
-      googleSheets: {
-        status: sheetsHealth.healthy ? 'up' : 'down',
-        latency: sheetsHealth.latency,
+      supabase: {
+        status: supabaseHealth.healthy ? 'up' : 'down',
+        latency: supabaseHealth.latency,
       },
       geminiAI: {
         status: geminiHealth.healthy ? 'up' : 'down',

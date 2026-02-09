@@ -6,11 +6,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 
-// Mock sheetsService
+// Mock salesTeamService
 const mockGetSalesTeamAll = vi.fn();
 
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
+vi.mock('../../services/sales-team.service.js', () => ({
+  salesTeamService: {
     getSalesTeamAll: () => mockGetSalesTeamAll(),
   },
 }));

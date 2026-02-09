@@ -7,7 +7,7 @@ import { Request, Response, NextFunction } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../types/index.js';
-import { sheetsService } from '../services/sheets.service.js';
+import { salesTeamService } from '../services/sales-team.service.js';
 
 // ===========================================
 // Types
@@ -180,9 +180,7 @@ export async function adminAuthMiddleware(
       );
     }
 
-    // TODO: Lookup user role from Google Sheets (Sales_Team sheet)
-    // For now, default to 'viewer'
-    // In production, this should query the Sales_Team sheet to get the user's role
+    // Lookup user role from Supabase sales_team table
     const role: UserRole = await getUserRole(email);
 
     // Attach user info to request
@@ -283,10 +281,10 @@ export const requireViewer = requireRole(['admin', 'viewer']);
 // ===========================================
 
 /**
- * ดึง role ของ user จาก Google Sheets (Sales_Team sheet)
- * ถ้าไม่พบใน Sheets จะใช้ ADMIN_EMAILS เป็น fallback
+ * ดึง role ของ user จาก Supabase sales_team table
+ * ถ้าไม่พบจะใช้ ADMIN_EMAILS เป็น fallback
  *
- * Role mapping from Sales_Team sheet:
+ * Role mapping:
  * - 'admin' → 'admin' (full access)
  * - 'sales' → 'viewer' (read-only)
  * - other/null → 'viewer' (default)
@@ -301,8 +299,8 @@ export const requireViewer = requireRole(['admin', 'viewer']);
  */
 async function getUserRole(email: string): Promise<UserRole> {
   try {
-    // ลองดึงจาก Google Sheets ก่อน
-    const user = await sheetsService.getUserByEmail(email);
+    // ลองดึงจาก Supabase ก่อน
+    const user = await salesTeamService.getUserByEmail(email);
 
     if (user) {
       // Check if user is inactive - reject login
@@ -353,17 +351,17 @@ async function getUserRole(email: string): Promise<UserRole> {
       throw error;
     }
 
-    logger.error('Failed to fetch user role from Sheets', {
+    logger.error('Failed to fetch user role from Supabase', {
       email,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    // Fallback: ตรวจสอบ ADMIN_EMAILS แม้ Sheets error
-    // NOTE: If Sheets fails and user is in ADMIN_EMAILS, they can login without status check.
-    // This is intentional for emergency access when Sheets is down.
+    // Fallback: ตรวจสอบ ADMIN_EMAILS แม้ Supabase error
+    // NOTE: If Supabase fails and user is in ADMIN_EMAILS, they can login without status check.
+    // This is intentional for emergency access when Supabase is down.
     // AppError (ACCOUNT_INACTIVE) is re-thrown above, so known inactive users are still blocked.
     if (ADMIN_EMAILS.includes(email.toLowerCase())) {
-      logger.info('ADMIN_EMAILS emergency fallback used (Sheets error)', { email });
+      logger.info('ADMIN_EMAILS emergency fallback used (Supabase error)', { email });
       return 'admin';
     }
 

@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import type { LeadRow } from '../../types/index.js';
 
-// Mock sheetsService (still needed for getSalesTeamMember, getStatusHistory)
+// Mock service functions
 const mockGetAllLeads = vi.fn();
 const mockGetRow = vi.fn();
 const mockGetSalesTeamMember = vi.fn();
@@ -17,12 +17,15 @@ const mockSupabaseLeadToLeadRow = vi.fn();
 const mockGetLeadsWithPagination = vi.fn();
 const mockGetDistinctFilterValues = vi.fn();
 
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
-    getAllLeads: () => mockGetAllLeads(),
-    getRow: (row: number) => mockGetRow(row),
+vi.mock('../../services/sales-team.service.js', () => ({
+  salesTeamService: {
     getSalesTeamMember: (id: string) => mockGetSalesTeamMember(id),
-    getStatusHistory: (leadUUID: string) => mockGetStatusHistory(leadUUID),
+  },
+}));
+
+vi.mock('../../services/status-history.service.js', () => ({
+  statusHistoryService: {
+    getStatusHistory: (leadId: string) => mockGetStatusHistory(leadId),
   },
 }));
 
@@ -1082,7 +1085,7 @@ describe('Admin Controller', () => {
         salesOwnerName: 'Sales Person',
         leadUUID: 'lead_abc-123',
       });
-      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockGetLeadByIdSupa.mockResolvedValue({ id: 'lead_abc-123' });
       mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       mockGetStatusHistory.mockResolvedValue([
@@ -1138,7 +1141,7 @@ describe('Admin Controller', () => {
         salesOwnerId: 'sales-001',
         leadUUID: 'lead_sort-test',
       });
-      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockGetLeadByIdSupa.mockResolvedValue({ id: 'lead_sort-test' });
       mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       // Return entries in ascending order (oldest first)
@@ -1167,7 +1170,7 @@ describe('Admin Controller', () => {
       expect(response.data.history[1].status).toBe('new');
     });
 
-    it('should use fallback history when lead has no UUID', async () => {
+    it('should use fallback history when getStatusHistory returns empty', async () => {
       const req = createMockRequest({ params: { id: '5' } });
       const res = createMockResponse();
       const next = createMockNext();
@@ -1177,19 +1180,21 @@ describe('Admin Controller', () => {
         status: 'closed',
         salesOwnerId: 'sales-001',
         salesOwnerName: 'Sales Person',
-        leadUUID: null, // Legacy lead without UUID
+        leadUUID: 'lead_fallback-123',
         date: '2024-01-14T09:00:00.000Z',
         contactedAt: '2024-01-15T10:00:00.000Z',
         closedAt: '2024-01-16T10:00:00.000Z',
       });
-      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockGetLeadByIdSupa.mockResolvedValue({ id: 'lead_fallback-123' });
       mockSupabaseLeadToLeadRow.mockReturnValue(lead);
+      // getStatusHistory returns empty → fallback kicks in
+      mockGetStatusHistory.mockResolvedValue([]);
 
       await getLeadById(req, res, next);
 
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      // Should NOT call getStatusHistory for leads without UUID
-      expect(mockGetStatusHistory).not.toHaveBeenCalled();
+      // getStatusHistory was called but returned empty
+      expect(mockGetStatusHistory).toHaveBeenCalledWith('lead_fallback-123');
       // Fallback reconstructs from timestamps
       expect(response.data.history).toHaveLength(3); // closed + contacted + new
       expect(response.data.history[0].status).toBe('closed');

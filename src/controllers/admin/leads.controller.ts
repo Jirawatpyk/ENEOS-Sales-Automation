@@ -5,7 +5,8 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../utils/logger.js';
-import { sheetsService } from '../../services/sheets.service.js';
+import { salesTeamService } from '../../services/sales-team.service.js';
+import { statusHistoryService } from '../../services/status-history.service.js';
 import * as leadsService from '../../services/leads.service.js';
 import {
   AdminApiResponse,
@@ -197,9 +198,9 @@ export async function getLeadById(
       return;
     }
 
-    // Get real status history from Status_History sheet (still Google Sheets until Story 9-3)
-    const historyEntries = lead.leadUUID
-      ? await sheetsService.getStatusHistory(lead.leadUUID)
+    // Get status history from Supabase (FK-based: use supabaseLead.id)
+    const historyEntries = supabaseLead
+      ? await statusHistoryService.getStatusHistory(supabaseLead.id)
       : [];
 
     let history: StatusHistoryItem[];
@@ -285,7 +286,7 @@ export async function getLeadById(
     // ดึงข้อมูล sales team member สำหรับ owner detail
     let ownerDetail = null;
     if (lead.salesOwnerId) {
-      const salesMember = await sheetsService.getSalesTeamMember(lead.salesOwnerId);
+      const salesMember = await salesTeamService.getSalesTeamMember(lead.salesOwnerId);
       if (salesMember) {
         ownerDetail = {
           id: salesMember.lineUserId,

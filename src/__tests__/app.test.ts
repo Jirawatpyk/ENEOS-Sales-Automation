@@ -27,16 +27,6 @@ vi.mock('../config/index.js', () => ({
     env: 'test',
     port: 3001,
     isDev: true,
-    google: {
-      serviceAccountEmail: 'test@test.iam.gserviceaccount.com',
-      privateKey: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----',
-      sheetId: 'test-sheet-id',
-      sheets: {
-        leads: 'Leads',
-        dedup: 'Deduplication_Log',
-        salesTeam: 'Sales_Team',
-      },
-    },
     gemini: {
       apiKey: 'test-api-key',
       model: 'gemini-1.5-flash',
@@ -133,15 +123,23 @@ vi.mock('../utils/logger.js', () => ({
   })),
 }));
 
-// Mock services - inline to avoid hoisting issues
-vi.mock('../services/sheets.service.js', () => ({
-  sheetsService: {
-    healthCheck: vi.fn().mockResolvedValue({ healthy: true, latency: 50 }),
-    checkDuplicate: vi.fn().mockResolvedValue(false),
-    markAsProcessed: vi.fn().mockResolvedValue(undefined),
+// Mock Supabase (health check)
+vi.mock('../lib/supabase.js', () => ({
+  supabase: {},
+  checkSupabaseHealth: vi.fn().mockResolvedValue(true),
+}));
+
+vi.mock('../services/sales-team.service.js', () => ({
+  salesTeamService: {
     getSalesTeamMember: vi.fn().mockResolvedValue(null),
   },
-  SheetsService: vi.fn(),
+}));
+
+vi.mock('../services/status-history.service.js', () => ({
+  statusHistoryService: {
+    addStatusHistory: vi.fn().mockResolvedValue(undefined),
+    getStatusHistory: vi.fn().mockResolvedValue([]),
+  },
 }));
 
 vi.mock('../services/leads.service.js', () => ({
@@ -199,25 +197,6 @@ vi.mock('../services/dead-letter-queue.service.js', () => ({
     getStats: vi.fn().mockReturnValue({ total: 0, byType: {} }),
     remove: vi.fn().mockReturnValue(true),
     clear: vi.fn().mockReturnValue(0),
-  },
-}));
-
-// Mock googleapis
-vi.mock('googleapis', () => ({
-  google: {
-    auth: {
-      GoogleAuth: vi.fn().mockImplementation(() => ({})),
-    },
-    sheets: vi.fn().mockReturnValue({
-      spreadsheets: {
-        values: {
-          get: vi.fn().mockResolvedValue({ data: { values: [] } }),
-          append: vi.fn().mockResolvedValue({ data: { updates: { updatedRange: 'Leads!A1:W1' } } }),
-          update: vi.fn().mockResolvedValue({}),
-        },
-        get: vi.fn().mockResolvedValue({ data: { spreadsheetId: 'test' } }),
-      },
-    }),
   },
 }));
 
@@ -342,11 +321,11 @@ describe('App Integration Tests', () => {
     it('should include service status details', async () => {
       const response = await request(app).get('/health');
 
-      expect(response.body.services).toHaveProperty('googleSheets');
+      expect(response.body.services).toHaveProperty('supabase');
       expect(response.body.services).toHaveProperty('geminiAI');
       expect(response.body.services).toHaveProperty('lineAPI');
-      expect(response.body.services.googleSheets).toHaveProperty('status');
-      expect(response.body.services.googleSheets).toHaveProperty('latency');
+      expect(response.body.services.supabase).toHaveProperty('status');
+      expect(response.body.services.supabase).toHaveProperty('latency');
     });
   });
 

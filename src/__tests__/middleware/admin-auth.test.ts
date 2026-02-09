@@ -26,11 +26,11 @@ vi.mock('google-auth-library', () => ({
   })),
 }));
 
-// Mock sheetsService
+// Mock salesTeamService
 const mockGetUserByEmail = vi.fn();
 
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
+vi.mock('../../services/sales-team.service.js', () => ({
+  salesTeamService: {
     getUserByEmail: mockGetUserByEmail,
   },
 }));

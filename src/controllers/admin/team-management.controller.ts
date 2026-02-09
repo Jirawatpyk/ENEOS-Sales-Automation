@@ -14,7 +14,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
-import { sheetsService } from '../../services/sheets.service.js';
+import { salesTeamService } from '../../services/sales-team.service.js';
 import { formatPhone } from '../../utils/phone-formatter.js';
 import { SalesTeamFilter, SalesTeamMemberUpdate } from '../../types/index.js';
 
@@ -122,7 +122,7 @@ export async function getSalesTeamList(
       role: queryResult.data.role,
     };
 
-    const members = await sheetsService.getAllSalesTeamMembers(filter);
+    const members = await salesTeamService.getAllSalesTeamMembers(filter);
 
     res.status(200).json({
       success: true,
@@ -155,7 +155,7 @@ export async function getSalesTeamMemberById(
     const lineUserId = req.params.lineUserId as string;
     logger.info('getSalesTeamMemberById called', { lineUserId, user: req.user?.email });
 
-    const member = await sheetsService.getSalesTeamMemberById(lineUserId);
+    const member = await salesTeamService.getSalesTeamMemberById(lineUserId);
 
     if (!member) {
       res.status(404).json({
@@ -230,7 +230,7 @@ export async function updateSalesTeamMember(
       updates.status = bodyResult.data.status;
     }
 
-    const updated = await sheetsService.updateSalesTeamMember(lineUserId, updates);
+    const updated = await salesTeamService.updateSalesTeamMember(lineUserId, updates);
 
     if (!updated) {
       res.status(404).json({
@@ -291,7 +291,7 @@ export async function createSalesTeamMember(
       normalizedPhone = formatPhone(bodyResult.data.phone);
     }
 
-    // Create member via sheets service
+    // Create member via sales team service
     const memberData = {
       name: bodyResult.data.name,
       email: bodyResult.data.email,
@@ -299,7 +299,7 @@ export async function createSalesTeamMember(
       role: bodyResult.data.role,
     };
 
-    const createdMember = await sheetsService.createSalesTeamMember(memberData);
+    const createdMember = await salesTeamService.createSalesTeamMember(memberData);
 
     res.status(201).json({
       success: true,
@@ -341,7 +341,7 @@ export async function getUnlinkedLINEAccounts(
   try {
     logger.info('getUnlinkedLINEAccounts called', { user: req.user?.email });
 
-    const unlinkedAccounts = await sheetsService.getUnlinkedLINEAccounts();
+    const unlinkedAccounts = await salesTeamService.getUnlinkedLINEAccounts();
 
     res.status(200).json({
       success: true,
@@ -390,7 +390,7 @@ export async function linkLINEAccount(
     const { targetLineUserId } = bodyResult.data;
 
     // Link the LINE account
-    const updatedMember = await sheetsService.linkLINEAccount(email, targetLineUserId);
+    const updatedMember = await salesTeamService.linkLINEAccount(email, targetLineUserId);
 
     if (!updatedMember) {
       res.status(404).json({
@@ -411,12 +411,8 @@ export async function linkLINEAccount(
 
     // Map service error names to proper HTTP status codes (AC#11, AC#15)
     if (error instanceof Error) {
-      if (error.name === 'ALREADY_LINKED') {
+      if (error.name === 'ALREADY_LINKED' || error.name === 'LINK_FAILED') {
         res.status(409).json({ success: false, error: error.message });
-        return;
-      }
-      if (error.name === 'LINE_ACCOUNT_NOT_FOUND') {
-        res.status(404).json({ success: false, error: error.message });
         return;
       }
     }
@@ -441,7 +437,7 @@ export async function getUnlinkedDashboardMembers(
   try {
     logger.info('getUnlinkedDashboardMembers called', { user: req.user?.email });
 
-    const unlinkedMembers = await sheetsService.getUnlinkedDashboardMembers();
+    const unlinkedMembers = await salesTeamService.getUnlinkedDashboardMembers();
 
     res.status(200).json({
       success: true,

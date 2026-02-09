@@ -412,7 +412,7 @@ export interface HealthCheckResponse {
   timestamp: string;
   version: string;
   services: {
-    googleSheets: ServiceStatus;
+    supabase: ServiceStatus;
     geminiAI: ServiceStatus;
     lineAPI: ServiceStatus;
   };

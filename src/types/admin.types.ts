@@ -866,7 +866,7 @@ export interface ActivityLogQueryParams extends PaginationQueryParams {
 }
 
 /**
- * Options for getAllStatusHistory in sheets.service.ts
+ * Options for getAllStatusHistory in status-history.service.ts
  */
 export interface GetAllStatusHistoryOptions {
   page?: number;

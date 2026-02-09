@@ -18,6 +18,10 @@ vi.mock('../../../services/sheets.service.js', () => ({
   },
 }));
 
+vi.mock('../../../services/leads.service.js', () => ({
+  getAllLeads: () => mockGetAllLeads(),
+}));
+
 // Mock json2csv - track actual input
 const mockParse = vi.fn((data: Record<string, unknown>[]) => {
   // Return CSV-like string with headers

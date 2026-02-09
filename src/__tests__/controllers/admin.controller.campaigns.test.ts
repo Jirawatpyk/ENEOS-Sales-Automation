@@ -16,6 +16,10 @@ vi.mock('../../services/sheets.service.js', () => ({
   },
 }));
 
+vi.mock('../../services/leads.service.js', () => ({
+  getAllLeads: () => mockGetAllLeads(),
+}));
+
 // Import after mocking
 import {
   getCampaigns,

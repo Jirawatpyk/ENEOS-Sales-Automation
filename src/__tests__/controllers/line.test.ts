@@ -5,22 +5,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import {
-  mockPostbackEvent,
   mockPostbackEventWithUUID,
   mockPostbackEventUUIDOnly,
+  mockPostbackEvent,
   mockLineWebhookBody,
   mockLineProfile,
 } from '../mocks/line.mock.js';
 import { mockLeadRow, mockClaimedLeadRow } from '../mocks/google-sheets.mock.js';
 
-// Mock all services
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
-    claimLead: vi.fn(),
-    getRow: vi.fn(),
-    updateLeadStatus: vi.fn(),
-    findLeadByUUID: vi.fn(),
-  },
+// Mock leads service (replaces sheetsService for lead operations)
+vi.mock('../../services/leads.service.js', () => ({
+  getLeadById: vi.fn(),
+  claimLead: vi.fn(),
 }));
 
 vi.mock('../../services/line.service.js', () => ({
@@ -73,10 +69,16 @@ vi.mock('../../services/dead-letter-queue.service.js', () => ({
   },
 }));
 
+// Webhook body using UUID-based postback (legacy row_id not supported after Supabase migration)
+const mockLineWebhookBodyUUID = {
+  destination: 'U123456',
+  events: [mockPostbackEventUUIDOnly],
+};
+
 describe('LINE Controller', () => {
   let handleLineWebhook: typeof import('../../controllers/line.controller.js').handleLineWebhook;
   let verifyLineSignature: typeof import('../../controllers/line.controller.js').verifyLineSignature;
-  let sheetsService: typeof import('../../services/sheets.service.js').sheetsService;
+  let leadsService: typeof import('../../services/leads.service.js');
   let lineService: typeof import('../../services/line.service.js').lineService;
 
   let mockReq: Partial<Request>;
@@ -88,21 +90,33 @@ describe('LINE Controller', () => {
 
     // Import modules
     const lineController = await import('../../controllers/line.controller.js');
-    const sheetsModule = await import('../../services/sheets.service.js');
+    const leadsModule = await import('../../services/leads.service.js');
     const lineModule = await import('../../services/line.service.js');
 
     handleLineWebhook = lineController.handleLineWebhook;
     verifyLineSignature = lineController.verifyLineSignature;
-    sheetsService = sheetsModule.sheetsService;
+    leadsService = leadsModule;
     lineService = lineModule.lineService;
 
     // Setup default mocks
     vi.mocked(lineService.getGroupMemberProfile).mockResolvedValue(mockLineProfile);
     vi.mocked(lineService.getUserProfile).mockResolvedValue(mockLineProfile);
-    vi.mocked(sheetsService.claimLead).mockResolvedValue({
+    vi.mocked(leadsService.getLeadById).mockResolvedValue({
+      id: 'lead_550e8400-e29b-41d4-a716-446655440000',
+      customer_name: mockLeadRow.customerName,
+      email: mockLeadRow.email,
+      phone: mockLeadRow.phone,
+      company: mockLeadRow.company,
+      status: 'new',
+      version: 1,
+      created_at: '2026-01-15T08:00:00.000Z',
+      updated_at: '2026-01-15T08:00:00.000Z',
+    } as any);
+    vi.mocked(leadsService.claimLead).mockResolvedValue({
       success: true,
       lead: mockLeadRow,
       alreadyClaimed: false,
+      isNewClaim: true,
     });
 
     // Setup request/response mocks
@@ -171,8 +185,8 @@ describe('LINE Controller', () => {
   });
 
   describe('postback event processing', () => {
-    it('should claim lead successfully', async () => {
-      mockReq = { body: mockLineWebhookBody };
+    it('should claim lead successfully via UUID', async () => {
+      mockReq = { body: mockLineWebhookBodyUUID };
 
       await handleLineWebhook(
         mockReq as Request,
@@ -187,8 +201,8 @@ describe('LINE Controller', () => {
         'G987654321',
         'U123456789'
       );
-      expect(sheetsService.claimLead).toHaveBeenCalledWith(
-        42,
+      expect(leadsService.claimLead).toHaveBeenCalledWith(
+        'lead_550e8400-e29b-41d4-a716-446655440000',
         'U123456789',
         'วิภา รักงาน',
         'contacted'
@@ -196,14 +210,15 @@ describe('LINE Controller', () => {
     });
 
     it('should handle already claimed lead', async () => {
-      vi.mocked(sheetsService.claimLead).mockResolvedValue({
+      vi.mocked(leadsService.claimLead).mockResolvedValue({
         success: false,
         lead: mockClaimedLeadRow,
         alreadyClaimed: true,
+        isNewClaim: false,
         owner: 'คนอื่น',
       });
 
-      mockReq = { body: mockLineWebhookBody };
+      mockReq = { body: mockLineWebhookBodyUUID };
 
       await handleLineWebhook(
         mockReq as Request,
@@ -245,7 +260,7 @@ describe('LINE Controller', () => {
       // Wait for async processing
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(sheetsService.claimLead).not.toHaveBeenCalled();
+      expect(leadsService.claimLead).not.toHaveBeenCalled();
     });
 
     it('should handle profile fetch error gracefully', async () => {
@@ -253,7 +268,7 @@ describe('LINE Controller', () => {
         new Error('Profile error')
       );
 
-      mockReq = { body: mockLineWebhookBody };
+      mockReq = { body: mockLineWebhookBodyUUID };
 
       await handleLineWebhook(
         mockReq as Request,
@@ -265,28 +280,44 @@ describe('LINE Controller', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Should still try to claim with partial userId
-      expect(sheetsService.claimLead).toHaveBeenCalled();
+      expect(leadsService.claimLead).toHaveBeenCalled();
+    });
+
+    it('should reply error for legacy row_id-only postback', async () => {
+      // Legacy mockLineWebhookBody uses row_id=42 only (no lead_id)
+      mockReq = { body: mockLineWebhookBody };
+
+      await handleLineWebhook(
+        mockReq as Request,
+        mockRes as Response,
+        mockNext
+      );
+
+      // Wait for async processing
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Legacy row_id not supported in Supabase — should reply error
+      expect(lineService.replyError).toHaveBeenCalled();
+      expect(leadsService.claimLead).not.toHaveBeenCalled();
     });
   });
 
   // ===========================================
-  // UUID-based Postback Processing (Migration Support)
+  // UUID-based Postback Processing
   // ===========================================
 
   describe('UUID-based postback processing', () => {
-    it('should use findLeadByUUID when lead_id is provided', async () => {
-      const mockLeadWithUUID = {
-        ...mockLeadRow,
-        leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
-        createdAt: '2026-01-15T08:00:00.000Z',
-        updatedAt: '2026-01-15T08:00:00.000Z',
-      };
-
-      vi.mocked(sheetsService.findLeadByUUID).mockResolvedValue(mockLeadWithUUID);
-      vi.mocked(sheetsService.claimLead).mockResolvedValue({
+    it('should use getLeadById when lead_id is provided', async () => {
+      vi.mocked(leadsService.claimLead).mockResolvedValue({
         success: true,
-        lead: mockLeadWithUUID,
+        lead: {
+          ...mockLeadRow,
+          leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
+          createdAt: '2026-01-15T08:00:00.000Z',
+          updatedAt: '2026-01-15T08:00:00.000Z',
+        },
         alreadyClaimed: false,
+        isNewClaim: true,
       });
 
       mockReq = {
@@ -305,13 +336,13 @@ describe('LINE Controller', () => {
       // Wait for async processing
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Should call findLeadByUUID with the UUID from postback
-      expect(sheetsService.findLeadByUUID).toHaveBeenCalledWith(
+      // Should call getLeadById with the UUID from postback
+      expect(leadsService.getLeadById).toHaveBeenCalledWith(
         'lead_550e8400-e29b-41d4-a716-446655440000'
       );
-      // Should claim the lead using the resolved row number
-      expect(sheetsService.claimLead).toHaveBeenCalledWith(
-        mockLeadWithUUID.rowNumber,
+      // Should claim the lead using the UUID
+      expect(leadsService.claimLead).toHaveBeenCalledWith(
+        'lead_550e8400-e29b-41d4-a716-446655440000',
         'U123456789',
         'วิภา รักงาน',
         'contacted'
@@ -319,19 +350,17 @@ describe('LINE Controller', () => {
     });
 
     it('should handle UUID-only postback (no row_id fallback)', async () => {
-      const mockLeadWithUUID = {
-        ...mockLeadRow,
-        rowNumber: 99,
-        leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
-        createdAt: '2026-01-15T08:00:00.000Z',
-        updatedAt: '2026-01-15T08:00:00.000Z',
-      };
-
-      vi.mocked(sheetsService.findLeadByUUID).mockResolvedValue(mockLeadWithUUID);
-      vi.mocked(sheetsService.claimLead).mockResolvedValue({
+      vi.mocked(leadsService.claimLead).mockResolvedValue({
         success: true,
-        lead: mockLeadWithUUID,
+        lead: {
+          ...mockLeadRow,
+          rowNumber: 99,
+          leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
+          createdAt: '2026-01-15T08:00:00.000Z',
+          updatedAt: '2026-01-15T08:00:00.000Z',
+        },
         alreadyClaimed: false,
+        isNewClaim: true,
       });
 
       mockReq = {
@@ -350,9 +379,9 @@ describe('LINE Controller', () => {
       // Wait for async processing
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(sheetsService.findLeadByUUID).toHaveBeenCalled();
-      expect(sheetsService.claimLead).toHaveBeenCalledWith(
-        99, // Row number from UUID lookup
+      expect(leadsService.getLeadById).toHaveBeenCalled();
+      expect(leadsService.claimLead).toHaveBeenCalledWith(
+        'lead_550e8400-e29b-41d4-a716-446655440000',
         'U123456789',
         'วิภา รักงาน',
         'contacted'
@@ -360,7 +389,7 @@ describe('LINE Controller', () => {
     });
 
     it('should reply error when UUID not found', async () => {
-      vi.mocked(sheetsService.findLeadByUUID).mockResolvedValue(null);
+      vi.mocked(leadsService.getLeadById).mockResolvedValue(null);
 
       mockReq = {
         body: {
@@ -378,24 +407,20 @@ describe('LINE Controller', () => {
       // Wait for async processing
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(sheetsService.findLeadByUUID).toHaveBeenCalled();
+      expect(leadsService.getLeadById).toHaveBeenCalled();
       expect(lineService.replyError).toHaveBeenCalled();
-      expect(sheetsService.claimLead).not.toHaveBeenCalled();
+      expect(leadsService.claimLead).not.toHaveBeenCalled();
     });
 
-    it('should fallback to row_id when UUID lookup fails but row_id exists', async () => {
-      // This tests the hybrid format where both lead_id and row_id exist
-      // If lead_id lookup succeeds, use that; otherwise behavior depends on implementation
-      const mockLeadWithUUID = {
-        ...mockLeadRow,
-        leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
-      };
-
-      vi.mocked(sheetsService.findLeadByUUID).mockResolvedValue(mockLeadWithUUID);
-      vi.mocked(sheetsService.claimLead).mockResolvedValue({
+    it('should use UUID when both lead_id and row_id present', async () => {
+      vi.mocked(leadsService.claimLead).mockResolvedValue({
         success: true,
-        lead: mockLeadWithUUID,
+        lead: {
+          ...mockLeadRow,
+          leadUUID: 'lead_550e8400-e29b-41d4-a716-446655440000',
+        },
         alreadyClaimed: false,
+        isNewClaim: true,
       });
 
       mockReq = {
@@ -415,7 +440,7 @@ describe('LINE Controller', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       // UUID takes priority when present
-      expect(sheetsService.findLeadByUUID).toHaveBeenCalled();
+      expect(leadsService.getLeadById).toHaveBeenCalled();
     });
   });
 });

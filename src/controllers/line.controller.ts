@@ -5,7 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { lineLogger as logger } from '../utils/logger.js';
-import { sheetsService } from '../services/sheets.service.js';
+import * as leadsService from '../services/leads.service.js';
 import { lineService } from '../services/line.service.js';
 import { addFailedLinePostback } from '../services/dead-letter-queue.service.js';
 import {
@@ -140,33 +140,32 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
     }
   };
 
-  // Determine the row number to use
-  // Priority: leadId (new UUID format) > rowId (legacy format)
-  let effectiveRowId: number;
+  // Determine the lead UUID to use
+  // Priority: leadId (new UUID format) > rowId (legacy — not supported in Supabase)
+  let effectiveLeadId: string;
   let userName: string;
 
   if (leadId) {
-    // UUID-based lookup - run findLeadByUUID and getUserProfile in PARALLEL
-    // This saves ~200-500ms by not waiting for getUserProfile sequentially
-    const [leadData, profileName] = await Promise.all([
-      sheetsService.findLeadByUUID(leadId),
+    // UUID-based lookup — run getLeadById and getUserProfile in PARALLEL
+    const [supabaseLead, profileName] = await Promise.all([
+      leadsService.getLeadById(leadId),
       getUserProfileSafe(),
     ]);
 
-    if (!leadData) {
+    if (!supabaseLead) {
       logger.warn('Lead not found by UUID', { leadId });
       await lineService.replyError(replyToken, 'ไม่พบข้อมูลเคสนี้ในระบบ');
       return;
     }
-    effectiveRowId = leadData.rowNumber;
+    effectiveLeadId = leadId;
     userName = profileName;
-    logger.info('Resolved leadId to rowNumber', { leadId, rowNumber: effectiveRowId });
+    logger.info('Resolved leadId via Supabase', { leadId });
   } else if (rowId !== undefined) {
-    // Legacy row-based lookup (backward compatibility)
-    // No parallel optimization possible here since we only need getUserProfile
-    effectiveRowId = rowId;
-    userName = await getUserProfileSafe();
-    logger.info('Using legacy rowId', { rowId });
+    // Legacy row-based postback — not supported after Supabase migration
+    // Story 9-1b will update templates to always use leadId
+    logger.warn('Legacy rowId postback received — not supported in Supabase', { rowId });
+    await lineService.replyError(replyToken, 'กรุณากดปุ่มจากข้อความใหม่');
+    return;
   } else {
     logger.warn('No leadId or rowId in postback', { data: postback?.data });
     await lineService.replyError(replyToken, 'ข้อมูลไม่ถูกต้อง');
@@ -174,8 +173,8 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
   }
 
   try {
-    // Claim or update lead
-    const result = await sheetsService.claimLead(effectiveRowId, userId, userName, action);
+    // Claim or update lead via Supabase
+    const result = await leadsService.claimLead(effectiveLeadId, userId, userName, action);
 
     if (result.alreadyClaimed) {
       // Lead was claimed by someone else
@@ -188,8 +187,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       );
       lineNotificationTotal.inc({ status: 'success', type: 'reply' });
       logger.info('Lead already claimed', {
-        rowId: effectiveRowId,
-        leadId,
+        leadId: effectiveLeadId,
         owner: result.owner,
         attemptedBy: userName,
       });
@@ -210,8 +208,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       lineNotificationTotal.inc({ status: 'success', type: 'reply' });
 
       logger.info('Lead claimed successfully', {
-        rowId: effectiveRowId,
-        leadId,
+        leadId: effectiveLeadId,
         owner: userName,
         status: action,
       });
@@ -231,8 +228,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       lineNotificationTotal.inc({ status: 'success', type: 'reply' });
 
       logger.info('Lead status updated by owner', {
-        rowId: effectiveRowId,
-        leadId,
+        leadId: effectiveLeadId,
         newStatus: action,
         owner: userName,
       });
@@ -240,8 +236,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
   } catch (error) {
     logger.error('Error processing postback', {
       error: error instanceof Error ? error.message : 'Unknown error',
-      rowId: effectiveRowId,
-      leadId,
+      leadId: effectiveLeadId,
       userId,
     });
 
@@ -249,13 +244,13 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       // Race condition = someone else claimed it at the same time
       // Re-fetch to get the actual owner and show proper message
       try {
-        const currentLead = await sheetsService.getRow(effectiveRowId);
-        if (currentLead?.salesOwnerName) {
+        const currentSupabaseLead = await leadsService.getLeadById(effectiveLeadId);
+        if (currentSupabaseLead?.sales_owner_name) {
           await lineService.replyClaimed(
             replyToken,
-            currentLead.company,
-            currentLead.customerName,
-            currentLead.salesOwnerName
+            currentSupabaseLead.company,
+            currentSupabaseLead.customer_name,
+            currentSupabaseLead.sales_owner_name
           );
         } else {
           await lineService.replyError(replyToken, 'มีคนรับเคสนี้ไปแล้ว กรุณาลองใหม่');

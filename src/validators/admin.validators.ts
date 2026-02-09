@@ -88,7 +88,7 @@ export type LeadsQueryInput = z.infer<typeof leadsQuerySchema>;
 // ===========================================
 
 export const leadIdSchema = z.object({
-  id: z.coerce.number().int().min(2, 'Lead ID ต้องมากกว่า 1 (row 1 คือ header)'),
+  id: z.string().min(1, 'Lead ID is required'),
 });
 
 export type LeadIdInput = z.infer<typeof leadIdSchema>;

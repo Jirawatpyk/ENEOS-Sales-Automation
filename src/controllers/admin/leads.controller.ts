@@ -6,7 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../utils/logger.js';
 import { sheetsService } from '../../services/sheets.service.js';
-import { extractDateKey } from '../../utils/date-formatter.js';
+import * as leadsService from '../../services/leads.service.js';
 import {
   AdminApiResponse,
   LeadsListResponse,
@@ -24,13 +24,6 @@ import {
   safeValidateQuery,
 } from '../../validators/admin.validators.js';
 import {
-  getAllLeads,
-  filterByStatus,
-  filterByOwner,
-  filterByCampaign,
-  filterBySearch,
-  filterByLeadSource,
-  sortLeads,
   leadRowToLeadItem,
   getMinutesBetween,
 } from './helpers/index.js';
@@ -80,83 +73,35 @@ export async function getLeads(
       user: req.user?.email,
     });
 
-    // ดึง leads ทั้งหมด
-    let allLeads = await getAllLeads();
+    // SQL-level filtering + pagination via Supabase (L1 fix: no more getAllLeads + in-memory)
+    const [paginatedResult, filterValues] = await Promise.all([
+      leadsService.getLeadsWithPagination(page, limit, {
+        status,
+        owner,
+        campaign,
+        leadSource,
+        search,
+        startDate,
+        endDate,
+        sortBy,
+        sortOrder: sortOrder as 'asc' | 'desc',
+      }),
+      leadsService.getDistinctFilterValues(),
+    ]);
 
-    // Apply filters
-    if (status) {
-      allLeads = filterByStatus(allLeads, status);
-    }
-
-    if (owner) {
-      allLeads = filterByOwner(allLeads, owner);
-    }
-
-    if (campaign) {
-      allLeads = filterByCampaign(allLeads, campaign);
-    }
-
-    if (search) {
-      allLeads = filterBySearch(allLeads, search);
-    }
-
-    // Story 4-14: Lead source filter
-    if (leadSource) {
-      allLeads = filterByLeadSource(allLeads, leadSource);
-    }
-
-    // Date filter
-    if (startDate || endDate) {
-      allLeads = allLeads.filter((lead) => {
-        const leadDateKey = extractDateKey(lead.date);
-        if (startDate && leadDateKey < startDate) {
-          return false;
-        }
-        if (endDate && leadDateKey > endDate) {
-          return false;
-        }
-        return true;
-      });
-    }
-
-    // Sort using helper function
-    allLeads = sortLeads(allLeads, sortBy, sortOrder);
-
-    // Pagination
-    const total = allLeads.length;
+    const total = paginatedResult.total;
     const totalPages = Math.ceil(total / limit);
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedLeads = allLeads.slice(startIndex, endIndex);
 
-    // Convert to LeadItem format
-    const leadItems: LeadItem[] = paginatedLeads.map(leadRowToLeadItem);
-
-    // Build available filters
-    const allSalesIds = new Set(allLeads.map((l) => l.salesOwnerId).filter(Boolean) as string[]);
-    const allCampaignIds = new Set(allLeads.map((l) => l.campaignId));
-    // Story 4-14: Get unique lead sources (filter out null/empty, sort alphabetically)
-    const allLeadSources = Array.from(
-      new Set(allLeads.map((l) => l.leadSource).filter(Boolean) as string[])
-    ).sort();
+    // Convert SupabaseLead[] → LeadItem[] via LeadRow mapping
+    const leadItems: LeadItem[] = paginatedResult.data
+      .map(row => leadsService.supabaseLeadToLeadRow(row))
+      .map(leadRowToLeadItem);
 
     const availableFilters: AvailableFilters = {
       statuses: ['new', 'claimed', 'contacted', 'closed', 'lost', 'unreachable'],
-      owners: Array.from(allSalesIds).map((id) => {
-        const lead = allLeads.find((l) => l.salesOwnerId === id);
-        return {
-          id,
-          name: lead?.salesOwnerName || 'Unknown',
-        };
-      }),
-      campaigns: Array.from(allCampaignIds).map((id) => {
-        const lead = allLeads.find((l) => l.campaignId === id);
-        return {
-          id,
-          name: lead?.campaignName || 'Unknown',
-        };
-      }),
-      leadSources: allLeadSources, // Story 4-14
+      owners: filterValues.owners,
+      campaigns: filterValues.campaigns,
+      leadSources: filterValues.leadSources,
     };
 
     const appliedFilters: AppliedFilters = {
@@ -229,15 +174,16 @@ export async function getLeadById(
       return;
     }
 
-    const rowNumber = validation.data.id;
+    const leadId = String(validation.data.id);
 
     logger.info('getLeadById called', {
-      rowNumber,
+      leadId,
       user: req.user?.email,
     });
 
-    // ดึงข้อมูล lead
-    const lead = await sheetsService.getRow(rowNumber);
+    // ดึงข้อมูล lead — try UUID lookup via Supabase first
+    const supabaseLead = await leadsService.getLeadById(leadId);
+    const lead = supabaseLead ? leadsService.supabaseLeadToLeadRow(supabaseLead) : null;
 
     if (!lead) {
       res.status(404).json({
@@ -245,13 +191,13 @@ export async function getLeadById(
         error: {
           code: 'NOT_FOUND',
           message: 'ไม่พบ Lead ที่ต้องการ',
-          details: { row: rowNumber },
+          details: { id: leadId },
         },
       });
       return;
     }
 
-    // Get real status history from Status_History sheet
+    // Get real status history from Status_History sheet (still Google Sheets until Story 9-3)
     const historyEntries = lead.leadUUID
       ? await sheetsService.getStatusHistory(lead.leadUUID)
       : [];
@@ -392,7 +338,7 @@ export async function getLeadById(
       data: leadDetail,
     };
 
-    logger.info('getLeadById completed', { rowNumber });
+    logger.info('getLeadById completed', { leadId });
 
     res.status(200).json(response);
   } catch (error) {

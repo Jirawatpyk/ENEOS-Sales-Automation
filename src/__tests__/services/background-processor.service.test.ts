@@ -30,10 +30,8 @@ vi.mock('../../services/gemini.service.js', () => ({
   })),
 }));
 
-vi.mock('../../services/sheets.service.js', () => ({
-  SheetsService: vi.fn().mockImplementation(() => ({
-    addLead: mockAddLead,
-  })),
+vi.mock('../../services/leads.service.js', () => ({
+  addLead: mockAddLead,
 }));
 
 vi.mock('../../services/line.service.js', () => ({
@@ -127,7 +125,12 @@ describe('Background Processor Service', () => {
 
     // Setup default mock responses
     mockAnalyzeCompany.mockResolvedValue(mockAIAnalysis);
-    mockAddLead.mockResolvedValue(42); // Row number
+    mockAddLead.mockResolvedValue({
+      id: 'lead-uuid-123',
+      version: 1,
+      created_at: '2024-01-15T10:00:00Z',
+      updated_at: '2024-01-15T10:00:00Z',
+    }); // SupabaseLead object
     mockPushLeadNotification.mockResolvedValue(undefined);
   });
 
@@ -141,7 +144,7 @@ describe('Background Processor Service', () => {
       expect(mockStartProcessing).toHaveBeenCalledWith(correlationId);
       expect(mockComplete).toHaveBeenCalledWith(
         correlationId,
-        42, // rowNumber
+        0, // No row number in Supabase
         'Technology', // industry
         0.95, // confidence
         expect.any(Number) // duration
@@ -162,7 +165,7 @@ describe('Background Processor Service', () => {
       // Should still complete with defaults
       expect(mockComplete).toHaveBeenCalledWith(
         correlationId,
-        42,
+        0, // No row number in Supabase
         'Unknown', // default industry
         0, // default confidence
         expect.any(Number)
@@ -181,7 +184,7 @@ describe('Background Processor Service', () => {
       // Should still complete despite LINE error
       expect(mockComplete).toHaveBeenCalledWith(
         correlationId,
-        42,
+        0, // No row number in Supabase
         'Technology',
         0.95,
         expect.any(Number)
@@ -221,7 +224,7 @@ describe('Background Processor Service', () => {
       });
       mockAddLead.mockImplementation(async () => {
         callOrder.push('addLead');
-        return 42;
+        return { id: 'lead-uuid-123', version: 1, created_at: '2024-01-15T10:00:00Z', updated_at: '2024-01-15T10:00:00Z' };
       });
       mockPushLeadNotification.mockImplementation(async () => {
         callOrder.push('pushLeadNotification');
@@ -343,7 +346,7 @@ describe('Background Processor Service', () => {
       // But should still complete with defaults
       expect(mockComplete).toHaveBeenCalledWith(
         correlationId,
-        42,
+        0, // No row number in Supabase
         'Unknown', // default
         0, // default
         expect.any(Number)

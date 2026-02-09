@@ -285,29 +285,29 @@ describe('API Contract Tests', () => {
   });
 
   describe('Lead Detail API Contract (/api/admin/leads/:id)', () => {
-    it('should accept numeric id parameter', () => {
-      const result = leadIdSchema.safeParse({ id: 5 });
+    it('should accept UUID string id', () => {
+      const result = leadIdSchema.safeParse({ id: '550e8400-e29b-41d4-a716-446655440000' });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.id).toBe(5);
+        expect(result.data.id).toBe('550e8400-e29b-41d4-a716-446655440000');
       }
     });
 
-    it('should accept string id and coerce to number', () => {
+    it('should accept numeric string id (legacy)', () => {
       const result = leadIdSchema.safeParse({ id: '10' });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.id).toBe(10);
+        expect(result.data.id).toBe('10');
       }
     });
 
-    it('should reject id=1 (header row)', () => {
-      const result = leadIdSchema.safeParse({ id: 1 });
+    it('should reject empty id', () => {
+      const result = leadIdSchema.safeParse({ id: '' });
       expect(result.success).toBe(false);
     });
 
-    it('should accept id=2 (first data row)', () => {
-      const result = leadIdSchema.safeParse({ id: 2 });
+    it('should accept any non-empty string id', () => {
+      const result = leadIdSchema.safeParse({ id: 'lead-abc-123' });
       expect(result.success).toBe(true);
     });
   });

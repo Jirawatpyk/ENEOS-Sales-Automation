@@ -363,7 +363,7 @@ app.use(errorHandler);
 // Server Reference (for graceful shutdown)
 // ===========================================
 
-// eslint-disable-next-line prefer-const
+ 
 let server: Server;
 
 // ===========================================
@@ -411,23 +411,27 @@ async function gracefulShutdown(signal: string): Promise<void> {
   }, 15000);
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+// Register process crash handlers only in non-test environments.
+// In test mode, Vitest manages the process lifecycle — these handlers
+// would kill the worker on any unhandled error, causing spurious EPIPE crashes.
+if (process.env.NODE_ENV !== 'test') {
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught exception', { error: error.message, stack: error.stack });
-  captureException(error, { tags: { type: 'uncaught_exception' } });
-  process.exit(1);
-});
+  process.on('uncaughtException', (error) => {
+    logger.error('Uncaught exception', { error: error.message, stack: error.stack });
+    captureException(error, { tags: { type: 'uncaught_exception' } });
+    process.exit(1);
+  });
 
-process.on('unhandledRejection', (reason) => {
-  logger.error('Unhandled rejection', { reason });
-  if (reason instanceof Error) {
-    captureException(reason, { tags: { type: 'unhandled_rejection' } });
-  }
-  process.exit(1);
-});
+  process.on('unhandledRejection', (reason) => {
+    logger.error('Unhandled rejection', { reason });
+    if (reason instanceof Error) {
+      captureException(reason, { tags: { type: 'unhandled_rejection' } });
+    }
+    process.exit(1);
+  });
+}
 
 // ===========================================
 // Start Server
@@ -435,7 +439,12 @@ process.on('unhandledRejection', (reason) => {
 
 const PORT = config.port;
 
-server = app.listen(PORT, () => {
+// Skip server.listen in test mode — supertest creates its own server.
+// This prevents EADDRINUSE when multiple test workers import app.ts.
+if (process.env.NODE_ENV === 'test') {
+  server = null as unknown as ReturnType<typeof app.listen>;
+} else {
+  server = app.listen(PORT, () => {
   logger.info(`ENEOS Sales Automation API started`, {
     port: PORT,
     environment: config.env,
@@ -455,7 +464,8 @@ server = app.listen(PORT, () => {
     brevoWebhook: `http://localhost:${PORT}/webhook/brevo`,
     lineWebhook: `http://localhost:${PORT}/webhook/line`,
   });
-});
+  });
+}
 
 export default app;
 export { server };

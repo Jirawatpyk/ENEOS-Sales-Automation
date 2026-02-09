@@ -16,6 +16,10 @@ vi.mock('../../services/sheets.service.js', () => ({
   },
 }));
 
+vi.mock('../../services/leads.service.js', () => ({
+  getAllLeads: () => mockGetAllLeads(),
+}));
+
 // Mock XLSX library
 vi.mock('xlsx', () => {
   return {

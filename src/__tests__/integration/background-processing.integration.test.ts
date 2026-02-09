@@ -27,10 +27,8 @@ vi.mock('../../services/gemini.service.js', () => ({
   })),
 }));
 
-vi.mock('../../services/sheets.service.js', () => ({
-  SheetsService: vi.fn().mockImplementation(() => ({
-    addLead: mockAddLead,
-  })),
+vi.mock('../../services/leads.service.js', () => ({
+  addLead: mockAddLead,
 }));
 
 vi.mock('../../services/line.service.js', () => ({
@@ -83,6 +81,12 @@ vi.mock('../../utils/logger.js', () => ({
       debug: vi.fn(),
     }),
   },
+  createModuleLogger: vi.fn(() => ({
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  })),
 }));
 
 vi.mock('../../middleware/admin-auth.js', () => ({
@@ -160,7 +164,7 @@ describe('Background Processing Integration Tests', () => {
     // Setup default mocks
     mockCheckOrThrow.mockResolvedValue(undefined);
     mockAnalyzeCompany.mockResolvedValue(mockAIAnalysis);
-    mockAddLead.mockResolvedValue(42);
+    mockAddLead.mockResolvedValue({ id: 'lead-uuid-integration', version: 1, created_at: '2024-01-15T10:00:00Z', updated_at: '2024-01-15T10:00:00Z' });
     mockPushLeadNotification.mockResolvedValue(undefined);
   });
 
@@ -210,7 +214,7 @@ describe('Background Processing Integration Tests', () => {
           email: 'integration@test.com',
           company: 'Test Corp',
           status: 'completed',
-          rowNumber: 42,
+          rowNumber: 0,
           industry: 'Technology',
           confidence: 0.9,
         },
@@ -335,7 +339,7 @@ describe('Background Processing Integration Tests', () => {
 
       // Should still complete (LINE is non-critical)
       expect(statusResponse.body.data.status).toBe('completed');
-      expect(statusResponse.body.data.rowNumber).toBe(42);
+      expect(statusResponse.body.data.rowNumber).toBe(0);
     });
   });
 

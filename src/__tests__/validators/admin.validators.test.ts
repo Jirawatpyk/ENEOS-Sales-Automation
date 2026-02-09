@@ -310,46 +310,30 @@ describe('Admin Validators', () => {
   // Lead ID Schema
   // ===========================================
   describe('leadIdSchema', () => {
-    it('should accept valid lead ID', () => {
-      const result = leadIdSchema.safeParse({ id: 5 });
+    it('should accept UUID string', () => {
+      const result = leadIdSchema.safeParse({ id: '550e8400-e29b-41d4-a716-446655440000' });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.id).toBe(5);
+        expect(result.data.id).toBe('550e8400-e29b-41d4-a716-446655440000');
       }
     });
 
-    it('should coerce string to number', () => {
+    it('should accept numeric string (legacy row ID)', () => {
       const result = leadIdSchema.safeParse({ id: '10' });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.id).toBe(10);
+        expect(result.data.id).toBe('10');
       }
     });
 
-    it('should reject ID less than 2 (row 1 is header)', () => {
-      const result = leadIdSchema.safeParse({ id: 1 });
+    it('should reject empty string', () => {
+      const result = leadIdSchema.safeParse({ id: '' });
       expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.errors[0].message).toContain('Lead ID');
-      }
     });
 
-    it('should accept ID equal to 2', () => {
-      const result = leadIdSchema.safeParse({ id: 2 });
+    it('should accept any non-empty string', () => {
+      const result = leadIdSchema.safeParse({ id: 'lead-abc-123' });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.id).toBe(2);
-      }
-    });
-
-    it('should reject non-integer values', () => {
-      const result = leadIdSchema.safeParse({ id: 5.5 });
-      expect(result.success).toBe(false);
-    });
-
-    it('should reject negative values', () => {
-      const result = leadIdSchema.safeParse({ id: -1 });
-      expect(result.success).toBe(false);
     });
   });
 

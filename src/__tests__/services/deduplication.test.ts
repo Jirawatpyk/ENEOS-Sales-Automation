@@ -1,28 +1,34 @@
 /**
- * Deduplication Service Tests
+ * Deduplication Service Tests (Supabase)
+ * Story 9-1a: AC #8 — Rewritten for Supabase mock
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DuplicateLeadError } from '../../types/index.js';
 
-// Mock the sheets service before importing deduplication service
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
-    checkDuplicate: vi.fn(),
-    markAsProcessed: vi.fn(),
-  },
+// ===========================================
+// Mock Setup (vi.hoisted)
+// ===========================================
+
+const { mockSupabase, mockChain } = vi.hoisted(() => {
+  const mockChain: Record<string, ReturnType<typeof vi.fn>> = {
+    select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    upsert: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+  };
+  const mockSupabase = {
+    from: vi.fn().mockReturnValue(mockChain),
+  };
+  return { mockSupabase, mockChain };
+});
+
+vi.mock('../../lib/supabase.js', () => ({
+  supabase: mockSupabase,
 }));
 
-// Mock config
-vi.mock('../../config/index.js', () => ({
-  config: {
-    features: {
-      deduplication: true,
-    },
-  },
-}));
-
-// Mock logger
 vi.mock('../../utils/logger.js', () => ({
   dedupLogger: {
     debug: vi.fn(),
@@ -44,223 +50,172 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }));
 
-// Mock Redis service
-vi.mock('../../services/redis.service.js', () => ({
-  redisService: {
-    isAvailable: vi.fn().mockReturnValue(false),
-    exists: vi.fn().mockResolvedValue(false),
-    set: vi.fn().mockResolvedValue(true),
-    get: vi.fn().mockResolvedValue(null),
-  },
-  REDIS_KEYS: {
-    DEDUP_PREFIX: 'dedup:',
-    dedupKey: (key: string) => `dedup:${key}`,
-    DLQ_HASH: 'dlq:events',
-    dlqEventKey: (id: string) => `dlq:event:${id}`,
-    CACHE_PREFIX: 'cache:',
-    cacheKey: (key: string) => `cache:${key}`,
+vi.mock('../../config/index.js', () => ({
+  config: {
+    features: {
+      deduplication: true,
+    },
   },
 }));
 
-describe('Deduplication Service', () => {
-  let deduplicationService: typeof import('../../services/deduplication.service.js').deduplicationService;
-  let sheetsService: typeof import('../../services/sheets.service.js').sheetsService;
+import {
+  checkAndMark,
+  checkOrThrow,
+  isDuplicate,
+  getStats,
+  buildDedupKey,
+  deduplicationService,
+} from '../../services/deduplication.service.js';
 
-  beforeEach(async () => {
+// ===========================================
+// Tests
+// ===========================================
+
+describe('Deduplication Service (Supabase)', () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-
-    // Reset modules to get fresh instance
-    vi.resetModules();
-
-    // Re-import to get fresh instances
-    const dedupModule = await import('../../services/deduplication.service.js');
-    const sheetsModule = await import('../../services/sheets.service.js');
-
-    deduplicationService = dedupModule.deduplicationService;
-    sheetsService = sheetsModule.sheetsService;
+    // Reset chainable mocks
+    Object.values(mockChain).forEach((fn) => {
+      if (typeof fn.mockReturnThis === 'function') {
+        fn.mockReturnThis();
+      }
+    });
+    mockChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+    mockSupabase.from.mockReturnValue(mockChain);
   });
 
-  afterEach(() => {
-    // Clear cache between tests
-    deduplicationService.clearCache();
-  });
+  // ===========================================
+  // checkAndMark (AC #2)
+  // ===========================================
 
   describe('checkAndMark', () => {
-    it('should return false for new lead and mark as processed', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-      vi.mocked(sheetsService.markAsProcessed).mockResolvedValue(undefined);
+    it('should return false for new lead (insert succeeds)', async () => {
+      // upsert with ignoreDuplicates: if row returned → new
+      const selectPromise = Promise.resolve({
+        data: [{ key: 'lead:test@example.com:Brevo' }],
+        error: null,
+      });
+      mockChain.select.mockReturnValue({
+        then: selectPromise.then.bind(selectPromise),
+        catch: selectPromise.catch.bind(selectPromise),
+      });
 
-      const result = await deduplicationService.checkAndMark('test@example.com', '12345');
+      const result = await checkAndMark('test@example.com', 'Brevo');
 
-      expect(result).toBe(false);
-      expect(sheetsService.checkDuplicate).toHaveBeenCalledWith('test@example.com_12345');
+      expect(result).toBe(false); // not duplicate
+      expect(mockSupabase.from).toHaveBeenCalledWith('dedup_log');
+      expect(mockChain.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: 'lead:test@example.com:Brevo',
+          info: 'test@example.com',
+          source: 'Brevo',
+        }),
+        { onConflict: 'key', ignoreDuplicates: true }
+      );
     });
 
-    it('should return true for duplicate in cache', async () => {
-      // First call - new lead
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-      await deduplicationService.checkAndMark('test@example.com', '12345');
+    it('should return true for duplicate lead (insert returns empty)', async () => {
+      // upsert with ignoreDuplicates: if empty → duplicate
+      const selectPromise = Promise.resolve({
+        data: [],
+        error: null,
+      });
+      mockChain.select.mockReturnValue({
+        then: selectPromise.then.bind(selectPromise),
+        catch: selectPromise.catch.bind(selectPromise),
+      });
 
-      // Second call - should be in cache
-      const result = await deduplicationService.checkAndMark('test@example.com', '12345');
+      const result = await checkAndMark('dup@example.com', 'Brevo');
 
-      expect(result).toBe(true);
-      // Should not call sheets again (in cache)
-      expect(sheetsService.checkDuplicate).toHaveBeenCalledTimes(1);
-    });
-
-    it('should return true for duplicate in Google Sheets', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(true);
-
-      const result = await deduplicationService.checkAndMark('existing@example.com', '12345');
-
-      expect(result).toBe(true);
-      expect(sheetsService.markAsProcessed).not.toHaveBeenCalled();
+      expect(result).toBe(true); // is duplicate
     });
 
     it('should normalize email to lowercase', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
+      const selectPromise = Promise.resolve({
+        data: [{ key: 'lead:test@example.com:Brevo' }],
+        error: null,
+      });
+      mockChain.select.mockReturnValue({
+        then: selectPromise.then.bind(selectPromise),
+        catch: selectPromise.catch.bind(selectPromise),
+      });
 
-      await deduplicationService.checkAndMark('TEST@EXAMPLE.COM', '12345');
+      await checkAndMark('TEST@EXAMPLE.COM', 'Brevo');
 
-      expect(sheetsService.checkDuplicate).toHaveBeenCalledWith('test@example.com_12345');
+      expect(mockChain.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: 'lead:test@example.com:Brevo',
+          info: 'test@example.com',
+        }),
+        expect.any(Object)
+      );
+    });
+
+    it('should throw AppError on DB error', async () => {
+      const selectPromise = Promise.resolve({
+        data: null,
+        error: { message: 'connection refused' },
+      });
+      mockChain.select.mockReturnValue({
+        then: selectPromise.then.bind(selectPromise),
+        catch: selectPromise.catch.bind(selectPromise),
+      });
+
+      await expect(checkAndMark('test@test.com', 'Brevo')).rejects.toThrow(
+        'Deduplication check failed'
+      );
     });
   });
+
+  // ===========================================
+  // checkOrThrow (AC #2)
+  // ===========================================
 
   describe('checkOrThrow', () => {
     it('should not throw for new lead', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
+      const selectPromise = Promise.resolve({
+        data: [{ key: 'lead:new@example.com:Brevo' }],
+        error: null,
+      });
+      mockChain.select.mockReturnValue({
+        then: selectPromise.then.bind(selectPromise),
+        catch: selectPromise.catch.bind(selectPromise),
+      });
 
       await expect(
-        deduplicationService.checkOrThrow('new@example.com', '12345')
+        checkOrThrow('new@example.com', 'Brevo')
       ).resolves.not.toThrow();
     });
 
-    it('should throw DuplicateLeadError for existing lead', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(true);
+    it('should throw DuplicateLeadError for duplicate', async () => {
+      const selectPromise = Promise.resolve({
+        data: [],
+        error: null,
+      });
+      mockChain.select.mockReturnValue({
+        then: selectPromise.then.bind(selectPromise),
+        catch: selectPromise.catch.bind(selectPromise),
+      });
 
       await expect(
-        deduplicationService.checkOrThrow('existing@example.com', '12345')
-      ).rejects.toThrow('Lead already processed');
-    });
-  });
-
-  describe('isDuplicate', () => {
-    it('should return false for non-duplicate', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-
-      const result = await deduplicationService.isDuplicate('test@example.com', '12345');
-
-      expect(result).toBe(false);
+        checkOrThrow('dup@example.com', 'Brevo')
+      ).rejects.toThrow(DuplicateLeadError);
     });
 
-    it('should return true for duplicate', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(true);
-
-      const result = await deduplicationService.isDuplicate('existing@example.com', '12345');
-
-      expect(result).toBe(true);
-    });
-
-    it('should check cache first before Google Sheets', async () => {
-      // Add to cache first
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-      await deduplicationService.checkAndMark('cached@example.com', '12345');
-
-      // Reset mock to verify it's not called
-      vi.mocked(sheetsService.checkDuplicate).mockClear();
-
-      const result = await deduplicationService.isDuplicate('cached@example.com', '12345');
-
-      expect(result).toBe(true);
-      expect(sheetsService.checkDuplicate).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('cache management', () => {
-    it('should track cache size correctly', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-
-      expect(deduplicationService.getCacheSize()).toBe(0);
-
-      await deduplicationService.checkAndMark('test1@example.com', '12345');
-      expect(deduplicationService.getCacheSize()).toBe(1);
-
-      await deduplicationService.checkAndMark('test2@example.com', '12345');
-      expect(deduplicationService.getCacheSize()).toBe(2);
-    });
-
-    it('should clear cache correctly', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-
-      await deduplicationService.checkAndMark('test@example.com', '12345');
-      expect(deduplicationService.getCacheSize()).toBe(1);
-
-      deduplicationService.clearCache();
-      expect(deduplicationService.getCacheSize()).toBe(0);
-    });
-
-    it('should return stats correctly', () => {
-      const stats = deduplicationService.getStats();
-
-      expect(stats).toEqual({
-        enabled: true,
-        memoryCacheSize: expect.any(Number),
-        redisAvailable: expect.any(Boolean),
-        cacheTtlMs: expect.any(Number),
+    it('should include email and source in error message', async () => {
+      const selectPromise = Promise.resolve({
+        data: [],
+        error: null,
       });
-    });
-  });
-
-  describe('preloadCache', () => {
-    it('should log preload message without error', async () => {
-      const { dedupLogger } = await import('../../utils/logger.js');
-
-      await deduplicationService.preloadCache();
-
-      expect(dedupLogger.info).toHaveBeenCalledWith(
-        'Preloading deduplication cache from Google Sheets'
-      );
-      expect(dedupLogger.info).toHaveBeenCalledWith(
-        'Cache preload not implemented - will populate on demand'
-      );
-    });
-
-    it('should accept custom limit parameter', async () => {
-      // Should not throw with custom limit
-      await expect(deduplicationService.preloadCache(500)).resolves.not.toThrow();
-    });
-  });
-
-  describe('markAsProcessed error handling', () => {
-    it('should handle sheets error when persisting dedup record', async () => {
-      const { dedupLogger } = await import('../../utils/logger.js');
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-      vi.mocked(sheetsService.markAsProcessed).mockRejectedValue(new Error('Sheets API error'));
-
-      // Should not throw - error is caught and logged
-      const result = await deduplicationService.checkAndMark('error@example.com', '12345');
-
-      expect(result).toBe(false);
-      // Give time for async markAsProcessed to fail
-      await new Promise(resolve => setTimeout(resolve, 10));
-      expect(dedupLogger.error).toHaveBeenCalledWith(
-        'Failed to persist dedup record to sheets',
-        expect.objectContaining({ key: 'error@example.com_12345' })
-      );
-    });
-  });
-
-  describe('DuplicateLeadError', () => {
-    it('should throw error with correct message and name', async () => {
-      vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(true);
+      mockChain.select.mockReturnValue({
+        then: selectPromise.then.bind(selectPromise),
+        catch: selectPromise.catch.bind(selectPromise),
+      });
 
       try {
-        await deduplicationService.checkOrThrow('dup@example.com', 'campaign-123');
+        await checkOrThrow('dup@example.com', 'campaign-123');
         expect.fail('Should have thrown');
       } catch (error) {
-        // Check error properties directly
-        expect((error as Error).message).toContain('Lead already processed');
         expect((error as Error).message).toContain('dup@example.com');
         expect((error as Error).message).toContain('campaign-123');
         expect(error).toHaveProperty('name', 'DuplicateLeadError');
@@ -268,151 +223,134 @@ describe('Deduplication Service', () => {
       }
     });
   });
-});
 
-describe('Deduplication Service with Redis', () => {
-  let deduplicationService: typeof import('../../services/deduplication.service.js').deduplicationService;
-  let sheetsService: typeof import('../../services/sheets.service.js').sheetsService;
-  let redisService: typeof import('../../services/redis.service.js').redisService;
+  // ===========================================
+  // isDuplicate (check without marking)
+  // ===========================================
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    vi.resetModules();
+  describe('isDuplicate', () => {
+    it('should return false when not found', async () => {
+      mockChain.maybeSingle.mockResolvedValue({
+        data: null,
+        error: null,
+      });
 
-    // Mock Redis as available
-    vi.doMock('../../services/redis.service.js', () => ({
-      redisService: {
-        isAvailable: vi.fn().mockReturnValue(true),
-        exists: vi.fn().mockResolvedValue(false),
-        set: vi.fn().mockResolvedValue(true),
-        get: vi.fn().mockResolvedValue(null),
-      },
-      REDIS_KEYS: {
-        DEDUP_PREFIX: 'dedup:',
-        dedupKey: (key: string) => `dedup:${key}`,
-        DLQ_HASH: 'dlq:events',
-        dlqEventKey: (id: string) => `dlq:event:${id}`,
-        CACHE_PREFIX: 'cache:',
-        cacheKey: (key: string) => `cache:${key}`,
-      },
-    }));
+      const result = await isDuplicate('test@example.com', 'Brevo');
 
-    const dedupModule = await import('../../services/deduplication.service.js');
-    const sheetsModule = await import('../../services/sheets.service.js');
-    const redisModule = await import('../../services/redis.service.js');
+      expect(result).toBe(false);
+      expect(mockSupabase.from).toHaveBeenCalledWith('dedup_log');
+      expect(mockChain.eq).toHaveBeenCalledWith('key', 'lead:test@example.com:Brevo');
+    });
 
-    deduplicationService = dedupModule.deduplicationService;
-    sheetsService = sheetsModule.sheetsService;
-    redisService = redisModule.redisService;
+    it('should return true when found', async () => {
+      mockChain.maybeSingle.mockResolvedValue({
+        data: { key: 'lead:existing@example.com:Brevo' },
+        error: null,
+      });
+
+      const result = await isDuplicate('existing@example.com', 'Brevo');
+
+      expect(result).toBe(true);
+    });
+
+    it('should throw AppError on DB error', async () => {
+      mockChain.maybeSingle.mockResolvedValue({
+        data: null,
+        error: { message: 'DB timeout' },
+      });
+
+      await expect(isDuplicate('test@test.com', 'Brevo')).rejects.toThrow(
+        'Deduplication check failed'
+      );
+    });
   });
 
-  afterEach(() => {
-    deduplicationService.clearCache();
-  });
+  // ===========================================
+  // Feature flag disabled
+  // ===========================================
 
-  it('should check Redis first when available', async () => {
-    vi.mocked(redisService.exists).mockResolvedValue(true);
+  describe('feature flag disabled', () => {
+    let checkAndMarkDisabled: typeof checkAndMark;
+    let isDuplicateDisabled: typeof isDuplicate;
+    let checkOrThrowDisabled: typeof checkOrThrow;
 
-    const result = await deduplicationService.checkAndMark('redis@example.com', '12345');
+    beforeEach(async () => {
+      vi.resetModules();
 
-    expect(result).toBe(true);
-    expect(redisService.exists).toHaveBeenCalled();
-    // Should not reach sheets check
-    expect(sheetsService.checkDuplicate).not.toHaveBeenCalled();
-  });
-
-  it('should add to Redis when processing new lead', async () => {
-    vi.mocked(redisService.exists).mockResolvedValue(false);
-    vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-
-    await deduplicationService.checkAndMark('new@example.com', '12345');
-
-    expect(redisService.set).toHaveBeenCalledWith(
-      'dedup:new@example.com_12345',
-      expect.any(String),
-      expect.any(Number)
-    );
-  });
-
-  it('should sync to Redis when found in memory cache', async () => {
-    // First call - add to memory cache
-    vi.mocked(redisService.exists).mockResolvedValue(false);
-    vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(false);
-    await deduplicationService.checkAndMark('sync@example.com', '12345');
-
-    // Clear Redis set call count
-    vi.mocked(redisService.set).mockClear();
-
-    // Second call - should be in memory cache and sync to Redis
-    const result = await deduplicationService.checkAndMark('sync@example.com', '12345');
-
-    expect(result).toBe(true);
-    expect(redisService.set).toHaveBeenCalled(); // Sync to Redis
-  });
-
-  it('should add to caches when found in Google Sheets', async () => {
-    vi.mocked(redisService.exists).mockResolvedValue(false);
-    vi.mocked(sheetsService.checkDuplicate).mockResolvedValue(true);
-
-    const result = await deduplicationService.checkAndMark('sheets@example.com', '12345');
-
-    expect(result).toBe(true);
-    expect(redisService.set).toHaveBeenCalled(); // Added to Redis cache
-    expect(deduplicationService.getCacheSize()).toBe(1); // Added to memory cache
-  });
-
-  it('should check Redis in isDuplicate', async () => {
-    vi.mocked(redisService.exists).mockResolvedValue(true);
-
-    const result = await deduplicationService.isDuplicate('redis@example.com', '12345');
-
-    expect(result).toBe(true);
-    expect(redisService.exists).toHaveBeenCalled();
-    expect(sheetsService.checkDuplicate).not.toHaveBeenCalled();
-  });
-});
-
-describe('Deduplication Service - disabled', () => {
-  let DeduplicationServiceClass: typeof import('../../services/deduplication.service.js').DeduplicationService;
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    vi.resetModules();
-
-    // Mock config with deduplication disabled
-    vi.doMock('../../config/index.js', () => ({
-      config: {
-        features: {
-          deduplication: false,
+      vi.doMock('../../config/index.js', () => ({
+        config: {
+          features: {
+            deduplication: false,
+          },
         },
-      },
-    }));
+      }));
 
-    const dedupModule = await import('../../services/deduplication.service.js');
-    DeduplicationServiceClass = dedupModule.DeduplicationService;
+      const mod = await import('../../services/deduplication.service.js');
+      checkAndMarkDisabled = mod.checkAndMark;
+      isDuplicateDisabled = mod.isDuplicate;
+      checkOrThrowDisabled = mod.checkOrThrow;
+    });
+
+    it('should return false for checkAndMark when disabled', async () => {
+      const result = await checkAndMarkDisabled('any@example.com', 'Brevo');
+      expect(result).toBe(false);
+    });
+
+    it('should return false for isDuplicate when disabled', async () => {
+      const result = await isDuplicateDisabled('any@example.com', 'Brevo');
+      expect(result).toBe(false);
+    });
+
+    it('should not throw for checkOrThrow when disabled', async () => {
+      await expect(
+        checkOrThrowDisabled('any@example.com', 'Brevo')
+      ).resolves.not.toThrow();
+    });
   });
 
-  it('should return false for checkAndMark when disabled', async () => {
-    const service = new DeduplicationServiceClass();
+  // ===========================================
+  // Key format (AC #7)
+  // ===========================================
 
-    const result = await service.checkAndMark('any@example.com', '12345');
+  describe('buildDedupKey', () => {
+    it('should use lead:{email}:{source} format', () => {
+      expect(buildDedupKey('Test@Example.COM', 'Brevo')).toBe(
+        'lead:test@example.com:Brevo'
+      );
+    });
 
-    expect(result).toBe(false);
+    it('should use "unknown" for empty source', () => {
+      expect(buildDedupKey('test@test.com', '')).toBe(
+        'lead:test@test.com:unknown'
+      );
+    });
   });
 
-  it('should return false for isDuplicate when disabled', async () => {
-    const service = new DeduplicationServiceClass();
+  // ===========================================
+  // getStats
+  // ===========================================
 
-    const result = await service.isDuplicate('any@example.com', '12345');
+  describe('getStats', () => {
+    it('should return Supabase backend info', () => {
+      const stats = getStats();
 
-    expect(result).toBe(false);
+      expect(stats).toEqual({
+        enabled: true,
+        backend: 'supabase',
+      });
+    });
   });
 
-  it('should not throw for checkOrThrow when disabled', async () => {
-    const service = new DeduplicationServiceClass();
+  // ===========================================
+  // Backward-compatible singleton export
+  // ===========================================
 
-    await expect(
-      service.checkOrThrow('any@example.com', '12345')
-    ).resolves.not.toThrow();
+  describe('deduplicationService (backward compat)', () => {
+    it('should export singleton with all methods', () => {
+      expect(deduplicationService.checkAndMark).toBe(checkAndMark);
+      expect(deduplicationService.checkOrThrow).toBe(checkOrThrow);
+      expect(deduplicationService.isDuplicate).toBe(isDuplicate);
+      expect(deduplicationService.getStats).toBe(getStats);
+    });
   });
 });

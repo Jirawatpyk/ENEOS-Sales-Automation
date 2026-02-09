@@ -10,12 +10,15 @@ import { Request, Response, NextFunction } from 'express';
 import type { LeadRow } from '../../types/index.js';
 
 // Use vi.hoisted for proper mock hoisting
-const { mockSheetsService } = vi.hoisted(() => {
+const { mockSheetsService, mockLeadsService } = vi.hoisted(() => {
   const mockSheetsService = {
-    getAllLeads: vi.fn().mockResolvedValue([]),
     getSalesTeamMember: vi.fn().mockResolvedValue(null),
+    getStatusHistory: vi.fn().mockResolvedValue([]),
   };
-  return { mockSheetsService };
+  const mockLeadsService = {
+    getAllLeads: vi.fn().mockResolvedValue([]),
+  };
+  return { mockSheetsService, mockLeadsService };
 });
 
 // Mock logger first (before any other imports that might use it)
@@ -28,10 +31,13 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }));
 
-// Mock sheetsService with hoisted mocks
+// Mock sheetsService (still needed for getSalesTeamMember)
 vi.mock('../../services/sheets.service.js', () => ({
   sheetsService: mockSheetsService,
 }));
+
+// Mock leadsService (getAllLeads moved from sheetsService)
+vi.mock('../../services/leads.service.js', () => mockLeadsService);
 
 // Import after mocking
 import { getSalesPerformanceTrend } from '../../controllers/admin.controller.js';
@@ -118,7 +124,7 @@ const createSampleLead = (overrides: Partial<LeadRow> = {}): LeadRow => ({
 describe('getSalesPerformanceTrend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSheetsService.getAllLeads.mockResolvedValue([]);
+    mockLeadsService.getAllLeads.mockResolvedValue([]);
     mockSheetsService.getSalesTeamMember.mockResolvedValue(null);
   });
 
@@ -168,7 +174,7 @@ describe('getSalesPerformanceTrend', () => {
   describe('Data Aggregation', () => {
     it('should return trend data for specified user', async () => {
       const userId = 'sales-001';
-      mockSheetsService.getAllLeads.mockResolvedValue([
+      mockLeadsService.getAllLeads.mockResolvedValue([
         createSampleLead({ salesOwnerId: userId, status: 'claimed', date: getDateISO(-1) }),
         createSampleLead({ rowNumber: 3, salesOwnerId: userId, status: 'closed', date: getDateISO(-1), closedAt: getDateISO(-1) }),
         createSampleLead({ rowNumber: 4, salesOwnerId: 'sales-002', status: 'claimed', date: getDateISO(-1) }),
@@ -195,7 +201,7 @@ describe('getSalesPerformanceTrend', () => {
       const userId = 'sales-001';
       const yesterday = getDateISO(-1);
 
-      mockSheetsService.getAllLeads.mockResolvedValue([
+      mockLeadsService.getAllLeads.mockResolvedValue([
         createSampleLead({ salesOwnerId: userId, status: 'claimed', date: yesterday }),
         createSampleLead({ rowNumber: 3, salesOwnerId: userId, status: 'claimed', date: yesterday }),
         createSampleLead({ rowNumber: 4, salesOwnerId: userId, status: 'closed', date: yesterday, closedAt: yesterday }),
@@ -220,7 +226,7 @@ describe('getSalesPerformanceTrend', () => {
     it('should calculate team average correctly', async () => {
       const yesterday = getDateISO(-1);
 
-      mockSheetsService.getAllLeads.mockResolvedValue([
+      mockLeadsService.getAllLeads.mockResolvedValue([
         // User 1: 2 claimed, 1 closed
         createSampleLead({ salesOwnerId: 'sales-001', status: 'claimed', date: yesterday }),
         createSampleLead({ rowNumber: 3, salesOwnerId: 'sales-001', status: 'closed', date: yesterday, closedAt: yesterday }),
@@ -247,7 +253,7 @@ describe('getSalesPerformanceTrend', () => {
     });
 
     it('should return empty data for user with no leads', async () => {
-      mockSheetsService.getAllLeads.mockResolvedValue([
+      mockLeadsService.getAllLeads.mockResolvedValue([
         createSampleLead({ salesOwnerId: 'sales-002', status: 'claimed' }),
       ]);
 
@@ -273,7 +279,7 @@ describe('getSalesPerformanceTrend', () => {
       const userId = 'sales-001';
       const yesterday = getDateISO(-1);
 
-      mockSheetsService.getAllLeads.mockResolvedValue([
+      mockLeadsService.getAllLeads.mockResolvedValue([
         createSampleLead({ salesOwnerId: userId, status: 'claimed', date: yesterday }),
         createSampleLead({ rowNumber: 3, salesOwnerId: userId, status: 'claimed', date: yesterday }),
         createSampleLead({ rowNumber: 4, salesOwnerId: userId, status: 'closed', date: yesterday, closedAt: yesterday }),
@@ -296,7 +302,7 @@ describe('getSalesPerformanceTrend', () => {
     });
 
     it('should return 0 conversion rate when no leads claimed', async () => {
-      mockSheetsService.getAllLeads.mockResolvedValue([]);
+      mockLeadsService.getAllLeads.mockResolvedValue([]);
 
       const req = createMockRequest({ query: { userId: 'sales-001', days: '7' } });
       const res = createMockResponse();
@@ -400,7 +406,7 @@ describe('getSalesPerformanceTrend', () => {
   describe('Error Handling', () => {
     it('should handle getAllLeads error gracefully with empty data', async () => {
       // Note: getAllLeads() catches errors internally and returns empty array (graceful degradation)
-      mockSheetsService.getAllLeads.mockRejectedValue(new Error('Database error'));
+      mockLeadsService.getAllLeads.mockRejectedValue(new Error('Database error'));
 
       const req = createMockRequest({ query: { userId: 'sales-001' } });
       const res = createMockResponse();

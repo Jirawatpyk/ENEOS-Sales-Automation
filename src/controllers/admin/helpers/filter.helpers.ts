@@ -7,7 +7,7 @@ import { PeriodInfo } from '../../../types/admin.types.js';
 import { LeadRow } from '../../../types/index.js';
 import { parseDateFromSheets } from '../../../utils/date-formatter.js';
 import { logger } from '../../../utils/logger.js';
-import { sheetsService } from '../../../services/sheets.service.js';
+import * as leadsService from '../../../services/leads.service.js';
 
 /**
  * กรอง leads ตาม period
@@ -104,7 +104,7 @@ export function filterByLeadSource(leads: LeadRow[], leadSource: string): LeadRo
  */
 export async function getAllLeads(): Promise<LeadRow[]> {
   try {
-    return await sheetsService.getAllLeads();
+    return await leadsService.getAllLeads();
   } catch (error) {
     logger.error('Failed to get all leads - dashboard will show empty data', {
       error: error instanceof Error ? error.message : 'Unknown error',

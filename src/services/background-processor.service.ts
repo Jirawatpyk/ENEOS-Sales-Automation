@@ -5,8 +5,8 @@
 
 import { logger } from '../utils/logger.js';
 import { GeminiService } from './gemini.service.js';
-import { SheetsService } from './sheets.service.js';
 import { LineService } from './line.service.js';
+import * as leadsService from './leads.service.js';
 import { deadLetterQueue } from './dead-letter-queue.service.js';
 import { processingStatusService } from './processing-status.service.js';
 import { extractDomain } from '../utils/email-parser.js';
@@ -79,8 +79,7 @@ export async function processLeadInBackground(
       }
     }
 
-    // Step 2: Save to Google Sheets
-    const sheetsService = new SheetsService();
+    // Step 2: Save to Supabase
     const lead: Partial<Lead> = {
       date: formatDateForSheets(),
       customerName: `${payload.firstname} ${payload.lastname}`.trim() || 'ไม่ระบุ',
@@ -108,19 +107,23 @@ export async function processLeadInBackground(
       fullAddress: aiAnalysis.fullAddress || null,
     };
 
-    const rowNumber = await sheetsService.addLead(lead);
+    const savedLead = await leadsService.addLead(lead);
 
-    logger.info('Lead saved to Google Sheets', {
+    logger.info('Lead saved to Supabase', {
       correlationId,
-      rowNumber,
+      leadId: savedLead.id,
       email: payload.email,
     });
 
-    // Create LeadRow for LINE notification
+    // Construct LeadRow-compatible object for LINE notification
+    // LINE template still expects LeadRow until Story 9-1b rewrites it
     const leadRow: LeadRow = {
       ...(lead as Lead),
-      rowNumber,
-      version: 1,
+      rowNumber: 0, // No row number in Supabase
+      version: savedLead.version,
+      leadUUID: savedLead.id,
+      createdAt: savedLead.created_at,
+      updatedAt: savedLead.updated_at,
     };
 
     // Step 3: Send LINE notification
@@ -136,7 +139,7 @@ export async function processLeadInBackground(
 
         logger.info('LINE notification sent', {
           correlationId,
-          rowNumber,
+          leadId: savedLead.id,
           company: lead.company,
         });
       } catch (lineError) {
@@ -144,7 +147,7 @@ export async function processLeadInBackground(
         logger.error('Failed to send LINE notification', {
           correlationId,
           error: lineError instanceof Error ? lineError.message : 'Unknown error',
-          rowNumber,
+          leadId: savedLead.id,
         });
       }
     }
@@ -153,7 +156,7 @@ export async function processLeadInBackground(
     const duration = Date.now() - startTime;
     processingStatusService.complete(
       correlationId,
-      rowNumber,
+      0, // No row number in Supabase — processingStatus still expects number
       aiAnalysis.industry,
       aiAnalysis.confidence,
       duration
@@ -161,7 +164,7 @@ export async function processLeadInBackground(
 
     logger.info('Background processing completed', {
       correlationId,
-      rowNumber,
+      leadId: savedLead.id,
       duration,
       email: payload.email,
     });

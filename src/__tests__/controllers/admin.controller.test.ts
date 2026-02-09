@@ -7,11 +7,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import type { LeadRow } from '../../types/index.js';
 
-// Mock sheetsService
+// Mock sheetsService (still needed for getSalesTeamMember, getStatusHistory)
 const mockGetAllLeads = vi.fn();
 const mockGetRow = vi.fn();
 const mockGetSalesTeamMember = vi.fn();
 const mockGetStatusHistory = vi.fn();
+const mockGetLeadByIdSupa = vi.fn();
+const mockSupabaseLeadToLeadRow = vi.fn();
+const mockGetLeadsWithPagination = vi.fn();
+const mockGetDistinctFilterValues = vi.fn();
 
 vi.mock('../../services/sheets.service.js', () => ({
   sheetsService: {
@@ -20,6 +24,14 @@ vi.mock('../../services/sheets.service.js', () => ({
     getSalesTeamMember: (id: string) => mockGetSalesTeamMember(id),
     getStatusHistory: (leadUUID: string) => mockGetStatusHistory(leadUUID),
   },
+}));
+
+vi.mock('../../services/leads.service.js', () => ({
+  getAllLeads: () => mockGetAllLeads(),
+  getLeadById: (id: string) => mockGetLeadByIdSupa(id),
+  supabaseLeadToLeadRow: (lead: unknown) => mockSupabaseLeadToLeadRow(lead),
+  getLeadsWithPagination: (...args: unknown[]) => mockGetLeadsWithPagination(...args),
+  getDistinctFilterValues: () => mockGetDistinctFilterValues(),
 }));
 
 // Import after mocking
@@ -111,6 +123,14 @@ describe('Admin Controller', () => {
     mockGetRow.mockResolvedValue(null);
     mockGetSalesTeamMember.mockResolvedValue(null);
     mockGetStatusHistory.mockResolvedValue([]); // Default to empty history (fallback mode)
+    mockGetLeadByIdSupa.mockResolvedValue(null);
+    mockSupabaseLeadToLeadRow.mockReturnValue(null);
+    mockGetLeadsWithPagination.mockResolvedValue({ data: [], total: 0 });
+    mockGetDistinctFilterValues.mockResolvedValue({
+      owners: [],
+      campaigns: [],
+      leadSources: [],
+    });
   });
 
   afterEach(() => {
@@ -706,22 +726,35 @@ describe('Admin Controller', () => {
   // getLeads
   // ===========================================
   describe('getLeads', () => {
+    // Helper: set up getLeadsWithPagination + supabaseLeadToLeadRow mocks
+    // The controller now delegates filtering/pagination to the service.
+    // Tests verify correct parameter passing and response transformation.
+    const setupPaginatedMock = (leads: LeadRow[], total?: number) => {
+      // getLeadsWithPagination returns SupabaseLead[] — we use LeadRow as proxy objects
+      mockGetLeadsWithPagination.mockResolvedValue({
+        data: leads, // proxy objects (mockSupabaseLeadToLeadRow converts them)
+        total: total ?? leads.length,
+      });
+      // supabaseLeadToLeadRow passes through the proxy objects as-is
+      mockSupabaseLeadToLeadRow.mockImplementation((lead: unknown) => lead);
+    };
+
     it('should return paginated leads with defaults', async () => {
       const req = createMockRequest();
       const res = createMockResponse();
       const next = createMockNext();
 
-      const leads = Array.from({ length: 25 }, (_, i) =>
+      const leads = Array.from({ length: 20 }, (_, i) =>
         createSampleLead({ rowNumber: i + 2 })
       );
-      mockGetAllLeads.mockResolvedValue(leads);
+      setupPaginatedMock(leads, 25);
 
       await getLeads(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(200);
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.success).toBe(true);
-      expect(response.data.data).toHaveLength(20); // Default limit
+      expect(response.data.data).toHaveLength(20); // Service returned 20 items
       expect(response.data.pagination.page).toBe(1);
       expect(response.data.pagination.limit).toBe(20);
       expect(response.data.pagination.total).toBe(25);
@@ -730,18 +763,19 @@ describe('Admin Controller', () => {
       expect(response.data.pagination.hasPrev).toBe(false);
     });
 
-    it('should respect page and limit parameters', async () => {
+    it('should pass page and limit to service', async () => {
       const req = createMockRequest({ query: { page: '2', limit: '10' } });
       const res = createMockResponse();
       const next = createMockNext();
 
-      const leads = Array.from({ length: 25 }, (_, i) =>
-        createSampleLead({ rowNumber: i + 2 })
+      const leads = Array.from({ length: 10 }, (_, i) =>
+        createSampleLead({ rowNumber: i + 12 })
       );
-      mockGetAllLeads.mockResolvedValue(leads);
+      setupPaginatedMock(leads, 25);
 
       await getLeads(req, res, next);
 
+      expect(mockGetLeadsWithPagination).toHaveBeenCalledWith(2, 10, expect.objectContaining({}));
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.data.data).toHaveLength(10);
       expect(response.data.pagination.page).toBe(2);
@@ -750,88 +784,99 @@ describe('Admin Controller', () => {
       expect(response.data.pagination.hasPrev).toBe(true);
     });
 
-    it('should filter by status', async () => {
+    it('should pass status filter to service', async () => {
       const req = createMockRequest({ query: { status: 'contacted' } });
       const res = createMockResponse();
       const next = createMockNext();
 
-      mockGetAllLeads.mockResolvedValue([
-        createSampleLead({ status: 'new' }),
+      const contactedLeads = [
         createSampleLead({ rowNumber: 3, status: 'contacted', salesOwnerId: 'sales-001', contactedAt: getCurrentDateISO() }),
         createSampleLead({ rowNumber: 4, status: 'contacted', salesOwnerId: 'sales-002', contactedAt: getCurrentDateISO() }),
-      ]);
+      ];
+      setupPaginatedMock(contactedLeads);
 
       await getLeads(req, res, next);
 
+      expect(mockGetLeadsWithPagination).toHaveBeenCalledWith(
+        1, 20, expect.objectContaining({ status: 'contacted' })
+      );
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.data.data).toHaveLength(2);
-      expect(response.data.data.every((l: { status: string }) => l.status === 'contacted')).toBe(true);
     });
 
-    it('should filter by status=claimed (leads with salesOwnerId)', async () => {
+    it('should pass status=claimed filter to service', async () => {
       const req = createMockRequest({ query: { status: 'claimed' } });
       const res = createMockResponse();
       const next = createMockNext();
 
-      mockGetAllLeads.mockResolvedValue([
-        createSampleLead({ rowNumber: 2, status: 'new', salesOwnerId: null }), // unclaimed
-        createSampleLead({ rowNumber: 3, status: 'contacted', salesOwnerId: 'sales-001', contactedAt: getCurrentDateISO() }), // claimed
-        createSampleLead({ rowNumber: 4, status: 'closed', salesOwnerId: 'sales-002', closedAt: getCurrentDateISO() }), // claimed
-        createSampleLead({ rowNumber: 5, status: 'new', salesOwnerId: null }), // unclaimed
-      ]);
+      const claimedLeads = [
+        createSampleLead({ rowNumber: 3, status: 'contacted', salesOwnerId: 'sales-001', contactedAt: getCurrentDateISO() }),
+        createSampleLead({ rowNumber: 4, status: 'closed', salesOwnerId: 'sales-002', closedAt: getCurrentDateISO() }),
+      ];
+      setupPaginatedMock(claimedLeads);
 
       await getLeads(req, res, next);
 
+      expect(mockGetLeadsWithPagination).toHaveBeenCalledWith(
+        1, 20, expect.objectContaining({ status: 'claimed' })
+      );
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      expect(response.data.data).toHaveLength(2); // Only leads with salesOwnerId
-      expect(response.data.data.every((l: { salesOwnerId: string | null }) => l.salesOwnerId !== null)).toBe(true);
+      expect(response.data.data).toHaveLength(2);
     });
 
-    it('should filter by owner', async () => {
+    it('should pass owner filter to service', async () => {
       const req = createMockRequest({ query: { owner: 'sales-001' } });
       const res = createMockResponse();
       const next = createMockNext();
 
-      mockGetAllLeads.mockResolvedValue([
-        createSampleLead({ status: 'claimed', salesOwnerId: 'sales-001' }),
-        createSampleLead({ rowNumber: 3, status: 'claimed', salesOwnerId: 'sales-002' }),
+      setupPaginatedMock([
+        createSampleLead({ status: 'contacted', salesOwnerId: 'sales-001' }),
       ]);
 
       await getLeads(req, res, next);
 
+      expect(mockGetLeadsWithPagination).toHaveBeenCalledWith(
+        1, 20, expect.objectContaining({ owner: 'sales-001' })
+      );
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.data.data).toHaveLength(1);
     });
 
-    it('should filter by search', async () => {
+    it('should pass search filter to service', async () => {
       const req = createMockRequest({ query: { search: 'Test Company' } });
       const res = createMockResponse();
       const next = createMockNext();
 
-      mockGetAllLeads.mockResolvedValue([
+      setupPaginatedMock([
         createSampleLead({ company: 'Test Company' }),
-        createSampleLead({ rowNumber: 3, company: 'Other Company' }),
       ]);
 
       await getLeads(req, res, next);
 
+      expect(mockGetLeadsWithPagination).toHaveBeenCalledWith(
+        1, 20, expect.objectContaining({ search: 'Test Company' })
+      );
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.data.data).toHaveLength(1);
     });
 
-    it('should sort by company ascending', async () => {
+    it('should pass sort params to service', async () => {
       const req = createMockRequest({ query: { sortBy: 'company', sortOrder: 'asc' } });
       const res = createMockResponse();
       const next = createMockNext();
 
-      mockGetAllLeads.mockResolvedValue([
-        createSampleLead({ company: 'Zebra Corp' }),
+      // Service returns pre-sorted data
+      setupPaginatedMock([
         createSampleLead({ rowNumber: 3, company: 'Alpha Corp' }),
         createSampleLead({ rowNumber: 4, company: 'Beta Corp' }),
+        createSampleLead({ company: 'Zebra Corp' }),
       ]);
 
       await getLeads(req, res, next);
 
+      expect(mockGetLeadsWithPagination).toHaveBeenCalledWith(
+        1, 20, expect.objectContaining({ sortBy: 'company', sortOrder: 'asc' })
+      );
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.data.data[0].company).toBe('Alpha Corp');
       expect(response.data.data[1].company).toBe('Beta Corp');
@@ -861,15 +906,17 @@ describe('Admin Controller', () => {
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
-    it('should include available filters in response', async () => {
+    it('should include available filters from getDistinctFilterValues', async () => {
       const req = createMockRequest();
       const res = createMockResponse();
       const next = createMockNext();
 
-      mockGetAllLeads.mockResolvedValue([
-        createSampleLead({ salesOwnerId: 'sales-001', salesOwnerName: 'Sales 1' }),
-        createSampleLead({ rowNumber: 3, salesOwnerId: 'sales-002', salesOwnerName: 'Sales 2' }),
-      ]);
+      setupPaginatedMock([]);
+      mockGetDistinctFilterValues.mockResolvedValue({
+        owners: [{ id: 'sales-001', name: 'Sales 1' }, { id: 'sales-002', name: 'Sales 2' }],
+        campaigns: [{ id: 'campaign-001', name: 'Campaign 1' }],
+        leadSources: ['Website', 'Referral'],
+      });
 
       await getLeads(req, res, next);
 
@@ -877,6 +924,9 @@ describe('Admin Controller', () => {
       expect(response.data.filters.available).toHaveProperty('statuses');
       expect(response.data.filters.available).toHaveProperty('owners');
       expect(response.data.filters.available).toHaveProperty('campaigns');
+      expect(response.data.filters.available.owners).toHaveLength(2);
+      expect(response.data.filters.available.campaigns).toHaveLength(1);
+      expect(response.data.filters.available.leadSources).toEqual(['Website', 'Referral']);
     });
 
     it('should include grounding fields in lead list (2026-01-26)', async () => {
@@ -884,7 +934,7 @@ describe('Admin Controller', () => {
       const res = createMockResponse();
       const next = createMockNext();
 
-      mockGetAllLeads.mockResolvedValue([
+      setupPaginatedMock([
         createSampleLead({
           rowNumber: 2,
           juristicId: '0105563079446',
@@ -927,7 +977,8 @@ describe('Admin Controller', () => {
       const next = createMockNext();
 
       const lead = createSampleLead({ rowNumber: 5 });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -945,7 +996,7 @@ describe('Admin Controller', () => {
       const res = createMockResponse();
       const next = createMockNext();
 
-      mockGetRow.mockResolvedValue(null);
+      mockGetLeadByIdSupa.mockResolvedValue(null);
 
       await getLeadById(req, res, next);
 
@@ -955,8 +1006,8 @@ describe('Admin Controller', () => {
       expect(response.error.code).toBe('NOT_FOUND');
     });
 
-    it('should return validation error for ID less than 2', async () => {
-      const req = createMockRequest({ params: { id: '1' } });
+    it('should return validation error for empty ID', async () => {
+      const req = createMockRequest({ params: { id: '' } });
       const res = createMockResponse();
       const next = createMockNext();
 
@@ -978,7 +1029,8 @@ describe('Admin Controller', () => {
         salesOwnerId: 'sales-001',
         salesOwnerName: 'Sales Person',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
       mockGetSalesTeamMember.mockResolvedValue({
         lineUserId: 'sales-001',
         name: 'Sales Person',
@@ -1007,7 +1059,8 @@ describe('Admin Controller', () => {
         clickedAt: '2024-01-15T11:00:00.000Z',
         closedAt: '2024-01-16T10:00:00.000Z',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -1029,7 +1082,8 @@ describe('Admin Controller', () => {
         salesOwnerName: 'Sales Person',
         leadUUID: 'lead_abc-123',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       mockGetStatusHistory.mockResolvedValue([
         {
@@ -1084,7 +1138,8 @@ describe('Admin Controller', () => {
         salesOwnerId: 'sales-001',
         leadUUID: 'lead_sort-test',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       // Return entries in ascending order (oldest first)
       mockGetStatusHistory.mockResolvedValue([
@@ -1127,7 +1182,8 @@ describe('Admin Controller', () => {
         contactedAt: '2024-01-15T10:00:00.000Z',
         closedAt: '2024-01-16T10:00:00.000Z',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -1160,7 +1216,8 @@ describe('Admin Controller', () => {
         lostAt: '2024-01-13T11:00:00.000Z',
         unreachableAt: '2024-01-14T12:00:00.000Z',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -1185,7 +1242,8 @@ describe('Admin Controller', () => {
         date: '2024-01-10T08:00:00.000Z',
         contactedAt: '2024-01-11T09:00:00.000Z',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -1215,7 +1273,8 @@ describe('Admin Controller', () => {
         contactedAt: contactedDate.toISOString(),
         closedAt: closedDate.toISOString(),
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -1236,7 +1295,8 @@ describe('Admin Controller', () => {
         contactedAt: null,
         closedAt: '2026-01-16T10:00:00.000Z',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -1262,7 +1322,8 @@ describe('Admin Controller', () => {
         contactedAt: contactedDate.toISOString(),
         closedAt: closedDate.toISOString(),
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -1283,7 +1344,8 @@ describe('Admin Controller', () => {
         province: 'กรุงเทพมหานคร',
         fullAddress: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110',
       });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 
@@ -1304,7 +1366,8 @@ describe('Admin Controller', () => {
 
       // Legacy lead without grounding fields
       const lead = createSampleLead({ rowNumber: 5 });
-      mockGetRow.mockResolvedValue(lead);
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
 
       await getLeadById(req, res, next);
 

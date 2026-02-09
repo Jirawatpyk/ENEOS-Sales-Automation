@@ -94,6 +94,7 @@ vi.mock('../utils/logger.js', () => ({
     debug: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    log: vi.fn(),
   },
   webhookLogger: {
     info: vi.fn(),
@@ -119,20 +120,32 @@ vi.mock('../utils/logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+  logRequest: vi.fn(),
+  createModuleLogger: vi.fn(() => ({
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  })),
 }));
 
 // Mock services - inline to avoid hoisting issues
 vi.mock('../services/sheets.service.js', () => ({
   sheetsService: {
     healthCheck: vi.fn().mockResolvedValue({ healthy: true, latency: 50 }),
-    addLead: vi.fn().mockResolvedValue(1),
-    getRow: vi.fn().mockResolvedValue(null),
     checkDuplicate: vi.fn().mockResolvedValue(false),
     markAsProcessed: vi.fn().mockResolvedValue(undefined),
-    claimLead: vi.fn().mockResolvedValue({ success: true, lead: {} }),
     getSalesTeamMember: vi.fn().mockResolvedValue(null),
   },
   SheetsService: vi.fn(),
+}));
+
+vi.mock('../services/leads.service.js', () => ({
+  addLead: vi.fn().mockResolvedValue({ id: 'lead-uuid-1', version: 1, created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z' }),
+  getLeadById: vi.fn().mockResolvedValue(null),
+  claimLead: vi.fn().mockResolvedValue({ success: true, lead: {}, alreadyClaimed: false, isNewClaim: true }),
+  getAllLeads: vi.fn().mockResolvedValue([]),
+  supabaseLeadToLeadRow: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock('../services/gemini.service.js', () => ({
@@ -171,7 +184,7 @@ vi.mock('../services/deduplication.service.js', () => ({
   deduplicationService: {
     checkAndMark: vi.fn().mockResolvedValue(false),
     isDuplicate: vi.fn().mockResolvedValue(false),
-    getStats: vi.fn().mockReturnValue({ cacheSize: 0, hits: 0, misses: 0 }),
+    getStats: vi.fn().mockReturnValue({ enabled: true, backend: 'supabase' }),
   },
 }));
 

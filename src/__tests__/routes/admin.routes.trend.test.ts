@@ -15,15 +15,17 @@ import type { LeadRow } from '../../types/index.js';
 // ===========================================
 
 // Use vi.hoisted for proper mock hoisting
-const { mockSheetsService } = vi.hoisted(() => {
+const { mockSheetsService, mockLeadsService } = vi.hoisted(() => {
   const mockSheetsService = {
-    getAllLeads: vi.fn().mockResolvedValue([]),
     getSalesTeamMember: vi.fn().mockResolvedValue(null),
   };
-  return { mockSheetsService };
+  const mockLeadsService = {
+    getAllLeads: vi.fn().mockResolvedValue([]),
+  };
+  return { mockSheetsService, mockLeadsService };
 });
 
-// Mock logger first
+// Mock logger first (including createModuleLogger used by leads.service)
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -31,12 +33,21 @@ vi.mock('../../utils/logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+  createModuleLogger: vi.fn(() => ({
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  })),
 }));
 
 // Mock sheetsService with hoisted mocks
 vi.mock('../../services/sheets.service.js', () => ({
   sheetsService: mockSheetsService,
 }));
+
+// Mock leadsService (getAllLeads moved from sheetsService)
+vi.mock('../../services/leads.service.js', () => mockLeadsService);
 
 // Mock admin-auth middleware to bypass Google OAuth
 vi.mock('../../middleware/admin-auth.js', () => ({
@@ -125,7 +136,7 @@ describe('GET /api/admin/sales-performance/trend (Integration)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSheetsService.getAllLeads.mockResolvedValue([]);
+    mockLeadsService.getAllLeads.mockResolvedValue([]);
     mockSheetsService.getSalesTeamMember.mockResolvedValue(null);
     app = createTestApp();
   });
@@ -210,7 +221,7 @@ describe('GET /api/admin/sales-performance/trend (Integration)', () => {
   describe('Data Aggregation via HTTP', () => {
     it('should aggregate leads by date correctly', async () => {
       const yesterday = getDateISO(-1);
-      mockSheetsService.getAllLeads.mockResolvedValue([
+      mockLeadsService.getAllLeads.mockResolvedValue([
         createSampleLead({ salesOwnerId: 'sales-001', status: 'claimed', date: yesterday }),
         createSampleLead({ rowNumber: 3, salesOwnerId: 'sales-001', status: 'closed', date: yesterday, closedAt: yesterday }),
         createSampleLead({ rowNumber: 4, salesOwnerId: 'sales-002', status: 'claimed', date: yesterday }),
@@ -235,7 +246,7 @@ describe('GET /api/admin/sales-performance/trend (Integration)', () => {
 
     it('should calculate team average correctly', async () => {
       const yesterday = getDateISO(-1);
-      mockSheetsService.getAllLeads.mockResolvedValue([
+      mockLeadsService.getAllLeads.mockResolvedValue([
         // User 1: 2 leads
         createSampleLead({ salesOwnerId: 'sales-001', status: 'claimed', date: yesterday }),
         createSampleLead({ rowNumber: 3, salesOwnerId: 'sales-001', status: 'claimed', date: yesterday }),
@@ -293,7 +304,7 @@ describe('GET /api/admin/sales-performance/trend (Integration)', () => {
   describe('Error Handling', () => {
     it('should handle service errors gracefully with empty data', async () => {
       // Note: getAllLeads() catches errors internally and returns empty array (graceful degradation)
-      mockSheetsService.getAllLeads.mockRejectedValue(new Error('Database connection failed'));
+      mockLeadsService.getAllLeads.mockRejectedValue(new Error('Database connection failed'));
 
       const response = await request(app)
         .get('/api/admin/sales-performance/trend')

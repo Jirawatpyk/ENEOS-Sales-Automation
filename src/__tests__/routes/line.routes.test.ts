@@ -52,12 +52,9 @@ vi.mock('../../services/line.service.js', () => ({
   },
 }));
 
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
-    claimLead: (...args: unknown[]) => mockClaimLead(...args),
-    findLeadByUUID: (...args: unknown[]) => mockFindLeadByUUID(...args),
-    getRow: (...args: unknown[]) => mockGetRow(...args),
-  },
+vi.mock('../../services/leads.service.js', () => ({
+  getLeadById: (...args: unknown[]) => mockFindLeadByUUID(...args),
+  claimLead: (...args: unknown[]) => mockClaimLead(...args),
 }));
 
 vi.mock('../../services/dead-letter-queue.service.js', () => ({
@@ -542,26 +539,35 @@ describe('LINE Routes', () => {
     beforeEach(() => {
       mockVerifySignature.mockReturnValue(true);
       mockIsPostbackEvent.mockReturnValue(true);
-      mockParsePostbackData.mockReturnValue({ action: 'contacted', rowId: 42 });
+      mockParsePostbackData.mockReturnValue({ action: 'contacted', leadId: '550e8400-e29b-41d4-a716-446655440000' });
+      mockFindLeadByUUID.mockResolvedValue({ id: '550e8400-e29b-41d4-a716-446655440000', company: 'Test', customer_name: 'Customer' });
       mockClaimLead.mockResolvedValue({
         isNewClaim: true,
+        alreadyClaimed: false,
         lead: { company: 'Test', customerName: 'Customer' },
       });
     });
 
-    it('[P2] should handle user source type', async () => {
-      // GIVEN: Event from direct user message
+    it('[P2] should handle user source type via UUID leadId', async () => {
+      // GIVEN: Event from direct user message with UUID leadId
       const event = {
         type: 'postback',
         replyToken: 'token-123',
         source: { type: 'user', userId: 'U123' },
-        postback: { data: 'action=contacted&row_id=42' },
+        postback: { data: 'action=contacted&lead_id=550e8400-e29b-41d4-a716-446655440000' },
       };
       mockValidateLineWebhook.mockReturnValue({
         success: true,
         data: { events: [event] },
       });
       mockGetUserProfile.mockResolvedValue({ displayName: 'Direct User' });
+      mockFindLeadByUUID.mockResolvedValue({ id: '550e8400-e29b-41d4-a716-446655440000', company: 'Test' });
+      mockClaimLead.mockResolvedValue({
+        success: true,
+        lead: { company: 'Test', customerName: 'Customer' },
+        alreadyClaimed: false,
+        isNewClaim: true,
+      });
 
       // WHEN: POST with user source event
       await request(app)
@@ -573,23 +579,30 @@ describe('LINE Routes', () => {
       // Give async processing time
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // THEN: getUserProfile is called
+      // THEN: getUserProfile is called (parallel with getLeadById)
       expect(mockGetUserProfile).toHaveBeenCalledWith('U123');
     });
 
-    it('[P2] should handle group source type', async () => {
-      // GIVEN: Event from group
+    it('[P2] should handle group source type via UUID leadId', async () => {
+      // GIVEN: Event from group with UUID leadId
       const event = {
         type: 'postback',
         replyToken: 'token-123',
         source: { type: 'group', groupId: 'G123', userId: 'U123' },
-        postback: { data: 'action=contacted&row_id=42' },
+        postback: { data: 'action=contacted&lead_id=550e8400-e29b-41d4-a716-446655440000' },
       };
       mockValidateLineWebhook.mockReturnValue({
         success: true,
         data: { events: [event] },
       });
       mockGetGroupMemberProfile.mockResolvedValue({ displayName: 'Group User' });
+      mockFindLeadByUUID.mockResolvedValue({ id: '550e8400-e29b-41d4-a716-446655440000', company: 'Test' });
+      mockClaimLead.mockResolvedValue({
+        success: true,
+        lead: { company: 'Test', customerName: 'Customer' },
+        alreadyClaimed: false,
+        isNewClaim: true,
+      });
 
       // WHEN: POST with group source event
       await request(app)
@@ -601,7 +614,7 @@ describe('LINE Routes', () => {
       // Give async processing time
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // THEN: getGroupMemberProfile is called
+      // THEN: getGroupMemberProfile is called (parallel with getLeadById)
       expect(mockGetGroupMemberProfile).toHaveBeenCalledWith('G123', 'U123');
     });
   });

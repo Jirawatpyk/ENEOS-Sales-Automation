@@ -1,283 +1,144 @@
 /**
- * ENEOS Sales Automation - Deduplication Service
- * Prevents duplicate lead processing with Redis + in-memory fallback + Google Sheets persistence
+ * ENEOS Sales Automation - Deduplication Service (Supabase)
+ * Prevents duplicate lead processing via DB constraint (INSERT ON CONFLICT DO NOTHING)
+ * Story 9-1a: Simplified from 3-tier cache (Redis → Memory → Sheet) to single Supabase call
  */
 
-import { sheetsService } from './sheets.service.js';
+import { supabase } from '../lib/supabase.js';
 import { dedupLogger as logger } from '../utils/logger.js';
 import { config } from '../config/index.js';
-import { createDedupKey, normalizeEmail } from '../utils/email-parser.js';
-import { DuplicateLeadError } from '../types/index.js';
-import { redisService, REDIS_KEYS } from './redis.service.js';
+import { normalizeEmail } from '../utils/email-parser.js';
+import { DuplicateLeadError, AppError } from '../types/index.js';
 
 // ===========================================
-// In-Memory Cache for Fallback
+// Dedup Key Builder (ADR-002 format)
 // ===========================================
 
-interface CacheEntry {
-  processedAt: Date;
-  expiresAt: Date;
+/**
+ * Build dedup key in new format: lead:{email}:{source}
+ * Replaces old format: email_source (from email-parser.ts createDedupKey)
+ */
+export function buildDedupKey(email: string, source: string): string {
+  return `lead:${normalizeEmail(email)}:${source || 'unknown'}`;
 }
 
-// Cache TTL: 24 hours (leads from same campaign within 24 hours are considered duplicates)
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const CACHE_TTL_SECONDS = 24 * 60 * 60; // 24 hours in seconds for Redis
-
 // ===========================================
-// Main Service Class
+// Exported Service Functions
 // ===========================================
 
-export class DeduplicationService {
-  private cache: Map<string, CacheEntry>;
-  private readonly enabled: boolean;
-
-  constructor() {
-    this.cache = new Map();
-    this.enabled = config.features.deduplication;
-
-    // Start cache cleanup interval (only needed when Redis is unavailable)
-    if (this.enabled) {
-      this.startCacheCleanup();
-    }
-  }
-
-  /**
-   * Check if a lead is duplicate and process if new
-   * Returns true if duplicate, false if new (and marks as processed)
-   *
-   * Priority:
-   * 1. Redis (if available) - distributed cache
-   * 2. In-memory cache - fallback
-   * 3. Google Sheets - persistent storage
-   */
-  async checkAndMark(email: string, leadSource: string): Promise<boolean> {
-    if (!this.enabled) {
-      logger.debug('Deduplication disabled, allowing all leads');
-      return false;
-    }
-
-    const normalizedEmail = normalizeEmail(email);
-    const key = createDedupKey(normalizedEmail, leadSource);
-    const redisKey = REDIS_KEYS.dedupKey(key);
-
-    logger.debug('Checking deduplication', { key, redisAvailable: redisService.isAvailable() });
-
-    // Fast path 1: Check Redis if available
-    if (redisService.isAvailable()) {
-      const existsInRedis = await redisService.exists(redisKey);
-      if (existsInRedis) {
-        logger.info('Duplicate found in Redis', { key });
-        return true;
-      }
-    }
-
-    // Fast path 2: Check in-memory cache (fallback or additional layer)
-    if (this.isInCache(key)) {
-      logger.info('Duplicate found in memory cache', { key });
-      // Also add to Redis if available (sync caches)
-      if (redisService.isAvailable()) {
-        await redisService.set(redisKey, new Date().toISOString(), CACHE_TTL_SECONDS);
-      }
-      return true;
-    }
-
-    // Slow path: check Google Sheets
-    const existsInSheet = await sheetsService.checkDuplicate(key);
-
-    if (existsInSheet) {
-      // Add to caches for faster future lookups
-      await this.addToCaches(key);
-      logger.info('Duplicate found in Google Sheets', { key });
-      return true;
-    }
-
-    // Not a duplicate - mark as processed
-    await this.markAsProcessed(key, normalizedEmail, leadSource);
-
-    logger.info('New lead processed', { key });
+/**
+ * Check if a lead is duplicate and mark as processed if new (AC #2)
+ * Uses INSERT ON CONFLICT DO NOTHING — if row returned → new, if empty → duplicate
+ *
+ * @returns true if duplicate, false if new (and marked as processed)
+ */
+export async function checkAndMark(email: string, source: string): Promise<boolean> {
+  if (!config.features.deduplication) {
+    logger.debug('Deduplication disabled, allowing all leads');
     return false;
   }
 
-  /**
-   * Check if duplicate and throw error if true
-   */
-  async checkOrThrow(email: string, leadSource: string): Promise<void> {
-    const isDuplicate = await this.checkAndMark(email, leadSource);
+  const key = buildDedupKey(email, source);
 
-    if (isDuplicate) {
-      throw new DuplicateLeadError(email, leadSource);
-    }
-  }
+  logger.debug('Checking deduplication', { key });
 
-  /**
-   * Check only (without marking)
-   */
-  async isDuplicate(email: string, leadSource: string): Promise<boolean> {
-    if (!this.enabled) {
-      return false;
-    }
-
-    const normalizedEmail = normalizeEmail(email);
-    const key = createDedupKey(normalizedEmail, leadSource);
-    const redisKey = REDIS_KEYS.dedupKey(key);
-
-    // Check Redis first
-    if (redisService.isAvailable()) {
-      const existsInRedis = await redisService.exists(redisKey);
-      if (existsInRedis) {
-        return true;
-      }
-    }
-
-    // Check in-memory cache
-    if (this.isInCache(key)) {
-      return true;
-    }
-
-    // Check Google Sheets
-    return sheetsService.checkDuplicate(key);
-  }
-
-  // ===========================================
-  // Private Methods
-  // ===========================================
-
-  /**
-   * Check if key exists in in-memory cache and is not expired
-   */
-  private isInCache(key: string): boolean {
-    const entry = this.cache.get(key);
-
-    if (!entry) {
-      return false;
-    }
-
-    if (new Date() > entry.expiresAt) {
-      // Entry expired, remove from cache
-      this.cache.delete(key);
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Add key to all available caches
-   */
-  private async addToCaches(key: string): Promise<void> {
-    const now = new Date();
-
-    // Add to in-memory cache
-    this.cache.set(key, {
-      processedAt: now,
-      expiresAt: new Date(now.getTime() + CACHE_TTL_MS),
-    });
-
-    // Add to Redis if available
-    if (redisService.isAvailable()) {
-      const redisKey = REDIS_KEYS.dedupKey(key);
-      await redisService.set(redisKey, now.toISOString(), CACHE_TTL_SECONDS);
-    }
-  }
-
-  /**
-   * Mark lead as processed (all caches + Google Sheets)
-   */
-  private async markAsProcessed(
-    key: string,
-    email: string,
-    leadSource: string
-  ): Promise<void> {
-    // Add to caches immediately
-    await this.addToCaches(key);
-
-    // Persist to Google Sheets (async, don't wait)
-    sheetsService.markAsProcessed(key, email, leadSource).catch((error) => {
-      logger.error('Failed to persist dedup record to sheets', {
+  const { data, error } = await supabase
+    .from('dedup_log')
+    .upsert(
+      {
         key,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    });
+        info: normalizeEmail(email),
+        source: source || 'unknown',
+        processed_at: new Date().toISOString(),
+      },
+      { onConflict: 'key', ignoreDuplicates: true }
+    )
+    .select();
+
+  if (error) {
+    logger.error('Dedup check failed', { error, key });
+    throw new AppError(
+      `Deduplication check failed: ${error.message}`,
+      500,
+      'DB_ERROR'
+    );
   }
 
-  /**
-   * Start periodic in-memory cache cleanup
-   * Note: Redis handles TTL automatically, so this is only for in-memory
-   */
-  private startCacheCleanup(): void {
-    // Cleanup every 5 minutes
-    setInterval(() => {
-      const now = new Date();
-      let cleanedCount = 0;
+  // If data has rows, the insert succeeded → new lead
+  // If data is empty, the row already existed → duplicate
+  const isDuplicate = !data || data.length === 0;
 
-      for (const [key, entry] of this.cache.entries()) {
-        if (now > entry.expiresAt) {
-          this.cache.delete(key);
-          cleanedCount++;
-        }
-      }
-
-      if (cleanedCount > 0) {
-        logger.debug('In-memory cache cleanup completed', {
-          cleaned: cleanedCount,
-          remaining: this.cache.size,
-        });
-      }
-    }, 5 * 60 * 1000);
+  if (isDuplicate) {
+    logger.info('Duplicate found', { key });
+  } else {
+    logger.info('New lead processed', { key });
   }
 
-  // ===========================================
-  // Cache Management
-  // ===========================================
+  return isDuplicate;
+}
 
-  /**
-   * Get current in-memory cache size
-   */
-  getCacheSize(): number {
-    return this.cache.size;
-  }
+/**
+ * Check if duplicate and throw DuplicateLeadError if true (AC #2)
+ */
+export async function checkOrThrow(email: string, source: string): Promise<void> {
+  const duplicate = await checkAndMark(email, source);
 
-  /**
-   * Clear entire in-memory cache (use with caution)
-   */
-  clearCache(): void {
-    const size = this.cache.size;
-    this.cache.clear();
-    logger.warn('Deduplication in-memory cache cleared', { clearedEntries: size });
-  }
-
-  /**
-   * Preload cache from Google Sheets (for startup)
-   */
-  async preloadCache(_limit: number = 1000): Promise<void> {
-    logger.info('Preloading deduplication cache from Google Sheets');
-
-    try {
-      // This would require adding a method to fetch recent dedup entries
-      // For now, we'll just log the intention
-      logger.info('Cache preload not implemented - will populate on demand');
-    } catch (error) {
-      logger.error('Failed to preload cache', { error });
-    }
-  }
-
-  /**
-   * Health check / Stats
-   */
-  getStats(): {
-    enabled: boolean;
-    memoryCacheSize: number;
-    redisAvailable: boolean;
-    cacheTtlMs: number;
-  } {
-    return {
-      enabled: this.enabled,
-      memoryCacheSize: this.cache.size,
-      redisAvailable: redisService.isAvailable(),
-      cacheTtlMs: CACHE_TTL_MS,
-    };
+  if (duplicate) {
+    throw new DuplicateLeadError(email, source);
   }
 }
 
-// Export singleton instance
-export const deduplicationService = new DeduplicationService();
+/**
+ * Check if duplicate without marking (AC #2)
+ * SELECT 1 FROM dedup_log WHERE key = $1
+ */
+export async function isDuplicate(email: string, source: string): Promise<boolean> {
+  if (!config.features.deduplication) {
+    return false;
+  }
+
+  const key = buildDedupKey(email, source);
+
+  const { data, error } = await supabase
+    .from('dedup_log')
+    .select('key')
+    .eq('key', key)
+    .maybeSingle();
+
+  if (error) {
+    logger.error('Dedup check failed', { error, key });
+    throw new AppError(
+      `Deduplication check failed: ${error.message}`,
+      500,
+      'DB_ERROR'
+    );
+  }
+
+  return data !== null;
+}
+
+/**
+ * Health check / Stats (AC #7)
+ */
+export function getStats(): {
+  enabled: boolean;
+  backend: string;
+} {
+  return {
+    enabled: config.features.deduplication,
+    backend: 'supabase',
+  };
+}
+
+// ===========================================
+// Backward-compatible singleton export
+// Callers (app.ts, webhook.controller.ts) import { deduplicationService }
+// These files are NOT in scope for this story — keep working
+// ===========================================
+
+export const deduplicationService = {
+  checkAndMark,
+  checkOrThrow,
+  isDuplicate,
+  getStats,
+};

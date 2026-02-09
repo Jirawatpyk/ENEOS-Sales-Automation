@@ -105,6 +105,8 @@ function rowToLead(row: string[], rowNumber: number): LeadRow {
     salesOwnerId: row[9] || null,
     salesOwnerName: row[10] || null,
     campaignId: row[11] || '',
+    workflowId: row[11] || '', // same as campaignId (backward compat)
+    brevoCampaignId: null, // not available in Google Sheets
     campaignName: row[12] || '',
     emailSubject: row[13] || '',
     source: row[14] || '',
@@ -1499,6 +1501,8 @@ export class SheetsService {
             salesOwnerId: null,
             salesOwnerName: null,
             campaignId: '',
+            workflowId: '',
+            brevoCampaignId: null,
             campaignName: '',
             emailSubject: '',
             source: '',

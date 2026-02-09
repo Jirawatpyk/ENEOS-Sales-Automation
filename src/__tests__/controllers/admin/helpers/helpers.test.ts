@@ -5,11 +5,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LeadRow } from '../../../../types/index.js';
 
-// Mock sheets service before importing helpers
-vi.mock('../../../../services/sheets.service.js', () => ({
-  sheetsService: {
-    getAllLeads: vi.fn(),
-  },
+// Mock leads service (filter.helpers now uses leadsService instead of sheetsService)
+vi.mock('../../../../services/leads.service.js', () => ({
+  getAllLeads: vi.fn(),
 }));
 
 vi.mock('../../../../utils/logger.js', () => ({

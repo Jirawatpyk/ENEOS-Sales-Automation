@@ -84,6 +84,7 @@ describe('LINE Controller', () => {
   let verifyLineSignature: typeof import('../../controllers/line.controller.js').verifyLineSignature;
   let leadsService: typeof import('../../services/leads.service.js');
   let lineService: typeof import('../../services/line.service.js').lineService;
+  let salesTeamService: typeof import('../../services/sales-team.service.js');
 
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
@@ -96,11 +97,13 @@ describe('LINE Controller', () => {
     const lineController = await import('../../controllers/line.controller.js');
     const leadsModule = await import('../../services/leads.service.js');
     const lineModule = await import('../../services/line.service.js');
+    const salesTeamModule = await import('../../services/sales-team.service.js');
 
     handleLineWebhook = lineController.handleLineWebhook;
     verifyLineSignature = lineController.verifyLineSignature;
     leadsService = leadsModule;
     lineService = lineModule.lineService;
+    salesTeamService = salesTeamModule;
 
     // Setup default mocks
     vi.mocked(lineService.getGroupMemberProfile).mockResolvedValue(mockLineProfile);
@@ -211,6 +214,11 @@ describe('LINE Controller', () => {
         'วิภา รักงาน',
         'contacted'
       );
+      // ensureSalesTeamMember called on new claim (fire-and-forget)
+      expect(salesTeamService.ensureSalesTeamMember).toHaveBeenCalledWith(
+        'U123456789',
+        'วิภา รักงาน',
+      );
     });
 
     it('should handle already claimed lead', async () => {
@@ -234,6 +242,8 @@ describe('LINE Controller', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(lineService.replyClaimed).toHaveBeenCalled();
+      // ensureSalesTeamMember NOT called when already claimed
+      expect(salesTeamService.ensureSalesTeamMember).not.toHaveBeenCalled();
     });
 
     it('should ignore non-postback events', async () => {

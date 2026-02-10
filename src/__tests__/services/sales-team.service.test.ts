@@ -40,6 +40,7 @@ vi.mock('../../utils/logger.js', () => ({
 
 // Import after mocks
 import {
+  ensureSalesTeamMember,
   getSalesTeamMember,
   getUserByEmail,
   getSalesTeamAll,
@@ -89,6 +90,63 @@ describe('Sales Team Service (Supabase)', () => {
     for (const key of Object.keys(mockSupabase)) {
       mockSupabase[key].mockReturnValue(mockSupabase);
     }
+  });
+
+  // =========================================
+  // ensureSalesTeamMember()
+  // =========================================
+
+  describe('ensureSalesTeamMember', () => {
+    it('should upsert new member with line_user_id and name only', async () => {
+      mockSupabase.upsert.mockResolvedValueOnce({ data: null, error: null });
+
+      await ensureSalesTeamMember('U_NEW_USER', 'New Sales');
+
+      expect(mockSupabase.from).toHaveBeenCalledWith('sales_team');
+      expect(mockSupabase.upsert).toHaveBeenCalledWith(
+        { line_user_id: 'U_NEW_USER', name: 'New Sales' },
+        { onConflict: 'line_user_id' },
+      );
+    });
+
+    it('should not throw on duplicate (upsert updates name)', async () => {
+      mockSupabase.upsert.mockResolvedValueOnce({ data: null, error: null });
+
+      await expect(ensureSalesTeamMember('U_EXISTING', 'Updated Name')).resolves.toBeUndefined();
+    });
+
+    it('should log warning on Supabase error and not throw', async () => {
+      mockSupabase.upsert.mockResolvedValueOnce({
+        data: null,
+        error: { code: '42P01', message: 'relation does not exist' },
+      });
+
+      await expect(ensureSalesTeamMember('U_ERR', 'Error User')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Failed to ensure sales team member',
+        expect.objectContaining({ lineUserId: 'U_ERR' }),
+      );
+    });
+
+    it('should catch unexpected exceptions and not throw', async () => {
+      mockSupabase.upsert.mockRejectedValueOnce(new Error('Network timeout'));
+
+      await expect(ensureSalesTeamMember('U_CRASH', 'Crash User')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'ensureSalesTeamMember failed (non-fatal)',
+        expect.objectContaining({ lineUserId: 'U_CRASH', error: 'Network timeout' }),
+      );
+    });
+
+    it('should handle non-Error exceptions gracefully', async () => {
+      mockSupabase.upsert.mockRejectedValueOnce('string error');
+
+      await expect(ensureSalesTeamMember('U_STR', 'Str Err')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'ensureSalesTeamMember failed (non-fatal)',
+        expect.objectContaining({ error: 'Unknown' }),
+      );
+    });
   });
 
   // =========================================

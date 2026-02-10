@@ -137,7 +137,7 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
         userId,
         error: profileError instanceof Error ? profileError.message : 'Unknown error',
       });
-      return userId.substring(0, 10) + '...';
+      return userId;
     }
   };
 
@@ -195,11 +195,11 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       return;
     }
 
-    // Ensure LINE user exists in sales_team (fire-and-forget)
-    ensureSalesTeamMember(userId, userName).catch(() => {});
-
     // Check if this is a NEW claim or owner updating status
     if (result.isNewClaim) {
+      // Ensure LINE user exists in sales_team (fire-and-forget, only on first claim)
+      ensureSalesTeamMember(userId, userName).catch(() => {});
+
       // First time claim - show success message
       leadsClaimedTotal.inc({ status: 'contacted' });
       await lineService.replySuccess(

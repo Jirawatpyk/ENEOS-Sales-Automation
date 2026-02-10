@@ -66,7 +66,7 @@ export async function exportData(
     }
 
     if (campaign) {
-      filteredLeads = filteredLeads.filter((lead) => lead.campaignId === campaign);
+      filteredLeads = filteredLeads.filter((lead) => (lead.brevoCampaignId || lead.campaignId) === campaign);
     }
 
     // Limit to MAX_ROWS
@@ -77,7 +77,6 @@ export async function exportData(
     // Prepare data based on type
     if (type === 'leads' || type === 'all') {
       dataToExport = filteredLeads.map((lead) => ({
-        'Row': lead.rowNumber,
         'Company': lead.company,
         'DBD Sector': lead.dbdSector || '',
         'Industry': lead.industryAI,
@@ -140,7 +139,7 @@ export async function exportData(
 
         // Set column widths (safe: only for columns present in current export)
         const columnWidthMap: Record<string, number> = {
-          'Row': 8, 'Company': 25, 'DBD Sector': 15, 'Industry': 20,
+          'Company': 25, 'DBD Sector': 15, 'Industry': 20,
           'Juristic ID': 18, 'Capital': 15, 'Location': 20, 'Full Address': 40,
           'Contact Name': 20, 'Phone': 15, 'Email': 25, 'Job Title': 20,
           'Website': 30, 'Lead Source': 15, 'Status': 12, 'Sales Owner': 20,

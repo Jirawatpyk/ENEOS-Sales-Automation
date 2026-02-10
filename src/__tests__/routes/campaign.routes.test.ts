@@ -21,14 +21,11 @@ const { mockGetAllCampaignStats, mockGetCampaignStatsById, mockGetCampaignEvents
 }));
 
 vi.mock('../../services/campaign-stats.service.js', () => ({
-  campaignStatsService: {
-    recordCampaignEvent: mockRecordCampaignEvent,
-    healthCheck: vi.fn().mockResolvedValue({ healthy: true, latency: 10 }),
-    getAllCampaignStats: mockGetAllCampaignStats,
-    getCampaignStatsById: mockGetCampaignStatsById,
-    getCampaignEvents: mockGetCampaignEvents,
-  },
-  CampaignStatsService: vi.fn(),
+  recordCampaignEvent: mockRecordCampaignEvent,
+  healthCheck: vi.fn().mockResolvedValue({ healthy: true, latency: 10 }),
+  getAllCampaignStats: mockGetAllCampaignStats,
+  getCampaignStatsById: mockGetCampaignStatsById,
+  getCampaignEvents: mockGetCampaignEvents,
 }));
 
 const { mockGetUserByEmail } = vi.hoisted(() => ({
@@ -36,10 +33,8 @@ const { mockGetUserByEmail } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../services/sales-team.service.js', () => ({
-  salesTeamService: {
-    getSalesTeamMember: vi.fn().mockResolvedValue(null),
-    getUserByEmail: mockGetUserByEmail,
-  },
+  getSalesTeamMember: vi.fn().mockResolvedValue(null),
+  getUserByEmail: mockGetUserByEmail,
 }));
 
 // Mock Google Auth for admin routes
@@ -94,10 +89,8 @@ vi.mock('../../services/dead-letter-queue.service.js', () => ({
 }));
 
 vi.mock('../../services/deduplication.service.js', () => ({
-  deduplicationService: {
-    getStats: vi.fn().mockReturnValue({ total: 0 }),
-    checkOrThrow: vi.fn().mockResolvedValue(undefined),
-  },
+  getStats: vi.fn().mockReturnValue({ total: 0 }),
+  checkOrThrow: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../lib/supabase.js', () => ({

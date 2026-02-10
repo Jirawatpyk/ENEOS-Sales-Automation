@@ -19,9 +19,7 @@ const { mockAddFailedCampaignWebhook } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../services/campaign-stats.service.js', () => ({
-  campaignStatsService: {
-    recordCampaignEvent: mockRecordCampaignEvent,
-  },
+  recordCampaignEvent: mockRecordCampaignEvent,
 }));
 
 vi.mock('../../services/dead-letter-queue.service.js', () => ({

@@ -10,7 +10,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { campaignLogger as logger } from '../../utils/logger.js';
-import { campaignStatsService } from '../../services/campaign-stats.service.js';
+import { getAllCampaignStats, getCampaignStatsById, getCampaignEvents as getCampaignEventsService } from '../../services/campaign-stats.service.js';
 import {
   safeValidateCampaignStatsQuery,
   safeValidateCampaignEventsQuery,
@@ -63,7 +63,7 @@ export async function getCampaignStats(
     });
 
     // Get campaign stats from service
-    const result = await campaignStatsService.getAllCampaignStats({
+    const result = await getAllCampaignStats({
       page,
       limit,
       search,
@@ -129,7 +129,7 @@ export async function getCampaignById(
     });
 
     // Get campaign stats from service
-    const campaign = await campaignStatsService.getCampaignStatsById(campaignId);
+    const campaign = await getCampaignStatsById(campaignId);
 
     if (!campaign) {
       res.status(404).json({
@@ -211,7 +211,7 @@ export async function getCampaignEvents(
     });
 
     // First check if campaign exists
-    const campaign = await campaignStatsService.getCampaignStatsById(campaignId);
+    const campaign = await getCampaignStatsById(campaignId);
     if (!campaign) {
       res.status(404).json({
         success: false,
@@ -225,7 +225,7 @@ export async function getCampaignEvents(
     }
 
     // Get campaign events from service
-    const result = await campaignStatsService.getCampaignEvents(campaignId, {
+    const result = await getCampaignEventsService(campaignId, {
       page,
       limit,
       event,

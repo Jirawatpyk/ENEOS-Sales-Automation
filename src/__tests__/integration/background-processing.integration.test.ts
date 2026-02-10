@@ -41,9 +41,10 @@ vi.mock('../../services/line.service.js', () => ({
 }));
 
 vi.mock('../../services/deduplication.service.js', () => ({
-  deduplicationService: {
-    checkOrThrow: mockCheckOrThrow,
-  },
+  checkOrThrow: mockCheckOrThrow,
+  checkAndMark: vi.fn(),
+  isDuplicate: vi.fn(),
+  getStats: vi.fn(),
 }));
 
 vi.mock('../../services/dead-letter-queue.service.js', () => ({

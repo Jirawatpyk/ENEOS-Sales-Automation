@@ -5,7 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { webhookLogger as logger } from '../utils/logger.js';
-import { deduplicationService } from '../services/deduplication.service.js';
+import { checkOrThrow } from '../services/deduplication.service.js';
 import { addFailedBrevoWebhook } from '../services/dead-letter-queue.service.js';
 import { processLeadAsync } from '../services/background-processor.service.js';
 import { processingStatusService } from '../services/processing-status.service.js';
@@ -72,7 +72,7 @@ export async function handleBrevoWebhook(
 
     // Step 3: Check for duplicates (using email + leadSource)
     try {
-      await deduplicationService.checkOrThrow(payload.email, payload.leadSource);
+      await checkOrThrow(payload.email, payload.leadSource);
     } catch (error) {
       if (error instanceof DuplicateLeadError) {
         duplicateLeadsTotal.inc();

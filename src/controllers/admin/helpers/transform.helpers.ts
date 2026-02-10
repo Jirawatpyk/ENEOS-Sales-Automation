@@ -50,7 +50,7 @@ export function leadRowToLeadItem(lead: LeadRow): LeadItem {
         }
       : null,
     campaign: {
-      id: lead.campaignId,
+      id: lead.brevoCampaignId || lead.campaignId,
       name: lead.campaignName,
     },
     source: lead.source,

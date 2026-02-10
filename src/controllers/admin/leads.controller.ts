@@ -5,9 +5,9 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../utils/logger.js';
-import { salesTeamService } from '../../services/sales-team.service.js';
-import { statusHistoryService } from '../../services/status-history.service.js';
-import { campaignStatsService } from '../../services/campaign-stats.service.js';
+import { getSalesTeamMember } from '../../services/sales-team.service.js';
+import { getStatusHistory } from '../../services/status-history.service.js';
+import { getCampaignEventsByEmail } from '../../services/campaign-stats.service.js';
 import * as leadsService from '../../services/leads.service.js';
 import {
   AdminApiResponse,
@@ -204,9 +204,9 @@ export async function getLeadById(
     // Get status history + campaign events in parallel (Story 9-5)
     const [historyEntries, campaignEvents] = await Promise.all([
       supabaseLead
-        ? statusHistoryService.getStatusHistory(supabaseLead.id)
+        ? getStatusHistory(supabaseLead.id)
         : Promise.resolve([]),
-      campaignStatsService.getCampaignEventsByEmail(lead.email).catch((err) => {
+      getCampaignEventsByEmail(lead.email).catch((err) => {
         logger.warn('Failed to fetch campaign events for lead', { err, leadId });
         return [] as LeadCampaignEvent[];
       }),
@@ -323,7 +323,7 @@ export async function getLeadById(
     // ดึงข้อมูล sales team member สำหรับ owner detail
     let ownerDetail = null;
     if (lead.salesOwnerId) {
-      const salesMember = await salesTeamService.getSalesTeamMember(lead.salesOwnerId);
+      const salesMember = await getSalesTeamMember(lead.salesOwnerId);
       if (salesMember) {
         ownerDetail = {
           id: salesMember.lineUserId,
@@ -355,7 +355,7 @@ export async function getLeadById(
           }
         : null),
       campaign: {
-        id: lead.campaignId,
+        id: lead.brevoCampaignId || lead.campaignId,
         name: lead.campaignName,
         subject: lead.emailSubject,
       },

@@ -32,7 +32,7 @@ import campaignRoutes from './routes/campaign.routes.js';
 import { checkSupabaseHealth } from './lib/supabase.js';
 import { geminiService } from './services/gemini.service.js';
 import { lineService } from './services/line.service.js';
-import { deduplicationService } from './services/deduplication.service.js';
+import { getStats } from './services/deduplication.service.js';
 import { deadLetterQueue } from './services/dead-letter-queue.service.js';
 import { HealthCheckResponse } from './types/index.js';
 import swaggerUi from 'swagger-ui-express';
@@ -331,7 +331,7 @@ app.use('/api/leads/status', statusRoutes);
 if (config.isDev) {
   app.get('/stats', (_req, res) => {
     res.json({
-      deduplication: deduplicationService.getStats(),
+      deduplication: getStats(),
       deadLetterQueue: deadLetterQueue.getStats(),
       uptime: process.uptime(),
       memory: process.memoryUsage(),

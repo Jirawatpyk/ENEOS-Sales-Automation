@@ -62,14 +62,25 @@ export interface NormalizedCampaignEvent {
  * Converts: "campaign name" → campaignName, camp_id → campaignId, etc.
  */
 export function normalizeCampaignEventPayload(input: CampaignEventInput): NormalizedCampaignEvent {
+  // Resolve event timestamp: prefer date_event, fallback to ts_event (unix)
+  let eventAt = input.date_event || '';
+  if (!eventAt && input.ts_event) {
+    eventAt = new Date(input.ts_event * 1000).toISOString();
+  }
+
+  let sentAt = input.date_sent || '';
+  if (!sentAt && input.ts_sent) {
+    sentAt = new Date(input.ts_sent * 1000).toISOString();
+  }
+
   return {
     eventId: input.id,
     campaignId: input.camp_id,
     campaignName: input['campaign name'] || '',
     email: input.email.toLowerCase().trim(),
     event: input.event,
-    eventAt: input.date_event || '',
-    sentAt: input.date_sent || '',
+    eventAt,
+    sentAt,
     url: input.URL || '',
     tag: input.tag || '',
     segmentIds: input.segment_ids || [],

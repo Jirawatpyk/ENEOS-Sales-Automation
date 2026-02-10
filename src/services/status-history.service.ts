@@ -147,14 +147,17 @@ export async function getAllStatusHistory(options: {
   // Map results
   const result = (entries || []).map(row => {
     const lead = leadsMap.get(row.lead_id);
+    const leadRow = lead ? supabaseLeadToLeadRow(lead) : undefined;
     return {
+      id: row.id,
       leadUUID: row.lead_id,
+      rowNumber: leadRow?.rowNumber ?? 0,
       status: row.status as LeadStatus,
       changedById: row.changed_by_id || '',
       changedByName: row.changed_by_name || '',
       timestamp: row.created_at,
       notes: row.notes || undefined,
-      lead: lead ? supabaseLeadToLeadRow(lead) : undefined,
+      lead: leadRow,
     };
   });
 
@@ -165,12 +168,3 @@ export async function getAllStatusHistory(options: {
   };
 }
 
-// ===========================================
-// Compatibility Wrapper
-// ===========================================
-
-export const statusHistoryService = {
-  addStatusHistory,
-  getStatusHistory,
-  getAllStatusHistory,
-};

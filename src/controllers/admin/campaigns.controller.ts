@@ -68,10 +68,12 @@ export async function getCampaigns(
 
     const campaignMap = new Map<string, LeadRow[]>();
     leads.forEach((lead) => {
-      if (!campaignMap.has(lead.campaignId)) {
-        campaignMap.set(lead.campaignId, []);
+      // Use brevoCampaignId (actual campaign) instead of campaignId (workflow_id)
+      const key = lead.brevoCampaignId || lead.campaignId;
+      if (!campaignMap.has(key)) {
+        campaignMap.set(key, []);
       }
-      campaignMap.get(lead.campaignId)?.push(lead);
+      campaignMap.get(key)?.push(lead);
     });
 
     // สร้าง campaign items
@@ -116,7 +118,7 @@ export async function getCampaigns(
 
       return {
         id,
-        name: campaignLeads[0].campaignName,
+        name: campaignLeads.find((l) => l.campaignName)?.campaignName || id,
         subject: campaignLeads[0].emailSubject,
         startDate: startDateCampaign.toISOString(),
         stats: {
@@ -260,7 +262,7 @@ export async function getCampaignDetail(
     });
 
     const allLeads = await getAllLeads();
-    const campaignLeads = allLeads.filter((lead) => lead.campaignId === campaignId);
+    const campaignLeads = allLeads.filter((lead) => (lead.brevoCampaignId || lead.campaignId) === campaignId);
 
     if (campaignLeads.length === 0) {
       res.status(404).json({

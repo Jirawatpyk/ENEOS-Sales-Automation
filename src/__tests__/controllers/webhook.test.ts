@@ -14,9 +14,7 @@ import { mockLeadRow } from '../mocks/leads.mock.js';
 
 // Mock all services
 vi.mock('../../services/deduplication.service.js', () => ({
-  deduplicationService: {
-    checkOrThrow: vi.fn(),
-  },
+  checkOrThrow: vi.fn(),
 }));
 
 vi.mock('../../services/background-processor.service.js', () => ({
@@ -77,7 +75,7 @@ vi.mock('../../services/dead-letter-queue.service.js', () => ({
 describe('Webhook Controller', () => {
   let handleBrevoWebhook: typeof import('../../controllers/webhook.controller.js').handleBrevoWebhook;
   let verifyWebhook: typeof import('../../controllers/webhook.controller.js').verifyWebhook;
-  let deduplicationService: typeof import('../../services/deduplication.service.js').deduplicationService;
+  let checkOrThrow: typeof import('../../services/deduplication.service.js').checkOrThrow;
   let processLeadAsync: typeof import('../../services/background-processor.service.js').processLeadAsync;
   let processingStatusService: typeof import('../../services/processing-status.service.js').processingStatusService;
 
@@ -96,12 +94,12 @@ describe('Webhook Controller', () => {
 
     handleBrevoWebhook = webhookController.handleBrevoWebhook;
     verifyWebhook = webhookController.verifyWebhook;
-    deduplicationService = dedupModule.deduplicationService;
+    checkOrThrow = dedupModule.checkOrThrow;
     processLeadAsync = bgProcessorModule.processLeadAsync;
     processingStatusService = statusModule.processingStatusService;
 
     // Setup mocks
-    vi.mocked(deduplicationService.checkOrThrow).mockResolvedValue(undefined);
+    vi.mocked(checkOrThrow).mockResolvedValue(undefined);
     vi.mocked(processLeadAsync).mockReturnValue(undefined);
     vi.mocked(processingStatusService.create).mockReturnValue(undefined);
 
@@ -123,7 +121,7 @@ describe('Webhook Controller', () => {
         mockNext
       );
 
-      expect(deduplicationService.checkOrThrow).toHaveBeenCalled();
+      expect(checkOrThrow).toHaveBeenCalled();
       expect(processingStatusService.create).toHaveBeenCalled();
       expect(processLeadAsync).toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -146,7 +144,7 @@ describe('Webhook Controller', () => {
         mockNext
       );
 
-      expect(deduplicationService.checkOrThrow).not.toHaveBeenCalled();
+      expect(checkOrThrow).not.toHaveBeenCalled();
       expect(processLeadAsync).not.toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -165,7 +163,7 @@ describe('Webhook Controller', () => {
         mockNext
       );
 
-      expect(deduplicationService.checkOrThrow).not.toHaveBeenCalled();
+      expect(checkOrThrow).not.toHaveBeenCalled();
       expect(processLeadAsync).not.toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -194,7 +192,7 @@ describe('Webhook Controller', () => {
 
     it('should handle duplicate lead gracefully', async () => {
       const { DuplicateLeadError } = await import('../../types/index.js');
-      vi.mocked(deduplicationService.checkOrThrow).mockRejectedValue(
+      vi.mocked(checkOrThrow).mockRejectedValue(
         new DuplicateLeadError('test@example.com', '12345')
       );
 
@@ -249,7 +247,7 @@ describe('Webhook Controller', () => {
     it('should add to DLQ when validation or deduplication throws error', async () => {
       const { addFailedBrevoWebhook } = await import('../../services/dead-letter-queue.service.js');
       const genericError = new Error('Database connection failed');
-      vi.mocked(deduplicationService.checkOrThrow).mockRejectedValueOnce(genericError);
+      vi.mocked(checkOrThrow).mockRejectedValueOnce(genericError);
 
       mockReq = { body: mockBrevoClickPayload, requestId: 'req-test-123' };
 
@@ -346,7 +344,7 @@ describe('Webhook Controller', () => {
 
     it('should increment duplicateLeadsTotal when duplicate detected', async () => {
       const { DuplicateLeadError } = await import('../../types/index.js');
-      vi.mocked(deduplicationService.checkOrThrow).mockRejectedValue(
+      vi.mocked(checkOrThrow).mockRejectedValue(
         new DuplicateLeadError('test@example.com', '12345')
       );
 

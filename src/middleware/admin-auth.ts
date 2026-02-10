@@ -7,7 +7,7 @@ import { Request, Response, NextFunction } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../types/index.js';
-import { salesTeamService } from '../services/sales-team.service.js';
+import { getUserByEmail } from '../services/sales-team.service.js';
 
 // ===========================================
 // Types
@@ -300,7 +300,7 @@ export const requireViewer = requireRole(['admin', 'viewer']);
 async function getUserRole(email: string): Promise<UserRole> {
   try {
     // ลองดึงจาก Supabase ก่อน
-    const user = await salesTeamService.getUserByEmail(email);
+    const user = await getUserByEmail(email);
 
     if (user) {
       // Check if user is inactive - reject login

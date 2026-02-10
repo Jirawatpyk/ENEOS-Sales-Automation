@@ -56,22 +56,24 @@ describe('Supabase Client Module', () => {
 
   describe('checkSupabaseHealth', () => {
     it('should return true when connection is healthy', async () => {
-      mockClient.rpc.mockResolvedValue({ data: 'PostgreSQL 15.1', error: null });
+      const mockSelect = vi.fn().mockResolvedValue({ data: null, error: null, count: 1 });
+      mockClient.from.mockReturnValue({ select: mockSelect });
 
       const result = await checkSupabaseHealth();
       expect(result).toBe(true);
-      expect(mockClient.rpc).toHaveBeenCalledWith('version');
+      expect(mockClient.from).toHaveBeenCalledWith('sales_team');
     });
 
-    it('should return false when rpc returns error', async () => {
-      mockClient.rpc.mockResolvedValue({ data: null, error: { message: 'connection error' } });
+    it('should return false when query returns error', async () => {
+      const mockSelect = vi.fn().mockResolvedValue({ data: null, error: { message: 'connection error' } });
+      mockClient.from.mockReturnValue({ select: mockSelect });
 
       const result = await checkSupabaseHealth();
       expect(result).toBe(false);
     });
 
     it('should return false when exception is thrown', async () => {
-      mockClient.rpc.mockImplementation(() => {
+      mockClient.from.mockImplementation(() => {
         throw new Error('Network error');
       });
 

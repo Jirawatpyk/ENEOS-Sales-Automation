@@ -45,12 +45,12 @@ vi.mock('../../config/index.js', () => ({
 // ===========================================
 
 import {
-  campaignStatsService,
   recordCampaignEvent,
   getAllCampaignStats,
   getCampaignStatsById,
   getCampaignEvents,
   getCampaignEventsByEmail,
+  healthCheck,
 } from '../../services/campaign-stats.service.js';
 
 // ===========================================
@@ -415,8 +415,9 @@ describe('CampaignStatsService (Supabase)', () => {
 
       await getAllCampaignStats({ dateFrom: '2026-01-15', dateTo: '2026-01-30' });
 
-      expect(mockSupabase.gte).toHaveBeenCalledWith('first_event', '2026-01-15');
-      expect(mockSupabase.lte).toHaveBeenCalledWith('first_event', '2026-01-30');
+      // Overlap logic: last_updated >= dateFrom AND first_event <= dateTo (Bangkok EOD)
+      expect(mockSupabase.gte).toHaveBeenCalledWith('last_updated', '2026-01-15');
+      expect(mockSupabase.lte).toHaveBeenCalledWith('first_event', '2026-01-30T16:59:59.999Z');
     });
 
     it('should apply sorting', async () => {
@@ -658,7 +659,7 @@ describe('CampaignStatsService (Supabase)', () => {
       await getCampaignEvents(100, { dateFrom: '2026-01-15', dateTo: '2026-01-30' });
 
       expect(mockSupabase.gte).toHaveBeenCalledWith('event_at', '2026-01-15');
-      expect(mockSupabase.lte).toHaveBeenCalledWith('event_at', '2026-01-30');
+      expect(mockSupabase.lte).toHaveBeenCalledWith('event_at', '2026-01-30T16:59:59.999Z');
     });
 
     it('should apply pagination', async () => {
@@ -872,17 +873,17 @@ describe('CampaignStatsService (Supabase)', () => {
   });
 
   // ===========================================
-  // Compatibility Wrapper Tests
+  // Named Exports Tests
   // ===========================================
 
-  describe('campaignStatsService (compatibility wrapper)', () => {
-    it('should export all required methods', () => {
-      expect(campaignStatsService.recordCampaignEvent).toBe(recordCampaignEvent);
-      expect(campaignStatsService.getAllCampaignStats).toBe(getAllCampaignStats);
-      expect(campaignStatsService.getCampaignStatsById).toBe(getCampaignStatsById);
-      expect(campaignStatsService.getCampaignEvents).toBe(getCampaignEvents);
-      expect(campaignStatsService.getCampaignEventsByEmail).toBe(getCampaignEventsByEmail);
-      expect(campaignStatsService.healthCheck).toBeDefined();
+  describe('named exports', () => {
+    it('should export all required functions', () => {
+      expect(typeof recordCampaignEvent).toBe('function');
+      expect(typeof getAllCampaignStats).toBe('function');
+      expect(typeof getCampaignStatsById).toBe('function');
+      expect(typeof getCampaignEvents).toBe('function');
+      expect(typeof getCampaignEventsByEmail).toBe('function');
+      expect(typeof healthCheck).toBe('function');
     });
   });
 
@@ -900,7 +901,7 @@ describe('CampaignStatsService (Supabase)', () => {
         error: null,
       });
 
-      const result = await campaignStatsService.healthCheck();
+      const result = await healthCheck();
 
       expect(result.healthy).toBe(true);
       expect(result.latency).toBeGreaterThanOrEqual(0);
@@ -915,7 +916,7 @@ describe('CampaignStatsService (Supabase)', () => {
         error: { message: 'Service unavailable' },
       });
 
-      const result = await campaignStatsService.healthCheck();
+      const result = await healthCheck();
 
       expect(result.healthy).toBe(false);
       expect(result.latency).toBeGreaterThanOrEqual(0);
@@ -927,7 +928,7 @@ describe('CampaignStatsService (Supabase)', () => {
 
       mockSupabase.limit.mockRejectedValueOnce(new Error('Connection refused'));
 
-      const result = await campaignStatsService.healthCheck();
+      const result = await healthCheck();
 
       expect(result.healthy).toBe(false);
     });

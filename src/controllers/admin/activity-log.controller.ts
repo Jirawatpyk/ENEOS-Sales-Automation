@@ -9,7 +9,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
-import { statusHistoryService } from '../../services/status-history.service.js';
+import { getAllStatusHistory } from '../../services/status-history.service.js';
 import { VALID_LEAD_STATUSES } from '../../types/index.js';
 import { leadRowToLeadItem } from './helpers/transform.helpers.js';
 
@@ -91,7 +91,7 @@ export async function getActivityLog(
     }
 
     // Fetch activity log from status history service
-    const result = await statusHistoryService.getAllStatusHistory({
+    const result = await getAllStatusHistory({
       page,
       limit,
       from,

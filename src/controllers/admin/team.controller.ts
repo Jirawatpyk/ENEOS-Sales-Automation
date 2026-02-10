@@ -5,7 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../utils/logger.js';
-import { salesTeamService } from '../../services/sales-team.service.js';
+import { getSalesTeamAll } from '../../services/sales-team.service.js';
 import { AdminApiResponse } from '../../types/admin.types.js';
 
 /**
@@ -21,7 +21,7 @@ export async function getSalesTeam(
   try {
     logger.info('getSalesTeam called', { user: req.user?.email });
 
-    const salesTeam = await salesTeamService.getSalesTeamAll();
+    const salesTeam = await getSalesTeamAll();
 
     // Transform to frontend format
     const teamMembers = salesTeam.map((member) => ({

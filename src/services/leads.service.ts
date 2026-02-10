@@ -5,7 +5,7 @@
  */
 
 import { supabase } from '../lib/supabase.js';
-import { statusHistoryService } from './status-history.service.js';
+import { addStatusHistory } from './status-history.service.js';
 import { createModuleLogger } from '../utils/logger.js';
 import { normalizeEmail } from '../utils/email-parser.js';
 import {
@@ -50,7 +50,7 @@ export async function addLead(lead: Partial<Lead>): Promise<SupabaseLead> {
   }
 
   // Fire-and-forget: write status history to Supabase
-  statusHistoryService.addStatusHistory({
+  addStatusHistory({
     leadUUID: data.id,
     status: 'new',
     changedById: 'System',
@@ -192,7 +192,7 @@ export async function claimLead(
 
   if (updated && !error) {
     // Fire-and-forget: write status history to Supabase
-    statusHistoryService.addStatusHistory({
+    addStatusHistory({
       leadUUID: id,
       status,
       changedById: salesUserId,
@@ -264,7 +264,7 @@ export async function updateLeadStatus(
   );
 
   // Fire-and-forget: write status history to Supabase
-  statusHistoryService.addStatusHistory({
+  addStatusHistory({
     leadUUID: id,
     status: newStatus,
     changedById: salesUserId,
@@ -343,8 +343,14 @@ export async function getLeadsWithPagination(
   }
 
   if (filters.endDate) {
-    countQuery = countQuery.lte('created_at', filters.endDate);
-    dataQuery = dataQuery.lte('created_at', filters.endDate);
+    // Append end-of-day Bangkok time when endDate is date-only (YYYY-MM-DD)
+    // Bangkok = UTC+7, so 23:59:59 Bangkok = 16:59:59 UTC
+    // Without this, '2026-02-10' = midnight UTC, excluding all leads created during the day
+    const endDateValue = filters.endDate.length === 10
+      ? `${filters.endDate}T16:59:59.999Z`
+      : filters.endDate;
+    countQuery = countQuery.lte('created_at', endDateValue);
+    dataQuery = dataQuery.lte('created_at', endDateValue);
   }
 
   if (filters.search) {
@@ -570,15 +576,15 @@ export async function getAllLeads(): Promise<LeadRow[]> {
 }
 
 /**
- * Lookup campaign ID for an email from campaign_events (AC #6)
- * Returns most recent campaign_id or null
+ * Lookup campaign info for an email from campaign_events (AC #6)
+ * Returns most recent campaign_id + campaign_name, or null
  */
-export async function lookupCampaignId(email: string): Promise<string | null> {
+export async function lookupCampaignId(email: string): Promise<{ campaignId: string; campaignName: string } | null> {
   const normalized = normalizeEmail(email);
 
   const { data, error } = await supabase
     .from('campaign_events')
-    .select('campaign_id')
+    .select('campaign_id, campaign_name')
     .eq('email', normalized)
     .order('event_at', { ascending: false })
     .limit(1)
@@ -593,7 +599,9 @@ export async function lookupCampaignId(email: string): Promise<string | null> {
     );
   }
 
-  return data ? (data as { campaign_id: string }).campaign_id : null;
+  if (!data) {return null;}
+  const row = data as { campaign_id: string; campaign_name: string | null };
+  return { campaignId: row.campaign_id, campaignName: row.campaign_name || '' };
 }
 
 /**

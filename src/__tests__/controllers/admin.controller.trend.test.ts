@@ -38,16 +38,14 @@ vi.mock('../../utils/logger.js', () => ({
 
 // Mock salesTeamService (extracted from sheets.service)
 vi.mock('../../services/sales-team.service.js', () => ({
-  salesTeamService: mockSalesTeamService,
+  ...mockSalesTeamService,
 }));
 
-// Mock statusHistoryService (extracted from sheets.service)
+// Mock status-history.service (extracted from sheets.service)
 vi.mock('../../services/status-history.service.js', () => ({
-  statusHistoryService: {
-    getStatusHistory: vi.fn().mockResolvedValue([]),
-    addStatusHistory: vi.fn().mockResolvedValue(undefined),
-    getAllStatusHistory: vi.fn().mockResolvedValue({ entries: [], total: 0, changedByOptions: [] }),
-  },
+  getStatusHistory: vi.fn().mockResolvedValue([]),
+  addStatusHistory: vi.fn().mockResolvedValue(undefined),
+  getAllStatusHistory: vi.fn().mockResolvedValue({ entries: [], total: 0, changedByOptions: [] }),
 }));
 
 // Mock leadsService (getAllLeads moved from sheetsService)

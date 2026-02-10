@@ -67,7 +67,7 @@ export function filterByOwner(leads: LeadRow[], owner: string): LeadRow[] {
  * กรอง leads ตาม campaign
  */
 export function filterByCampaign(leads: LeadRow[], campaign: string): LeadRow[] {
-  return leads.filter((lead) => lead.campaignId === campaign);
+  return leads.filter((lead) => (lead.brevoCampaignId || lead.campaignId) === campaign);
 }
 
 /**

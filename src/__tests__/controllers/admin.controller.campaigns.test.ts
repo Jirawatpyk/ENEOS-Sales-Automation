@@ -67,6 +67,8 @@ const createSampleLead = (overrides: Partial<LeadRow> = {}): LeadRow => ({
   salesOwnerId: null,
   salesOwnerName: null,
   campaignId: 'campaign-001',
+  workflowId: 'campaign-001',
+  brevoCampaignId: null,
   campaignName: 'Q1 Promotion',
   emailSubject: 'Test Subject',
   source: 'Brevo',
@@ -77,6 +79,16 @@ const createSampleLead = (overrides: Partial<LeadRow> = {}): LeadRow => ({
   closedAt: null,
   lostAt: null,
   unreachableAt: null,
+  leadSource: null,
+  jobTitle: null,
+  city: null,
+  leadUUID: null,
+  createdAt: null,
+  updatedAt: null,
+  contactedAt: null,
+  juristicId: null,
+  dbdSector: null,
+  province: null,
   version: 1,
   ...overrides,
 });
@@ -126,6 +138,31 @@ describe('Admin Controller - Campaigns', () => {
       expect(response.data.totals.closed).toBe(2);
       expect(response.data.period).toBeDefined();
       expect(response.data.period.type).toBe('quarter');
+    });
+
+    it('should group by brevoCampaignId when available (same workflow_id, different campaigns)', async () => {
+      // All leads share workflow_id "11" but have different brevoCampaignId
+      const mockLeads: LeadRow[] = [
+        createSampleLead({ campaignId: '11', workflowId: '11', brevoCampaignId: '150', campaignName: 'Oil Solutions', status: 'new' }),
+        createSampleLead({ campaignId: '11', workflowId: '11', brevoCampaignId: '200', campaignName: 'Lubricant Promo', status: 'new', rowNumber: 3 }),
+        createSampleLead({ campaignId: '11', workflowId: '11', brevoCampaignId: '300', campaignName: 'Industrial Q1', status: 'closed', rowNumber: 4 }),
+      ];
+
+      mockGetAllLeads.mockResolvedValue(mockLeads);
+
+      const req = createMockRequest({ query: { period: 'quarter' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await getCampaigns(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.success).toBe(true);
+      // Should be 3 campaigns (grouped by brevoCampaignId), not 1 (grouped by workflow_id)
+      expect(response.data.campaigns.length).toBe(3);
+      expect(response.data.totals.campaigns).toBe(3);
+      const names = response.data.campaigns.map((c: { name: string }) => c.name).sort();
+      expect(names).toEqual(['Industrial Q1', 'Lubricant Promo', 'Oil Solutions']);
     });
 
     it('should filter campaigns by period', async () => {

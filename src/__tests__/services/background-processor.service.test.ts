@@ -127,7 +127,7 @@ describe('Background Processor Service', () => {
 
     // Setup default mock responses
     mockAnalyzeCompany.mockResolvedValue(mockAIAnalysis);
-    mockLookupCampaignId.mockResolvedValue('campaign-abc-123');
+    mockLookupCampaignId.mockResolvedValue({ campaignId: 'campaign-abc-123', campaignName: 'Campaign ABC' });
     mockAddLead.mockResolvedValue({
       id: 'lead-uuid-123',
       version: 1,
@@ -227,7 +227,7 @@ describe('Background Processor Service', () => {
       });
       mockLookupCampaignId.mockImplementation(async () => {
         callOrder.push('lookupCampaignId');
-        return 'campaign-abc-123';
+        return { campaignId: 'campaign-abc-123', campaignName: 'Campaign ABC' };
       });
       mockAddLead.mockImplementation(async () => {
         callOrder.push('addLead');
@@ -266,9 +266,9 @@ describe('Background Processor Service', () => {
           industryAI: 'Technology',
           status: 'new',
           workflowId: '12345',
-          campaignId: '12345',
+          campaignId: 'campaign-abc-123',
           brevoCampaignId: 'campaign-abc-123',
-          campaignName: 'Test Campaign',
+          campaignName: 'Campaign ABC',
           source: 'Brevo',
         })
       );
@@ -451,7 +451,7 @@ describe('Background Processor Service', () => {
     it('should run Gemini and lookupCampaignId in parallel', async () => {
       const correlationId = '550e8400-e29b-41d4-a716-446655440000';
       mockAnalyzeCompany.mockResolvedValue(mockAIAnalysis);
-      mockLookupCampaignId.mockResolvedValue('campaign-123');
+      mockLookupCampaignId.mockResolvedValue({ campaignId: 'campaign-123', campaignName: 'Test Campaign' });
 
       await processLeadInBackground(mockPayload, correlationId);
 
@@ -459,12 +459,13 @@ describe('Background Processor Service', () => {
       expect(mockAnalyzeCompany).toHaveBeenCalledWith('example.com', 'Test Corp');
       expect(mockLookupCampaignId).toHaveBeenCalledWith(mockPayload.email);
 
-      // Lead should have workflowId, campaignId (backward compat), and brevoCampaignId
+      // Lead should have workflowId, campaignId from lookup, and brevoCampaignId
       expect(mockAddLead).toHaveBeenCalledWith(
         expect.objectContaining({
           workflowId: mockPayload.campaignId,
-          campaignId: mockPayload.campaignId,
+          campaignId: 'campaign-123',
           brevoCampaignId: 'campaign-123',
+          campaignName: 'Test Campaign',
         })
       );
     });
@@ -505,7 +506,7 @@ describe('Background Processor Service', () => {
       config.features.aiEnrichment = false;
 
       const correlationId = '550e8400-e29b-41d4-a716-446655440000';
-      mockLookupCampaignId.mockResolvedValue('campaign-456');
+      mockLookupCampaignId.mockResolvedValue({ campaignId: 'campaign-456', campaignName: 'Campaign 456' });
 
       await processLeadInBackground(mockPayload, correlationId);
 
@@ -518,6 +519,7 @@ describe('Background Processor Service', () => {
         expect.objectContaining({
           industryAI: 'Unknown', // default (no AI)
           brevoCampaignId: 'campaign-456',
+          campaignName: 'Campaign 456',
         })
       );
 

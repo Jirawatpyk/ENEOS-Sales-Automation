@@ -30,9 +30,7 @@ vi.mock('../../utils/logger.js', () => ({
 }));
 
 vi.mock('../../services/deduplication.service.js', () => ({
-  deduplicationService: {
-    checkOrThrow: (...args: unknown[]) => mockCheckOrThrow(...args),
-  },
+  checkOrThrow: (...args: unknown[]) => mockCheckOrThrow(...args),
 }));
 
 vi.mock('../../services/dead-letter-queue.service.js', () => ({

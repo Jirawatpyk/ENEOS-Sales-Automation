@@ -21,7 +21,7 @@ const { mockSalesTeamService } = vi.hoisted(() => {
 });
 
 vi.mock('../../../services/sales-team.service.js', () => ({
-  salesTeamService: mockSalesTeamService,
+  ...mockSalesTeamService,
 }));
 
 import {

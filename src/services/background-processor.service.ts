@@ -61,7 +61,7 @@ export async function processLeadInBackground(
 
     // Step 1b: Run AI enrichment + campaign lookup in parallel
     const parallelStartTime = Date.now();
-    const [aiResult, brevoCampaignId] = await Promise.all([
+    const [aiResult, campaignLookup] = await Promise.all([
       config.features.aiEnrichment
         ? geminiService.analyzeCompany(domain, payload.company).catch((aiError) => {
             logger.warn('AI analysis failed, using defaults', {
@@ -86,7 +86,7 @@ export async function processLeadInBackground(
       email: payload.email,
       industry: aiAnalysis.industry,
       confidence: aiAnalysis.confidence,
-      brevoCampaignId,
+      brevoCampaignId: campaignLookup?.campaignId ?? null,
       duration: Date.now() - parallelStartTime,
     });
 
@@ -102,9 +102,9 @@ export async function processLeadInBackground(
       capital: aiAnalysis.registeredCapital,
       status: 'new',
       workflowId: payload.campaignId,
-      campaignId: payload.campaignId,
-      brevoCampaignId: brevoCampaignId,
-      campaignName: payload.campaignName,
+      campaignId: campaignLookup?.campaignId || payload.campaignId,
+      brevoCampaignId: campaignLookup?.campaignId ?? null,
+      campaignName: campaignLookup?.campaignName || payload.campaignName,
       emailSubject: payload.subject,
       source: 'Brevo',
       leadId: payload.contactId,

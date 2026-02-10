@@ -27,12 +27,12 @@ export const supabase = createClient(
 
 /**
  * Health check helper — verifies Supabase connectivity
- * Uses rpc('version') to avoid dependency on table existence (safe for first deploy)
+ * Uses a lightweight head-only query on sales_team (always exists)
  * @returns true if connection is healthy
  */
 export async function checkSupabaseHealth(): Promise<boolean> {
   try {
-    const { error } = await supabase.rpc('version');
+    const { error } = await supabase.from('sales_team').select('id', { count: 'exact', head: true });
     return !error;
   } catch {
     return false;

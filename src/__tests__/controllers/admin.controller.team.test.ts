@@ -10,9 +10,7 @@ import { Request, Response, NextFunction } from 'express';
 const mockGetSalesTeamAll = vi.fn();
 
 vi.mock('../../services/sales-team.service.js', () => ({
-  salesTeamService: {
-    getSalesTeamAll: () => mockGetSalesTeamAll(),
-  },
+  getSalesTeamAll: () => mockGetSalesTeamAll(),
 }));
 
 // Mock logger

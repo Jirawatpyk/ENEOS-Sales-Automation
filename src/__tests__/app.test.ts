@@ -124,16 +124,12 @@ vi.mock('../lib/supabase.js', () => ({
 }));
 
 vi.mock('../services/sales-team.service.js', () => ({
-  salesTeamService: {
-    getSalesTeamMember: vi.fn().mockResolvedValue(null),
-  },
+  getSalesTeamMember: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../services/status-history.service.js', () => ({
-  statusHistoryService: {
-    addStatusHistory: vi.fn().mockResolvedValue(undefined),
-    getStatusHistory: vi.fn().mockResolvedValue([]),
-  },
+  addStatusHistory: vi.fn().mockResolvedValue(undefined),
+  getStatusHistory: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../services/leads.service.js', () => ({
@@ -177,11 +173,10 @@ vi.mock('../services/line.service.js', () => ({
 }));
 
 vi.mock('../services/deduplication.service.js', () => ({
-  deduplicationService: {
-    checkAndMark: vi.fn().mockResolvedValue(false),
-    isDuplicate: vi.fn().mockResolvedValue(false),
-    getStats: vi.fn().mockReturnValue({ enabled: true, backend: 'supabase' }),
-  },
+  checkAndMark: vi.fn().mockResolvedValue(false),
+  checkOrThrow: vi.fn(),
+  isDuplicate: vi.fn().mockResolvedValue(false),
+  getStats: vi.fn().mockReturnValue({ enabled: true, backend: 'supabase' }),
 }));
 
 vi.mock('../services/dead-letter-queue.service.js', () => ({

@@ -45,9 +45,7 @@ vi.mock('../../lib/supabase.js', () => ({
 }));
 
 vi.mock('../../services/status-history.service.js', () => ({
-  statusHistoryService: {
-    addStatusHistory: vi.fn().mockResolvedValue(undefined),
-  },
+  addStatusHistory: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../utils/logger.js', () => ({
@@ -671,15 +669,15 @@ describe('leads.service', () => {
   // ===========================================
 
   describe('lookupCampaignId', () => {
-    it('should return campaign_id when found', async () => {
+    it('should return campaignId and campaignName when found', async () => {
       mockChain.maybeSingle.mockResolvedValue({
-        data: { campaign_id: 'camp-123' },
+        data: { campaign_id: 'camp-123', campaign_name: 'Test Campaign' },
         error: null,
       });
 
       const result = await lookupCampaignId('test@example.com');
 
-      expect(result).toBe('camp-123');
+      expect(result).toEqual({ campaignId: 'camp-123', campaignName: 'Test Campaign' });
       expect(mockSupabase.from).toHaveBeenCalledWith('campaign_events');
     });
 

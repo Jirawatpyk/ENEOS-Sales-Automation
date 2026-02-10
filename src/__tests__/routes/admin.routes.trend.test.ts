@@ -43,7 +43,7 @@ vi.mock('../../utils/logger.js', () => ({
 
 // Mock salesTeamService (extracted from sheets.service)
 vi.mock('../../services/sales-team.service.js', () => ({
-  salesTeamService: mockSalesTeamService,
+  ...mockSalesTeamService,
 }));
 
 // Mock leadsService (getAllLeads moved from sheetsService)

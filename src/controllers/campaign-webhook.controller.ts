@@ -8,7 +8,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { campaignLogger as logger } from '../utils/logger.js';
-import { campaignStatsService } from '../services/campaign-stats.service.js';
+import { recordCampaignEvent } from '../services/campaign-stats.service.js';
 import { addFailedBrevoWebhook } from '../services/dead-letter-queue.service.js';
 import { validateCampaignEvent } from '../validators/campaign-event.validator.js';
 import { isEventEnabled } from '../constants/campaign.constants.js';
@@ -143,7 +143,7 @@ async function processCampaignEventAsync(
     return;
   }
 
-  const result = await campaignStatsService.recordCampaignEvent(event);
+  const result = await recordCampaignEvent(event);
 
   if (result.duplicate) {
     logger.info('Duplicate event detected (async)', { eventId: event.eventId });

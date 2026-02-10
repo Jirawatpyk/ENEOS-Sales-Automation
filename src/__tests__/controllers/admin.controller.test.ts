@@ -19,21 +19,15 @@ const mockGetDistinctFilterValues = vi.fn();
 const mockGetCampaignEventsByEmail = vi.fn();
 
 vi.mock('../../services/sales-team.service.js', () => ({
-  salesTeamService: {
-    getSalesTeamMember: (id: string) => mockGetSalesTeamMember(id),
-  },
+  getSalesTeamMember: (id: string) => mockGetSalesTeamMember(id),
 }));
 
 vi.mock('../../services/status-history.service.js', () => ({
-  statusHistoryService: {
-    getStatusHistory: (leadId: string) => mockGetStatusHistory(leadId),
-  },
+  getStatusHistory: (leadId: string) => mockGetStatusHistory(leadId),
 }));
 
 vi.mock('../../services/campaign-stats.service.js', () => ({
-  campaignStatsService: {
-    getCampaignEventsByEmail: (email: string) => mockGetCampaignEventsByEmail(email),
-  },
+  getCampaignEventsByEmail: (email: string) => mockGetCampaignEventsByEmail(email),
 }));
 
 vi.mock('../../services/leads.service.js', () => ({

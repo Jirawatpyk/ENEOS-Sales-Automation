@@ -271,12 +271,15 @@ export async function getAllCampaignStats(options: {
     query = query.ilike('campaign_name', `%${escapedSearch}%`);
   }
 
-  // Apply date range filters on first_event
+  // Apply date range filters — overlap logic: show campaigns with any activity in range
+  // Campaign overlaps [dateFrom, dateTo] when: started before range ends AND last active after range starts
   if (dateFrom) {
-    query = query.gte('first_event', dateFrom);
+    query = query.gte('last_updated', dateFrom);
   }
   if (dateTo) {
-    query = query.lte('first_event', dateTo);
+    // Append Bangkok end-of-day when dateTo is date-only (23:59:59 Bangkok = 16:59:59 UTC)
+    const dateToValue = dateTo.length === 10 ? `${dateTo}T16:59:59.999Z` : dateTo;
+    query = query.lte('first_event', dateToValue);
   }
 
   // Apply sorting
@@ -367,7 +370,9 @@ export async function getCampaignEvents(
     query = query.gte('event_at', dateFrom);
   }
   if (dateTo) {
-    query = query.lte('event_at', dateTo);
+    // Append Bangkok end-of-day when dateTo is date-only (23:59:59 Bangkok = 16:59:59 UTC)
+    const dateToValue = dateTo.length === 10 ? `${dateTo}T16:59:59.999Z` : dateTo;
+    query = query.lte('event_at', dateToValue);
   }
 
   query = query.order('event_at', { ascending: false });
@@ -464,7 +469,7 @@ export async function getCampaignEventsByEmail(email: string): Promise<LeadCampa
 /**
  * Check if campaign tables are accessible
  */
-async function healthCheck(): Promise<{ healthy: boolean; latency: number }> {
+export async function healthCheck(): Promise<{ healthy: boolean; latency: number }> {
   const start = Date.now();
 
   try {
@@ -544,15 +549,3 @@ function createPaginationMeta(total: number, page: number, limit: number): Pagin
   };
 }
 
-// ===========================================
-// Compatibility Wrapper (keeps existing imports working)
-// ===========================================
-
-export const campaignStatsService = {
-  recordCampaignEvent,
-  getAllCampaignStats,
-  getCampaignStatsById,
-  getCampaignEvents,
-  getCampaignEventsByEmail,
-  healthCheck,
-};

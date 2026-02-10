@@ -14,7 +14,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
-import { salesTeamService } from '../../services/sales-team.service.js';
+import {
+  getAllSalesTeamMembers,
+  getSalesTeamMemberById as getSalesTeamMemberByIdService,
+  updateSalesTeamMember as updateSalesTeamMemberService,
+  createSalesTeamMember as createSalesTeamMemberService,
+  getUnlinkedLINEAccounts as getUnlinkedLINEAccountsService,
+  linkLINEAccount as linkLINEAccountService,
+  getUnlinkedDashboardMembers as getUnlinkedDashboardMembersService,
+} from '../../services/sales-team.service.js';
 import { formatPhone } from '../../utils/phone-formatter.js';
 import { SalesTeamFilter, SalesTeamMemberUpdate } from '../../types/index.js';
 
@@ -122,7 +130,7 @@ export async function getSalesTeamList(
       role: queryResult.data.role,
     };
 
-    const members = await salesTeamService.getAllSalesTeamMembers(filter);
+    const members = await getAllSalesTeamMembers(filter);
 
     res.status(200).json({
       success: true,
@@ -155,7 +163,7 @@ export async function getSalesTeamMemberById(
     const lineUserId = req.params.lineUserId as string;
     logger.info('getSalesTeamMemberById called', { lineUserId, user: req.user?.email });
 
-    const member = await salesTeamService.getSalesTeamMemberById(lineUserId);
+    const member = await getSalesTeamMemberByIdService(lineUserId);
 
     if (!member) {
       res.status(404).json({
@@ -230,7 +238,7 @@ export async function updateSalesTeamMember(
       updates.status = bodyResult.data.status;
     }
 
-    const updated = await salesTeamService.updateSalesTeamMember(lineUserId, updates);
+    const updated = await updateSalesTeamMemberService(lineUserId, updates);
 
     if (!updated) {
       res.status(404).json({
@@ -299,7 +307,7 @@ export async function createSalesTeamMember(
       role: bodyResult.data.role,
     };
 
-    const createdMember = await salesTeamService.createSalesTeamMember(memberData);
+    const createdMember = await createSalesTeamMemberService(memberData);
 
     res.status(201).json({
       success: true,
@@ -341,7 +349,7 @@ export async function getUnlinkedLINEAccounts(
   try {
     logger.info('getUnlinkedLINEAccounts called', { user: req.user?.email });
 
-    const unlinkedAccounts = await salesTeamService.getUnlinkedLINEAccounts();
+    const unlinkedAccounts = await getUnlinkedLINEAccountsService();
 
     res.status(200).json({
       success: true,
@@ -390,7 +398,7 @@ export async function linkLINEAccount(
     const { targetLineUserId } = bodyResult.data;
 
     // Link the LINE account
-    const updatedMember = await salesTeamService.linkLINEAccount(email, targetLineUserId);
+    const updatedMember = await linkLINEAccountService(email, targetLineUserId);
 
     if (!updatedMember) {
       res.status(404).json({
@@ -437,7 +445,7 @@ export async function getUnlinkedDashboardMembers(
   try {
     logger.info('getUnlinkedDashboardMembers called', { user: req.user?.email });
 
-    const unlinkedMembers = await salesTeamService.getUnlinkedDashboardMembers();
+    const unlinkedMembers = await getUnlinkedDashboardMembersService();
 
     res.status(200).json({
       success: true,

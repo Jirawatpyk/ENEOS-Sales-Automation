@@ -130,15 +130,3 @@ export function getStats(): {
   };
 }
 
-// ===========================================
-// Backward-compatible singleton export
-// Callers (app.ts, webhook.controller.ts) import { deduplicationService }
-// These files are NOT in scope for this story — keep working
-// ===========================================
-
-export const deduplicationService = {
-  checkAndMark,
-  checkOrThrow,
-  isDuplicate,
-  getStats,
-};

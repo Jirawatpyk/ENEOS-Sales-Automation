@@ -5,7 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../utils/logger.js';
-import { salesTeamService } from '../../services/sales-team.service.js';
+import { getSalesTeamMember } from '../../services/sales-team.service.js';
 import { parseDateFromSheets } from '../../utils/date-formatter.js';
 import {
   AdminApiResponse,
@@ -153,7 +153,7 @@ export async function getSalesPerformance(
       }));
 
       // ดึงข้อมูล sales member
-      const salesMember = await salesTeamService.getSalesTeamMember(salesId);
+      const salesMember = await getSalesTeamMember(salesId);
 
       team.push({
         id: salesId,
@@ -398,7 +398,7 @@ export async function getSalesPerformanceTrend(
     });
 
     // ดึงข้อมูล sales member
-    const salesMember = await salesTeamService.getSalesTeamMember(userId);
+    const salesMember = await getSalesTeamMember(userId);
 
     // Check if user has any leads in the period
     const totalUserClaimed = dailyData.reduce((sum, d) => sum + d.claimed, 0);

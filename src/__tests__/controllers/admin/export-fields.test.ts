@@ -142,8 +142,8 @@ const parseCSVRow = (csvOutput: string, rowIndex: number): Record<string, string
   return record;
 };
 
-// Backend exports 23 columns for leads - update if backend adds/removes columns
-const BACKEND_LEAD_COLUMN_COUNT = 23;
+// Backend exports 22 columns for leads - update if backend adds/removes columns
+const BACKEND_LEAD_COLUMN_COUNT = 22;
 
 // ===========================================
 // Tests
@@ -230,8 +230,8 @@ describe('Story 6-5: Backend Column Filtering', () => {
   describe('AC#9: Backward Compatibility', () => {
     // GIVEN `fields` param is missing
     // WHEN generating CSV
-    // THEN export all 23 columns (backward compatible)
-    it('should export all 23 columns when fields param is missing', async () => {
+    // THEN export all 22 columns (backward compatible)
+    it('should export all 22 columns when fields param is missing', async () => {
       const req = createMockRequest({
         format: 'csv',
         // No fields param
@@ -248,7 +248,7 @@ describe('Story 6-5: Backend Column Filtering', () => {
       expect(headers).toContain('Company');
       expect(headers).toContain('Email');
       expect(headers).toContain('Status');
-      expect(headers).toContain('Row');
+      expect(headers).not.toContain('Row');
       expect(headers).toContain('Full Address');
     });
   });

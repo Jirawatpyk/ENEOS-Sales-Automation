@@ -314,19 +314,3 @@ export async function getUnlinkedDashboardMembers(): Promise<SalesTeamMemberFull
   return (data || []).map(mapToSalesTeamMemberFull);
 }
 
-// ===========================================
-// Compatibility Wrapper
-// ===========================================
-
-export const salesTeamService = {
-  getSalesTeamMember,
-  getUserByEmail,
-  getSalesTeamAll,
-  getAllSalesTeamMembers,
-  getSalesTeamMemberById,
-  updateSalesTeamMember,
-  createSalesTeamMember,
-  getUnlinkedLINEAccounts,
-  linkLINEAccount,
-  getUnlinkedDashboardMembers,
-};

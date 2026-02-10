@@ -509,7 +509,7 @@ describe('Admin Controller - Export', () => {
   // ===========================================
 
   describe('Story 0-15: Export with Grounding Fields', () => {
-    it('should export all 23 columns in correct order', async () => {
+    it('should export all 22 columns in correct order', async () => {
       const { default: ExcelJS } = await import('exceljs');
 
       const mockLeads: LeadRow[] = [
@@ -546,7 +546,6 @@ describe('Admin Controller - Export', () => {
       const headers = worksheet!.getRow(1).values as (string | undefined)[];
       expect(headers).toEqual([
         undefined, // Excel 1-indexed
-        'Row',
         'Company',
         'DBD Sector',
         'Industry',
@@ -572,9 +571,9 @@ describe('Admin Controller - Export', () => {
       ]);
 
       const dataRow = worksheet!.getRow(2).values as (string | number | null | undefined)[];
-      expect(dataRow[3]).toBe('F&B-M'); // DBD Sector column
-      expect(dataRow[5]).toBe('0105536049046'); // Juristic ID column
-      expect(dataRow[7]).toBe('กรุงเทพมหานคร'); // Location (province prioritized)
+      expect(dataRow[2]).toBe('F&B-M'); // DBD Sector column
+      expect(dataRow[4]).toBe('0105536049046'); // Juristic ID column
+      expect(dataRow[6]).toBe('กรุงเทพมหานคร'); // Location (province prioritized)
     });
 
     it('should handle null grounding fields with empty strings', async () => {
@@ -610,12 +609,12 @@ describe('Admin Controller - Export', () => {
       const worksheet = workbook.getWorksheet('Leads');
 
       const dataRow = worksheet!.getRow(2).values as (string | number | null | undefined)[];
-      expect(dataRow[3]).toBe(''); // DBD Sector should be empty string, not null
-      expect(dataRow[5]).toBe(''); // Juristic ID should be empty string
-      expect(dataRow[7]).toBe(''); // Location should be empty string
-      expect(dataRow[8]).toBe(''); // Full Address should be empty string
-      expect(dataRow[12]).toBe(''); // Job Title should be empty string
-      expect(dataRow[14]).toBe(''); // Lead Source should be empty string
+      expect(dataRow[2]).toBe(''); // DBD Sector should be empty string, not null
+      expect(dataRow[4]).toBe(''); // Juristic ID should be empty string
+      expect(dataRow[6]).toBe(''); // Location should be empty string
+      expect(dataRow[7]).toBe(''); // Full Address should be empty string
+      expect(dataRow[11]).toBe(''); // Job Title should be empty string
+      expect(dataRow[13]).toBe(''); // Lead Source should be empty string
     });
 
     it('should prioritize province over city in Location column', async () => {
@@ -671,7 +670,7 @@ describe('Admin Controller - Export', () => {
         const worksheet = workbook.getWorksheet('Leads');
 
         const dataRow = worksheet!.getRow(2).values as (string | number | null | undefined)[];
-        expect(dataRow[7]).toBe(testCase.expected);
+        expect(dataRow[6]).toBe(testCase.expected);
       }
     });
 

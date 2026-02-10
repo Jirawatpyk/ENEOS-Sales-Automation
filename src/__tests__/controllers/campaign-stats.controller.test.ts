@@ -22,7 +22,9 @@ const mockCampaignStatsService = vi.hoisted(() => ({
 }));
 
 vi.mock('../../services/campaign-stats.service.js', () => ({
-  campaignStatsService: mockCampaignStatsService,
+  getAllCampaignStats: mockCampaignStatsService.getAllCampaignStats,
+  getCampaignStatsById: mockCampaignStatsService.getCampaignStatsById,
+  getCampaignEvents: mockCampaignStatsService.getCampaignEvents,
 }));
 
 vi.mock('../../utils/logger.js', () => ({

@@ -64,7 +64,6 @@ import {
   isDuplicate,
   getStats,
   buildDedupKey,
-  deduplicationService,
 } from '../../services/deduplication.service.js';
 
 // ===========================================
@@ -341,16 +340,4 @@ describe('Deduplication Service (Supabase)', () => {
     });
   });
 
-  // ===========================================
-  // Backward-compatible singleton export
-  // ===========================================
-
-  describe('deduplicationService (backward compat)', () => {
-    it('should export singleton with all methods', () => {
-      expect(deduplicationService.checkAndMark).toBe(checkAndMark);
-      expect(deduplicationService.checkOrThrow).toBe(checkOrThrow);
-      expect(deduplicationService.isDuplicate).toBe(isDuplicate);
-      expect(deduplicationService.getStats).toBe(getStats);
-    });
-  });
 });

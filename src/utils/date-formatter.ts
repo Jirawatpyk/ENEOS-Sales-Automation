@@ -1,11 +1,11 @@
 /**
  * ENEOS Sales Automation - Date Formatter Utility
- * Format dates for Google Sheets in ISO 8601 format
+ * Format dates in ISO 8601 format for database storage
  * Supports parsing both legacy Thai format and ISO format
  */
 
 /**
- * Format date for Google Sheets (ISO 8601 format)
+ * Format date to ISO 8601 format
  * Output: "YYYY-MM-DDTHH:MM:SS.sssZ"
  *
  * Changed from Thai format (DD/MM/YYYY HH:MM:SS) to ISO for:
@@ -27,7 +27,7 @@ export function formatDateForSheets(date: Date | string = new Date()): string {
 }
 
 /**
- * Get current time as ISO timestamp for Google Sheets
+ * Get current time as ISO timestamp
  * @deprecated Use formatDateForSheets() or formatISOTimestamp() directly
  */
 export function getCurrentThaiTime(): string {
@@ -43,7 +43,7 @@ export function getCurrentTimestamp(): string {
 }
 
 /**
- * Parse date from Google Sheets format (Thai format) or ISO format
+ * Parse date from legacy Thai format or ISO format
  * Input: "DD/MM/YYYY HH:MM:SS" or "YYYY-MM-DDTHH:MM:SS.sssZ"
  * Output: Date object
  */
@@ -109,7 +109,7 @@ export function extractDateKey(dateStr: string): string {
 /**
  * Format date as ISO 8601 timestamp
  * Output: "2026-01-15T08:30:00.000Z"
- * Used for created_at and updated_at columns (future Supabase compatibility)
+ * Used for created_at and updated_at columns in Supabase
  */
 export function formatISOTimestamp(date: Date = new Date()): string {
   return date.toISOString();

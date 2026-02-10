@@ -22,17 +22,6 @@ const envSchema = z.object({
   // Brevo
   BREVO_WEBHOOK_SECRET: z.string().min(1, 'BREVO_WEBHOOK_SECRET is required'),
 
-  // Google
-  GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email('Invalid service account email'),
-  GOOGLE_PRIVATE_KEY: z.string().min(1, 'GOOGLE_PRIVATE_KEY is required'),
-  GOOGLE_SHEET_ID: z.string().min(1, 'GOOGLE_SHEET_ID is required'),
-  LEADS_SHEET_NAME: z.string().default('Leads'),
-  DEDUP_SHEET_NAME: z.string().default('Deduplication_Log'),
-  SALES_TEAM_SHEET_NAME: z.string().default('Sales_Team'),
-  STATUS_HISTORY_SHEET_NAME: z.string().default('Status_History'),
-  CAMPAIGN_EVENTS_SHEET_NAME: z.string().default('Campaign_Events'),
-  CAMPAIGN_STATS_SHEET_NAME: z.string().default('Campaign_Stats'),
-
   // Gemini
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_MODEL: z.string().default('gemini-1.5-flash'),
@@ -129,21 +118,6 @@ export const config = {
   // Brevo
   brevo: {
     webhookSecret: env.BREVO_WEBHOOK_SECRET,
-  },
-
-  // Google
-  google: {
-    serviceAccountEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    privateKey: env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    sheetId: env.GOOGLE_SHEET_ID,
-    sheets: {
-      leads: env.LEADS_SHEET_NAME,
-      dedup: env.DEDUP_SHEET_NAME,
-      salesTeam: env.SALES_TEAM_SHEET_NAME,
-      statusHistory: env.STATUS_HISTORY_SHEET_NAME,
-      campaignEvents: env.CAMPAIGN_EVENTS_SHEET_NAME,
-      campaignStats: env.CAMPAIGN_STATS_SHEET_NAME,
-    },
   },
 
   // Gemini AI

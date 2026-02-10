@@ -165,7 +165,7 @@ The `industry` field format has been changed from **Thai-specific descriptions**
   - `dbdSector` - DBD Sector code (e.g., "F&B-M", "MFG-A")
   - `province` - จังหวัด (e.g., "กรุงเทพมหานคร")
   - `fullAddress` - ที่อยู่เต็มของบริษัท
-- Existing leads in Google Sheets may have Thai-format industry values
+- Existing leads may have Thai-format industry values
 - New leads created after 2026-01-26 will use generic English format
 - Frontend should handle both formats gracefully during transition period
 
@@ -551,16 +551,16 @@ avgResponseTime: 45  // means 45 minutes
 avgResponseTime: 45  // NOT 45 seconds
 ```
 
-### 2. Row Number = Primary Key
+### 2. Lead UUID = Primary Key
 
-Lead ID is the row number in Google Sheets. Row 1 is the header, so valid IDs start from 2.
+Lead ID is a UUID string in format `lead_<uuid>`. Leads are identified by their `leadUuid` field in Supabase.
 
 ```typescript
 // Valid lead IDs
-lead.row >= 2
+lead.leadUuid.startsWith('lead_')
 
-// Invalid
-lead.row === 1  // This is the header row
+// Example
+lead.leadUuid = 'lead_550e8400-e29b-41d4-a716-446655440000'
 ```
 
 ### 3. SortBy Aliases

@@ -45,7 +45,7 @@ Full health check with service status.
   "timestamp": "2026-01-11T12:00:00.000Z",
   "version": "1.0.0",
   "services": {
-    "googleSheets": { "status": "up", "latency": 150 },
+    "supabase": { "status": "up", "latency": 150 },
     "geminiAI": { "status": "up", "latency": 500 },
     "lineAPI": { "status": "up", "latency": 100 }
   }
@@ -127,7 +127,7 @@ Receives webhook from **Brevo Automation** (Workflow trigger). Creates new leads
   "success": true,
   "message": "Lead processed successfully",
   "data": {
-    "rowNumber": 42,
+    "leadId": "lead_550e8400-e29b-41d4-a716-446655440000",
     "email": "customer@company.com",
     "company": "ACME Corporation",
     "industry": "Manufacturing"
@@ -235,9 +235,9 @@ Receives webhook from **Brevo Campaigns** (Email metrics). Stores events for ana
 }
 ```
 
-**Google Sheets**
-- Events stored in `Campaign_Events` sheet
-- Aggregates updated in `Campaign_Stats` sheet
+**Supabase**
+- Events stored in `campaign_events` table
+- Aggregates updated in `campaign_stats` table
 
 ---
 
@@ -266,7 +266,7 @@ Receives postback events from LINE OA.
         "userId": "Uxxxxxxxxx"
       },
       "postback": {
-        "data": "action=contacted&row_id=42"
+        "data": "action=contacted&lead_id=<uuid>"
       }
     }
   ]
@@ -403,7 +403,7 @@ Get dead letter queue events.
     {
       "id": "evt-123",
       "type": "brevo_webhook",
-      "error": "Google Sheets API error",
+      "error": "Supabase query error",
       "timestamp": "2026-01-11T12:00:00.000Z",
       "retryCount": 3,
       "payload": { ... }
@@ -639,12 +639,12 @@ Get leads with pagination and filters.
 
 ### GET /api/admin/leads/:id
 
-Get lead detail by row number.
+Get lead detail by UUID.
 
 **Parameters**
 | Param | Type | Description |
 |-------|------|-------------|
-| id | number | Row number in Google Sheets |
+| id | string | Lead UUID (e.g., `lead_550e8400-...`) |
 
 **Access:** viewer, admin
 

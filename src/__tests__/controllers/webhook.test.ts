@@ -10,7 +10,7 @@ import {
   mockInvalidPayload,
 } from '../mocks/brevo.mock.js';
 import { mockCompanyAnalysis } from '../mocks/gemini.mock.js';
-import { mockLeadRow } from '../mocks/google-sheets.mock.js';
+import { mockLeadRow } from '../mocks/leads.mock.js';
 
 // Mock all services
 vi.mock('../../services/deduplication.service.js', () => ({

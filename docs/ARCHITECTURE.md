@@ -35,7 +35,7 @@
 | Runtime | Node.js 20+ |
 | Language | TypeScript 5.x |
 | Framework | Express.js 4.x |
-| Database | Google Sheets API |
+| Database | Supabase PostgreSQL |
 | AI | Google Gemini 1.5 Flash |
 | Messaging | LINE Messaging API |
 | Cache | Redis (optional) / In-Memory |
@@ -51,7 +51,7 @@ graph TB
         Brevo[Brevo Email Platform]
         LINE[LINE Platform]
         Gemini[Google Gemini AI]
-        Sheets[Google Sheets]
+        DB[Supabase PostgreSQL]
         Google[Google OAuth]
     end
 
@@ -70,7 +70,9 @@ graph TB
         end
 
         subgraph Services
-            SheetsService[Sheets Service]
+            LeadsService[Leads Service]
+            SalesTeamService[Sales Team Service]
+            StatusHistoryService[Status History Service]
             GeminiService[Gemini + Grounding]
             LineService[LINE Service]
             CampaignStats[Campaign Stats]
@@ -93,7 +95,7 @@ graph TB
     AdminAuth --> Google
     Controllers --> Services
     Services --> Gemini
-    Services --> Sheets
+    Services --> DB
     Services --> LINE
 ```
 
@@ -110,7 +112,7 @@ sequenceDiagram
     participant V as Validator
     participant D as Dedup Service
     participant AI as Gemini AI
-    participant S as Google Sheets
+    participant S as Supabase
     participant L as LINE API
 
     B->>API: POST /webhook/brevo
@@ -127,8 +129,8 @@ sequenceDiagram
         API->>AI: Analyze Company
         AI-->>API: Industry, Talking Point
 
-        API->>S: Add Lead Row
-        S-->>API: Row Number
+        API->>S: Insert Lead
+        S-->>API: Lead UUID
 
         API->>L: Send Flex Message
         L-->>API: Success
@@ -144,12 +146,12 @@ sequenceDiagram
     participant Sales as Sales Person
     participant L as LINE App
     participant API as API Server
-    participant S as Google Sheets
+    participant S as Supabase
 
     Sales->>L: Click "รับงาน" Button
     L->>API: POST /webhook/line (Postback)
 
-    API->>S: Get Lead by Row
+    API->>S: Get Lead by UUID
     S-->>API: Lead Data
 
     alt Lead Available
@@ -198,7 +200,7 @@ sequenceDiagram
     participant BG as Background Processor
     participant Status as Status Service
     participant AI as Gemini AI
-    participant S as Google Sheets
+    participant S as Supabase
     participant L as LINE API
 
     B->>API: POST /webhook/brevo
@@ -214,8 +216,8 @@ sequenceDiagram
     BG->>AI: Analyze Company
     AI-->>BG: Industry, Talking Point
 
-    BG->>S: Add Lead Row
-    S-->>BG: Row Number
+    BG->>S: Insert Lead
+    S-->>BG: Lead UUID
 
     BG->>L: Send Flex Message
     L-->>BG: Success
@@ -255,7 +257,7 @@ sequenceDiagram
     participant S1 as Sales A
     participant S2 as Sales B
     participant API as API Server
-    participant DB as Google Sheets
+    participant DB as Supabase
 
     Note over S1,S2: Both click "รับงาน" simultaneously
 
@@ -309,11 +311,13 @@ src/
 │   ├── admin.routes.ts            # /api/admin/*
 │   └── status.routes.ts           # /api/leads/status
 ├── services/
-│   ├── sheets.service.ts          # Google Sheets CRUD
-│   ├── gemini.service.ts          # AI + Google Search Grounding
-│   ├── line.service.ts            # LINE messaging
-│   ├── campaign-stats.service.ts  # Campaign email metrics
-│   ├── deduplication.service.ts   # Prevent duplicates
+│   ├── leads.service.ts            # Lead CRUD (Supabase)
+│   ├── sales-team.service.ts       # Sales team CRUD (Supabase)
+│   ├── status-history.service.ts   # Status history (Supabase)
+│   ├── campaign-stats.service.ts   # Campaign email metrics (Supabase)
+│   ├── deduplication.service.ts    # Prevent duplicates (Supabase)
+│   ├── gemini.service.ts           # AI + Google Search Grounding
+│   ├── line.service.ts             # LINE messaging
 │   ├── dead-letter-queue.service.ts # Failed events
 │   ├── redis.service.ts           # Redis cache (optional)
 │   ├── background-processor.service.ts # Async lead processor
@@ -356,7 +360,9 @@ graph LR
     end
 
     subgraph Core Services
-        SS[Sheets Service]
+        LeadS[Leads Service]
+        STS[Sales Team Service]
+        SHS[Status History Service]
         GS[Gemini + Grounding]
         LS[LINE Service]
         CS[Campaign Stats]
@@ -375,23 +381,22 @@ graph LR
     WC --> DS
     WC --> BP
     BP --> GS
-    BP --> SS
+    BP --> LeadS
     BP --> LS
     BP --> PS
     SC --> PS
     WC --> DLQ
 
     CC --> CS
-    CS --> SS
 
-    LC --> SS
+    LC --> LeadS
     LC --> LS
 
     AC --> AA
-    AC --> SS
+    AC --> LeadS
+    AC --> STS
     AC --> CS
 
-    DS --> SS
     DS --> RS
 ```
 
@@ -412,9 +417,9 @@ graph TB
         Services[Services Layer]
     end
 
-    subgraph Google
+    subgraph External
         OAuth[Google OAuth]
-        Sheets[Google Sheets]
+        DB[Supabase PostgreSQL]
     end
 
     UI --> RQ
@@ -424,12 +429,12 @@ graph TB
     Routes --> Middleware
     Middleware --> Controller
     Controller --> Services
-    Services --> Sheets
+    Services --> DB
 ```
 
 **RBAC (Role-Based Access Control):**
 
-| Role | Sheet Value | Permissions |
+| Role | DB Value | Permissions |
 |------|-------------|-------------|
 | Admin | `admin` | Full access (export, team management) |
 | Viewer | `sales` | Read-only access |
@@ -438,114 +443,94 @@ graph TB
 
 ## Database Schema
 
-### Google Sheets Structure (6 Sheets)
+### Supabase PostgreSQL Tables (6 Tables)
 
-#### Sheet 1: Leads (Main Database) - 34 Columns
+#### Table 1: leads (Main Database)
 
-| Column | Field | Type | Description |
-|--------|-------|------|-------------|
-| A | Date | DateTime | วันที่สร้าง Lead |
-| B | Customer_Name | String | ชื่อลูกค้า |
-| C | Email | String | อีเมล |
-| D | Phone | String | เบอร์โทร |
-| E | Company | String | ชื่อบริษัท |
-| F | Industry_AI | String | อุตสาหกรรม (จาก AI) |
-| G | Website | String | เว็บไซต์ |
-| H | Capital | String | ทุนจดทะเบียน (Grounding) |
-| I | Status | Enum | new/contacted/closed/lost/unreachable |
-| J | Sales_Owner_ID | String | LINE User ID ของเซลล์ |
-| K | Sales_Owner_Name | String | ชื่อเซลล์ |
-| L | Campaign_ID | String | Brevo Campaign ID |
-| M | Campaign_Name | String | ชื่อแคมเปญ |
-| N | Email_Subject | String | หัวข้ออีเมล |
-| O | Source | String | แหล่งที่มา |
-| P | Lead_ID | String | Brevo Contact ID |
-| Q | Event_ID | String | Brevo Event ID |
-| R | Clicked_At | DateTime | เวลาที่คลิก |
-| S | Talking_Point | String | จุดขาย (จาก AI) |
-| T | Closed_At | DateTime | เวลาปิดการขาย |
-| U | Lost_At | DateTime | เวลา Lost |
-| V | Unreachable_At | DateTime | เวลาติดต่อไม่ได้ |
-| W | Version | Number | Optimistic Lock |
-| X | Lead_Source | String | Lead source categorization |
-| Y | Job_Title | String | Contact's job title |
-| Z | City | String | Contact's city |
-| AA | Lead_UUID | String | UUID for Supabase migration |
-| AB | Created_At | DateTime | ISO 8601 timestamp |
-| AC | Updated_At | DateTime | ISO 8601 timestamp |
-| AD | Contacted_At | DateTime | When sales claimed |
-| AE | Juristic_ID | String | เลขทะเบียนนิติบุคคล (Grounding) |
-| AF | DBD_Sector | String | DBD Sector code (Grounding) |
-| AG | Province | String | จังหวัด (Grounding) |
-| AH | Full_Address | String | ที่อยู่เต็ม (Grounding) |
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Auto-generated primary key |
+| date | timestamptz | วันที่สร้าง Lead |
+| customer_name | text | ชื่อลูกค้า |
+| email | text | อีเมล |
+| phone | text | เบอร์โทร |
+| company | text | ชื่อบริษัท |
+| industry_ai | text | อุตสาหกรรม (จาก AI) |
+| website | text | เว็บไซต์ |
+| capital | text | ทุนจดทะเบียน (Grounding) |
+| status | text | new/contacted/closed/lost/unreachable |
+| sales_owner_id | text | LINE User ID ของเซลล์ |
+| sales_owner_name | text | ชื่อเซลล์ |
+| campaign_id | text | Brevo Campaign ID |
+| talking_point | text | จุดขาย (จาก AI) |
+| version | integer | Optimistic Lock |
+| lead_uuid | text | Legacy UUID field |
+| created_at | timestamptz | ISO 8601 timestamp |
+| updated_at | timestamptz | ISO 8601 timestamp |
+| contacted_at | timestamptz | When sales claimed |
+| juristic_id | text | เลขทะเบียนนิติบุคคล (Grounding) |
+| dbd_sector | text | DBD Sector code (Grounding) |
+| province | text | จังหวัด (Grounding) |
+| full_address | text | ที่อยู่เต็ม (Grounding) |
 
-#### Sheet 2: Sales_Team - 7 Columns
+#### Table 2: sales_team
 
-| Column | Field | Type | Description |
-|--------|-------|------|-------------|
-| A | LINE_User_ID | String | LINE User ID (nullable for manual members) |
-| B | Name | String | ชื่อเซลล์ |
-| C | Email | String | @eneos.co.th email |
-| D | Phone | String | เบอร์โทร |
-| E | Role | String | admin or sales |
-| F | Created_At | DateTime | ISO 8601 timestamp |
-| G | Status | String | active or inactive |
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Auto-generated primary key |
+| line_user_id | text | LINE User ID (nullable) |
+| name | text | ชื่อเซลล์ |
+| email | text | @eneos.co.th email |
+| phone | text | เบอร์โทร |
+| role | text | admin or sales |
+| status | text | active or inactive |
 
-#### Sheet 3: Status_History (Audit Log) - 6 Columns
+#### Table 3: status_history (Audit Log)
 
-| Column | Field | Type | Description |
-|--------|-------|------|-------------|
-| A | Lead_UUID | String | Reference to Leads.Lead_UUID |
-| B | Status | Enum | Status at this point |
-| C | Changed_By_ID | String | LINE User ID or "System" |
-| D | Changed_By_Name | String | Who made the change |
-| E | Timestamp | DateTime | ISO 8601 timestamp |
-| F | Notes | String | Optional notes |
+| Column | Type | Description |
+|--------|------|-------------|
+| id | UUID (PK) | Auto-generated primary key |
+| lead_id | UUID (FK) | Reference to leads.id |
+| status | text | Status at this point |
+| changed_by_id | text | LINE User ID or "System" |
+| changed_by_name | text | Who made the change |
+| timestamp | timestamptz | ISO 8601 timestamp |
+| notes | text | Optional notes |
 
-#### Sheet 4: Deduplication_Log - 4 Columns
+#### Table 4: deduplication_log
 
-| Column | Field | Type | Description |
-|--------|-------|------|-------------|
-| A | Key | String | `${email}:${campaignId}` |
-| B | Email | String | อีเมล |
-| C | Campaign_ID | String | Campaign ID |
-| D | Processed_At | DateTime | เวลา process |
+| Column | Type | Description |
+|--------|------|-------------|
+| key | text (UNIQUE) | `${email}:${campaignId}` |
+| email | text | อีเมล |
+| campaign_id | text | Campaign ID |
+| processed_at | timestamptz | เวลา process |
 
-#### Sheet 5: Campaign_Events - 11 Columns
+#### Table 5: campaign_events
 
-| Column | Field | Type | Description |
-|--------|-------|------|-------------|
-| A | Event_ID | Number | Unique event ID (PK) |
-| B | Campaign_ID | Number | Brevo campaign ID |
-| C | Campaign_Name | String | Campaign name |
-| D | Email | String | Recipient email |
-| E | Event | String | delivered/opened/click |
-| F | Event_At | DateTime | Event timestamp |
-| G | Sent_At | DateTime | Email sent timestamp |
-| H | URL | String | Clicked URL |
-| I | Tag | String | Brevo tag |
-| J | Segment_IDs | String | Brevo segment IDs |
-| K | Created_At | DateTime | Row creation time |
+| Column | Type | Description |
+|--------|------|-------------|
+| event_id | text (UNIQUE) | Unique event ID |
+| campaign_id | text | Brevo campaign ID |
+| campaign_name | text | Campaign name |
+| email | text | Recipient email |
+| event | text | delivered/opened/click |
+| event_at | timestamptz | Event timestamp |
+| created_at | timestamptz | Row creation time |
 
-#### Sheet 6: Campaign_Stats - 15 Columns
+#### Table 6: campaign_stats
 
-| Column | Field | Type | Description |
-|--------|-------|------|-------------|
-| A | Campaign_ID | Number | Brevo campaign ID (PK) |
-| B | Campaign_Name | String | Campaign name |
-| C | Delivered | Number | Total delivered |
-| D | Opened | Number | Total opens |
-| E | Clicked | Number | Total clicks |
-| F | Unique_Opens | Number | Unique openers |
-| G | Unique_Clicks | Number | Unique clickers |
-| H | Open_Rate | Number | Unique_Opens / Delivered * 100 |
-| I | Click_Rate | Number | Unique_Clicks / Delivered * 100 |
-| J | Hard_Bounce | Number | (Future) |
-| K | Soft_Bounce | Number | (Future) |
-| L | Unsubscribe | Number | (Future) |
-| M | Spam | Number | (Future) |
-| N | First_Event | DateTime | First event timestamp |
-| O | Last_Updated | DateTime | Last update timestamp |
+| Column | Type | Description |
+|--------|------|-------------|
+| campaign_id | text (PK) | Brevo campaign ID |
+| campaign_name | text | Campaign name |
+| delivered | integer | Total delivered |
+| opened | integer | Total opens |
+| clicked | integer | Total clicks |
+| unique_opens | integer | Unique openers |
+| unique_clicks | integer | Unique clickers |
+| open_rate | numeric | Unique_Opens / Delivered * 100 |
+| click_rate | numeric | Unique_Clicks / Delivered * 100 |
 
 ---
 
@@ -593,7 +578,7 @@ graph TB
 | Rate Limit | DoS Protection | express-rate-limit |
 | Validation | Input Validation | Zod schemas |
 | Auth | LINE Signature | HMAC-SHA256 verification |
-| Data | SQL Injection | N/A (Google Sheets API) |
+| Data | SQL Injection | Supabase parameterized queries |
 
 ---
 
@@ -699,7 +684,7 @@ graph LR
   "timestamp": "2026-01-11T12:00:00.000Z",
   "version": "1.0.0",
   "services": {
-    "googleSheets": { "status": "up", "latency": 150 },
+    "supabase": { "status": "up", "latency": 150 },
     "geminiAI": { "status": "up", "latency": 500 },
     "lineAPI": { "status": "up", "latency": 100 }
   }

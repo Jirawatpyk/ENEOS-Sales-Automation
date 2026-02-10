@@ -7,14 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Request, Response, NextFunction } from 'express';
 import type { LeadRow } from '../../types/index.js';
 
-// Mock sheetsService
 const mockGetAllLeads = vi.fn();
-
-vi.mock('../../services/sheets.service.js', () => ({
-  sheetsService: {
-    getAllLeads: () => mockGetAllLeads(),
-  },
-}));
 
 vi.mock('../../services/leads.service.js', () => ({
   getAllLeads: () => mockGetAllLeads(),

@@ -96,7 +96,7 @@ export function filterByLeadSource(leads: LeadRow[], leadSource: string): LeadRo
 }
 
 /**
- * ดึง leads ทั้งหมดจาก Google Sheets
+ * ดึง leads ทั้งหมดจาก Supabase
  *
  * @returns Array of leads, or empty array on error (fails gracefully)
  * @note Returns empty array on error to prevent dashboard crash.

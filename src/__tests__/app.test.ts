@@ -108,12 +108,6 @@ vi.mock('../utils/logger.js', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
-  sheetsLogger: {
-    info: vi.fn(),
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
   logRequest: vi.fn(),
   createModuleLogger: vi.fn(() => ({
     info: vi.fn(),

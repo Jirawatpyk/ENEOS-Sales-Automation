@@ -18,7 +18,7 @@ npm run lint:fix         # Fix ESLint errors automatically
 
 ### Testing
 ```bash
-npm test                 # Run all tests (Vitest) - 711 tests
+npm test                 # Run all tests (Vitest) - 1400+ tests
 npm run test:watch       # Run tests in watch mode
 npm run test:coverage    # Generate coverage report (79%+ coverage)
 npm run test:ui          # Open Vitest UI
@@ -139,13 +139,13 @@ gh pr create --base main --title "feat: story title" --body "## Summary ..."
 **Scenario A (New Lead from Brevo):**
 ```
 Brevo Webhook → Validate → Check Duplicate → Gemini AI Analysis
-→ Save to Google Sheets → Send LINE Flex Message
+→ Save to Supabase → Send LINE Flex Message
 ```
 
 **Scenario B (Sales Action from LINE):**
 ```
 LINE Postback → Verify Signature → Check Race Condition
-→ Update Google Sheets → Reply LINE Confirmation
+→ Update Supabase → Reply LINE Confirmation
 ```
 
 ### Project Structure
@@ -157,12 +157,15 @@ src/
 ├── middleware/          # Express middleware (auth, logging, errors)
 ├── routes/              # API routes definition
 ├── services/            # Business logic layer
-│   ├── sheets.service.ts         # Google Sheets CRUD operations
-│   ├── gemini.service.ts         # AI company analysis
-│   ├── line.service.ts           # LINE messaging & Flex Message
-│   ├── deduplication.service.ts  # Prevent duplicate leads
+│   ├── leads.service.ts            # Lead CRUD (Supabase)
+│   ├── sales-team.service.ts       # Sales team CRUD (Supabase)
+│   ├── status-history.service.ts   # Status history tracking (Supabase)
+│   ├── campaign-stats.service.ts   # Campaign events & stats (Supabase)
+│   ├── deduplication.service.ts    # Prevent duplicate leads (Supabase)
+│   ├── gemini.service.ts           # AI company analysis
+│   ├── line.service.ts             # LINE messaging & Flex Message
 │   ├── dead-letter-queue.service.ts  # Failed event tracking
-│   └── redis.service.ts          # Redis client wrapper (optional)
+│   └── redis.service.ts            # Redis client wrapper (optional)
 ├── templates/           # LINE Flex Message JSON templates
 ├── types/               # TypeScript type definitions
 ├── utils/               # Utilities (logger, retry, formatter)
@@ -177,73 +180,76 @@ src/
 
 ### Core Services
 
-1. **sheets.service.ts** - ใจกลางของระบบ CRUD
+1. **leads.service.ts** - Lead CRUD (Supabase)
    - `addLead()`: เพิ่ม Lead ใหม่ (Scenario A)
-   - `updateLeadStatus()`: อัปเดตสถานะพร้อม Race Condition Check (Scenario B)
-   - `getLeadByRow()`: ดึงข้อมูล Lead ตาม row number
-   - `checkDuplicate()`: ตรวจสอบการซ้ำซ้อนผ่าน Deduplication_Log sheet
-   - `getSalesTeamMember()`: ดึงข้อมูลเซลล์จาก Sales_Team sheet
+   - `getLeadById()`: ดึงข้อมูล Lead ตาม UUID
+   - `claimLead()`: อัปเดตสถานะพร้อม Race Condition Check (Scenario B)
+   - `getAllLeads()`: ดึง Lead ทั้งหมดสำหรับ Admin Dashboard
 
-2. **gemini.service.ts** - AI Enrichment
+2. **sales-team.service.ts** - Sales Team CRUD (Supabase)
+   - `getSalesTeamMember()`: ดึงข้อมูลเซลล์ตาม LINE User ID
+   - `getUserByEmail()`: ดึงข้อมูลสมาชิกตาม email
+   - `linkLINEAccount()`: เชื่อม LINE account กับสมาชิก (race-safe)
+
+3. **status-history.service.ts** - Status History (Supabase)
+   - `addStatusHistory()`: บันทึกการเปลี่ยนสถานะ (fire-and-forget)
+   - `getStatusHistory()`: ดึงประวัติสถานะของ Lead
+
+4. **campaign-stats.service.ts** - Campaign Events & Stats (Supabase)
+   - `recordCampaignEvent()`: บันทึก event จาก Brevo Campaign webhook
+   - `getAllCampaignStats()`: ดึง campaign stats ทั้งหมด
+   - `getCampaignEvents()`: ดึง events สำหรับ campaign เฉพาะ
+
+5. **deduplication.service.ts** - Prevent Duplicates (Supabase)
+   - ใช้ `email + campaignId` เป็น unique key
+   - Supabase upsert with `ignoreDuplicates: true`
+
+6. **gemini.service.ts** - AI Enrichment
    - `analyzeCompany()`: วิเคราะห์อุตสาหกรรมและสร้าง Talking Point
    - Fallback ไป default values เมื่อ API error
-   - Retry logic with exponential backoff
 
-3. **line.service.ts** - LINE Integration
+7. **line.service.ts** - LINE Integration
    - `pushLeadNotification()`: ส่ง Flex Message ไปกลุ่ม
    - `replyMessage()`: ตอบกลับเซลล์หลังกดปุ่ม
    - `verifySignature()`: ตรวจสอบ webhook signature (CRITICAL for security)
 
-4. **deduplication.service.ts** - Prevent Duplicates
-   - ใช้ `email + campaignId` เป็น unique key
-   - บันทึกลง Google Sheets tab "Deduplication_Log"
-   - Fallback to in-memory cache ถ้า Sheets ล่ม
-
-5. **dead-letter-queue.service.ts** - Error Recovery
+8. **dead-letter-queue.service.ts** - Error Recovery
    - เก็บ failed events ไว้ใน memory (development)
    - มี `/dlq` endpoints สำหรับดู/ลบ events ที่ล้มเหลว
 
-## Google Sheets Structure
+## Supabase Database Structure
 
-ระบบต้องการ 6 Sheets หลัก:
+ระบบใช้ Supabase PostgreSQL เป็น database หลัก พร้อม 6 tables:
 
-1. **Leads** (Main database)
-   - Columns: Date, Customer Name, Email, Phone, Company, Industry_AI, Website, Capital, Status, Sales_Owner_ID, Sales_Owner_Name, Campaign_ID, Campaign_Name, Email_Subject, Source, Lead_ID, Event_ID, Clicked_At, Talking_Point, Closed_At, Lost_At, Unreachable_At, Version, Lead_Source, Job_Title, City, Lead_UUID, Created_At, Updated_At, Contacted_At, Juristic_ID, DBD_Sector, Province, Full_Address
-   - **UUID Migration Notes:** Lead_UUID (unique identifier for Supabase migration), Created_At/Updated_At (ISO 8601 timestamps)
-   - **Metrics Notes:** Contacted_At = timestamp when sales claimed the lead (used for Response Time and Closing Time metrics)
-   - **Google Search Grounding Fields (2026-01-26):** Juristic_ID (Col AE), DBD_Sector (Col AF), Province (Col AG), Full_Address (Col AH) - Added at end to preserve existing data. Capital (Col H) also from grounding.
+1. **leads** (Main database)
+   - Primary Key: `id` (UUID, auto-generated)
+   - Key columns: email, customer_name, phone, company, industry_ai, status, sales_owner_id, sales_owner_name, campaign_id, talking_point, version, lead_uuid, created_at, updated_at, contacted_at
+   - `version` column for optimistic locking (race condition protection)
 
-2. **Deduplication_Log** (Prevent duplicates)
-   - Columns: Key, Email, Campaign_ID, Processed_At
+2. **deduplication_log** (Prevent duplicates)
+   - Key columns: key, email, campaign_id, processed_at
+   - UNIQUE constraint on `key` for upsert-based dedup
 
-3. **Sales_Team** (User mapping)
-   - Columns: LINE_User_ID, Name, Email, Phone
+3. **sales_team** (User mapping)
+   - Key columns: line_user_id, name, email, phone, role, status
 
-4. **Status_History** (Status change audit log)
-   - Columns: Lead_UUID, Status, Changed_By_ID, Changed_By_Name, Timestamp, Notes
-   - **Purpose:** Track all status changes for leads (new → contacted → closed/lost/unreachable)
-   - **Fire-and-forget:** History writes are async to not block main operations
-   - **Fallback:** Legacy leads without history use reconstructed timestamps
-   - **UUID Migration:** Uses Lead_UUID (not row number) for Supabase compatibility
+4. **status_history** (Status change audit log)
+   - Key columns: lead_id (FK → leads.id), status, changed_by_id, changed_by_name, timestamp, notes
+   - Fire-and-forget writes — never blocks main operations
 
-5. **Campaign_Events** (Brevo Campaign Event Log)
-   - Columns: Event_ID, Campaign_ID, Campaign_Name, Email, Event, Event_At, Sent_At, URL, Tag, Segment_IDs, Created_At
-   - **Purpose:** Store raw events from Brevo Campaign webhook (delivered, opened, click)
-   - **Deduplication:** Event_ID is unique - prevents duplicate event processing
-   - **Source:** POST /webhook/brevo/campaign
+5. **campaign_events** (Brevo Campaign Event Log)
+   - Key columns: event_id, campaign_id, campaign_name, email, event, event_at
+   - UNIQUE constraint on event_id for dedup
 
-6. **Campaign_Stats** (Campaign Aggregate Metrics)
-   - Columns: Campaign_ID, Campaign_Name, Delivered, Opened, Clicked, Unique_Opens, Unique_Clicks, Open_Rate, Click_Rate, Hard_Bounce, Soft_Bounce, Unsubscribe, Spam, First_Event, Last_Updated
-   - **Purpose:** Aggregated stats per campaign for Admin Dashboard
-   - **Rates:** Open_Rate = Unique_Opens / Delivered * 100, Click_Rate = Unique_Clicks / Delivered * 100
-   - **Future columns:** Hard_Bounce, Soft_Bounce, Unsubscribe, Spam (prepared but not enabled)
+6. **campaign_stats** (Campaign Aggregate Metrics)
+   - Key columns: campaign_id, campaign_name, delivered, opened, clicked, unique_opens, unique_clicks, open_rate, click_rate
 
 ## Environment Variables
 
 ตัวแปรที่จำเป็นต้องตั้งค่า (ดูรายละเอียดครบใน `.env.example`):
 
 **Critical:**
-- `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `GOOGLE_SHEET_ID`
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
 - `GEMINI_API_KEY`
 - `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `LINE_GROUP_ID`
 - `BREVO_WEBHOOK_SECRET`
@@ -260,7 +266,7 @@ src/
 
 ### Test Structure
 - Framework: **Vitest** with supertest for HTTP testing
-- Coverage: **79%+** (711 tests)
+- Coverage: **75%+** (1400+ tests)
 - Mocks: `src/__tests__/mocks/` for shared mock objects
 
 ### Key Testing Patterns
@@ -303,7 +309,7 @@ expect(response.status).toBe(200);
 npm test                                                    # Run all tests
 npm run test:coverage                                       # With coverage report
 npm run test:ui                                             # Visual UI mode
-npm test -- src/__tests__/services/sheets.service.test.ts   # Run specific file
+npm test -- src/__tests__/services/leads.service.test.ts    # Run specific file
 npm test -- -t "should add lead"                            # Run test by name
 ```
 
@@ -319,8 +325,8 @@ npm test -- -t "should add lead"                            # Run test by name
    - ปรับได้ผ่าน `RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_WINDOW_MS`
 
 3. **Race Condition Protection:**
-   - ใช้ Google Sheets row เป็น lock mechanism
-   - อ่าน → เช็ค Sales_Owner_ID → เขียน (atomic)
+   - ใช้ Supabase version column (optimistic locking)
+   - อ่าน → เช็ค Sales_Owner_ID → เขียน (version check)
    - ถ้ามีคนรับงานก่อน จะ reply LINE แจ้งเตือน
 
 4. **Error Handling:**
@@ -390,9 +396,9 @@ if (config.features.aiEnrichment) {
 
 ## Critical Notes
 
-1. **Google Sheets as Database:**
-   - ระบบใช้ Google Sheets เป็น database หลัก (ไม่ใช่ SQL/NoSQL)
-   - Row number คือ Primary Key
+1. **Supabase as Database:**
+   - ระบบใช้ Supabase PostgreSQL เป็น database หลัก
+   - UUID คือ Primary Key
    - Version column ใช้สำหรับ optimistic locking
 
 2. **LINE Webhook Timeout:**
@@ -411,12 +417,11 @@ if (config.features.aiEnrichment) {
    - ใช้ `utils/email-parser.ts` แยก domain จาก email
    - ส่งให้ Gemini วิเคราะห์ว่าบริษัทนี้ทำธุรกิจอะไร
 
-6. **UUID Migration (Future Supabase):**
-   - Lead_UUID: Unique identifier สำหรับ database migration
-   - Format: `lead_<uuid>` (e.g., `lead_550e8400-e29b-41d4-a716-446655440000`)
-   - LINE Postback รองรับทั้ง `row_id` (legacy) และ `lead_id` (UUID)
+6. **UUID-based Identifiers:**
+   - Lead UUID เป็น Primary Key ใน Supabase
+   - LINE Postback ใช้ `lead_id` (UUID) เท่านั้น (legacy `row_id` ไม่รองรับแล้ว)
    - Timestamps: `created_at`, `updated_at` เป็น ISO 8601 format
-   - UUID จะถูกสร้างอัตโนมัติเมื่อ addLead() หรือ update existing lead
+   - UUID ถูกสร้างอัตโนมัติโดย Supabase เมื่อ addLead()
 
 ## Documentation
 

@@ -194,7 +194,7 @@ export interface LeadsListResponse {
  * Lead Item (List View)
  */
 export interface LeadItem {
-  row: number;                    // Primary Key (Row number in Google Sheets)
+  row: number;                    // Legacy field (preserved for Dashboard API compatibility)
   date: string;                   // ISO 8601
   customerName: string;
   email: string;

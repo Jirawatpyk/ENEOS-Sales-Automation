@@ -111,7 +111,7 @@ Middleware หลักสำหรับ authentication
 1. ดึง Bearer token จาก `Authorization` header
 2. Verify token กับ Google OAuth API
 3. ตรวจสอบว่า email domain อยู่ใน `ALLOWED_DOMAINS` (default: `@eneos.co.th`)
-4. Query role จาก Google Sheets (Sales_Team sheet)
+4. Query role จาก Supabase (sales_team table)
 5. ตรวจสอบ status (active/inactive) - reject ถ้า inactive
 6. Attach `req.user` object
 
@@ -350,15 +350,15 @@ export async function getDashboard() {
 
 ## Implementation Status
 
-### ✅ Role Lookup from Google Sheets (Implemented)
+### ✅ Role Lookup from Supabase (Implemented)
 
 Role lookup is fully implemented in `admin-auth.ts`:
 
 ```typescript
-// admin-auth.ts:302-373
+// admin-auth.ts
 async function getUserRole(email: string): Promise<UserRole> {
-  // Query from Sales_Team sheet
-  const user = await sheetsService.getUserByEmail(email);
+  // Query from sales_team table
+  const user = await salesTeamService.getUserByEmail(email);
 
   if (user) {
     // Check if user is inactive - reject login

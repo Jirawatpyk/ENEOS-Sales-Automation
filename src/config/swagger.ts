@@ -18,7 +18,7 @@ Enterprise-grade Sales Automation System for ENEOS Thailand.
 - Brevo Webhook Integration for Email Campaign Leads
 - Gemini AI Analysis for Company Insights
 - LINE OA Notifications for Sales Team
-- Google Sheets as Database
+- Supabase PostgreSQL Database
 - Race Condition Protection
 
 ## Authentication
@@ -138,7 +138,7 @@ Receives webhook events from Brevo email campaigns.
 1. Validates webhook payload
 2. Checks for duplicate leads
 3. Analyzes company with Gemini AI
-4. Saves to Google Sheets
+4. Saves to Supabase
 5. Sends LINE notification to sales team
           `,
           requestBody: {
@@ -225,7 +225,7 @@ Check the background processing status of a lead using the correlation ID return
 
 **Status Values:**
 - \`pending\` - Lead is queued for processing
-- \`processing\` - Currently being processed (AI analysis, Sheets write)
+- \`processing\` - Currently being processed (AI analysis, Supabase write)
 - \`completed\` - Successfully processed and saved
 - \`failed\` - Processing failed with error message
 
@@ -453,7 +453,7 @@ Plus default Node.js metrics (CPU, memory, event loop, etc.)
             services: {
               type: 'object',
               properties: {
-                googleSheets: {
+                supabase: {
                   $ref: '#/components/schemas/ServiceStatus',
                 },
                 geminiAI: {
@@ -565,7 +565,7 @@ Plus default Node.js metrics (CPU, memory, event loop, etc.)
                     properties: {
                       data: {
                         type: 'string',
-                        example: 'action=contacted&row_id=42',
+                        example: 'action=contacted&lead_id=550e8400-e29b-41d4-a716-446655440000',
                       },
                     },
                   },
@@ -579,26 +579,22 @@ Plus default Node.js metrics (CPU, memory, event loop, etc.)
           properties: {
             success: {
               type: 'boolean',
+              example: true,
             },
             message: {
               type: 'string',
+              example: 'Lead received and processing',
             },
-            data: {
-              type: 'object',
-              properties: {
-                rowNumber: {
-                  type: 'integer',
-                },
-                email: {
-                  type: 'string',
-                },
-                company: {
-                  type: 'string',
-                },
-                industry: {
-                  type: 'string',
-                },
-              },
+            processing: {
+              type: 'string',
+              example: 'background',
+              description: 'Processing mode (always background)',
+            },
+            correlationId: {
+              type: 'string',
+              format: 'uuid',
+              example: '550e8400-e29b-41d4-a716-446655440000',
+              description: 'UUID to track processing status via /api/leads/status/:correlationId',
             },
           },
         },
@@ -641,10 +637,11 @@ Plus default Node.js metrics (CPU, memory, event loop, etc.)
               example: '2024-01-15T10:30:15.500Z',
               description: 'When processing finished (ISO 8601)',
             },
-            rowNumber: {
-              type: 'integer',
-              example: 42,
-              description: 'Google Sheets row number where lead was saved',
+            leadId: {
+              type: 'string',
+              format: 'uuid',
+              example: '550e8400-e29b-41d4-a716-446655440000',
+              description: 'UUID of the lead saved in Supabase',
             },
             industry: {
               type: 'string',

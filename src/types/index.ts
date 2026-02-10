@@ -201,9 +201,8 @@ export const VALID_LEAD_STATUSES: LeadStatus[] = [
 // ===========================================
 
 /**
- * Status History Entry for Google Sheets storage
- * Columns: Lead_UUID, Status, Changed_By_ID, Changed_By_Name, Timestamp, Notes
- * Uses UUID for future Supabase migration compatibility
+ * Status History Entry for Supabase storage
+ * Table: status_history (lead_id FK, status, changed_by_id, changed_by_name, timestamp, notes)
  */
 export interface StatusHistoryEntry {
   leadUUID: string;
@@ -339,7 +338,7 @@ export interface GeminiAnalysisRequest {
 }
 
 // ===========================================
-// Google Sheets Types
+// Legacy Sheet Config Types (retained for type compatibility)
 // ===========================================
 
 export interface SheetConfig {

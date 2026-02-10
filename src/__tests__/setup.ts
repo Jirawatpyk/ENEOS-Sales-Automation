@@ -15,9 +15,6 @@ process.env.LOG_LEVEL = 'error'; // Suppress logs during tests
 
 // Mock environment variables
 process.env.BREVO_WEBHOOK_SECRET = 'test_brevo_secret';
-process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL = 'test@test.iam.gserviceaccount.com';
-process.env.GOOGLE_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\nTEST\n-----END PRIVATE KEY-----\n';
-process.env.GOOGLE_SHEET_ID = 'test_sheet_id';
 process.env.GEMINI_API_KEY = 'test_gemini_key';
 process.env.LINE_CHANNEL_ACCESS_TOKEN = 'test_line_token';
 process.env.LINE_CHANNEL_SECRET = 'test_line_secret';

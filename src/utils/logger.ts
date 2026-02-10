@@ -51,7 +51,6 @@ export const createModuleLogger = (moduleName: string) => {
 // Pre-configured module loggers
 export const webhookLogger = createModuleLogger('webhook');
 export const lineLogger = createModuleLogger('line');
-export const sheetsLogger = createModuleLogger('sheets');
 export const geminiLogger = createModuleLogger('gemini');
 export const dedupLogger = createModuleLogger('dedup');
 export const campaignLogger = createModuleLogger('campaign');

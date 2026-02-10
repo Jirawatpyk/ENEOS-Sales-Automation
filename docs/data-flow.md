@@ -26,8 +26,8 @@
                     │                          │                          │
                     ▼                          ▼                          ▼
               ┌───────────┐            ┌───────────────┐          ┌────────────┐
-              │ Duplicate │            │  Gemini AI    │          │   Sheets   │
-              │  Return   │            │  Analysis     │          │   Add Row  │
+              │ Duplicate │            │  Gemini AI    │          │  Supabase  │
+              │  Return   │            │  Analysis     │          │  Insert    │
               └───────────┘            └───────┬───────┘          └─────┬──────┘
                                                │                        │
                                                └────────────┬───────────┘
@@ -48,9 +48,9 @@
 | 3 | Event Filter | Check if event = "click" | Acknowledge non-click events |
 | 4 | Dedup Service | Check email + campaignId | Return if duplicate |
 | 5 | Gemini Service | Analyze company domain | Fallback to defaults |
-| 6 | Sheets Service | Add new row to Leads sheet | Retry 3x, then DLQ |
+| 6 | Leads Service | Insert new lead to Supabase | Retry, then DLQ |
 | 7 | LINE Service | Send Flex Message to group | Retry 3x, then DLQ |
-| 8 | Response | Return success + row number | - |
+| 8 | Response | Return success + lead UUID | - |
 
 ### Data Transformation
 
@@ -87,12 +87,12 @@ Brevo Webhook Payload
         │ Merge & Save
         ▼
 ┌───────────────────────────────────────┐
-│ Google Sheets Row:                    │
-│ [Date, John Doe, customer@company.com,│
-│  0812345678, ACME Corp, Manufacturing,│
-│  https://acme.com, 10M THB, new,      │
-│  null, null, 12345, ENEOS Oil 2024,   │
-│  Special Offer, Brevo, lead-123, ...]│
+│ Supabase leads row:                   │
+│ { id: 'uuid', email: 'customer@...', │
+│   customer_name: 'John Doe',          │
+│   company: 'ACME Corp',               │
+│   industry_ai: 'Manufacturing',       │
+│   status: 'new', version: 1 }        │
 └───────────────────────────────────────┘
 ```
 
@@ -111,7 +111,7 @@ Brevo Webhook Payload
                                                ▼
                                        ┌───────────────┐
                                        │ Parse Action  │
-                                       │ & Row ID      │
+                                       │ & Lead UUID   │
                                        └───────┬───────┘
                                                │
                     ┌──────────────────────────┼──────────────────────────┐
@@ -143,9 +143,9 @@ Brevo Webhook Payload
 sequenceDiagram
     participant S as Sales
     participant API as API
-    participant DB as Sheets
+    participant DB as Supabase
 
-    S->>API: action=contacted&row_id=42
+    S->>API: action=contacted&lead_id=<uuid>
     API->>DB: Get Row 42
     DB-->>API: Lead Data (Owner=null, Version=1)
 
@@ -164,9 +164,9 @@ sequenceDiagram
 sequenceDiagram
     participant S as Sales
     participant API as API
-    participant DB as Sheets
+    participant DB as Supabase
 
-    S->>API: action=closed&row_id=42
+    S->>API: action=closed&lead_id=<uuid>
     API->>DB: Get Row 42
     DB-->>API: Lead Data (Owner=Sales)
 
@@ -491,14 +491,12 @@ async claimLead(rowNumber: number, userId: string, userName: string) {
 │     ├── HIT ──────────────▶ Return: Duplicate                │
 │     └── MISS ─────────────▶ Continue                         │
 │                                                              │
-│  4. Check Google Sheets (Deduplication_Log)                  │
-│     ├── FOUND ────────────▶ Add to Cache, Return: Duplicate  │
+│  4. Check Supabase (deduplication_log)                       │
+│     ├── FOUND ────────────▶ Return: Duplicate                │
 │     └── NOT FOUND ────────▶ Continue                         │
 │                                                              │
 │  5. Mark as Processed                                        │
-│     ├── Add to Memory Cache                                  │
-│     ├── Add to Redis (if available)                          │
-│     └── Add to Google Sheets                                 │
+│     └── Supabase upsert (ignoreDuplicates: true)             │
 │                                                              │
 │  6. Return: New Lead                                         │
 │                                                              │
@@ -537,7 +535,7 @@ async claimLead(rowNumber: number, userId: string, userName: string) {
 │            │ DLQ Event:                  │                   │
 │            │  - id: "dlq-123"            │                   │
 │            │  - type: "brevo_webhook"    │                   │
-│            │  - error: "Sheets API fail" │                   │
+│            │  - error: "Supabase timeout" │                   │
 │            │  - retryCount: 3            │                   │
 │            │  - payload: {...}           │                   │
 │            │  - timestamp: "2026-01-11"  │                   │
@@ -587,7 +585,7 @@ async claimLead(rowNumber: number, userId: string, userName: string) {
 |--------|-------------|------|
 | โทร | URI | `tel:0812345678` |
 | Website | URI | `https://acme.com` |
-| รับงาน | Postback | `action=contacted&row_id=42` |
-| ปิดการขาย | Postback | `action=closed&row_id=42` |
-| ไม่สำเร็จ | Postback | `action=lost&row_id=42` |
-| ติดต่อไม่ได้ | Postback | `action=unreachable&row_id=42` |
+| รับงาน | Postback | `action=contacted&lead_id=<uuid>` |
+| ปิดการขาย | Postback | `action=closed&lead_id=<uuid>` |
+| ไม่สำเร็จ | Postback | `action=lost&lead_id=<uuid>` |
+| ติดต่อไม่ได้ | Postback | `action=unreachable&lead_id=<uuid>` |

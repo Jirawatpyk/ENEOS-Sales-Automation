@@ -10,14 +10,14 @@
 ├───────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│  │   Sheets    │  │   Gemini    │  │    LINE     │  │  Campaign   │   │
+│  │   Leads     │  │   Gemini    │  │    LINE     │  │  Campaign   │   │
 │  │   Service   │  │   Service   │  │   Service   │  │   Stats     │   │
 │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘   │
 │         │                │                │                │          │
 │         ▼                ▼                ▼                ▼          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
-│  │   Google    │  │  Gemini AI  │  │    LINE     │  │   Google    │   │
-│  │   Sheets    │  │  + Grounding│  │    API      │  │   Sheets    │   │
+│  │  Supabase   │  │  Gemini AI  │  │    LINE     │  │  Supabase   │   │
+│  │  PostgreSQL │  │  + Grounding│  │    API      │  │  PostgreSQL │   │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘   │
 │                                                                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
@@ -35,79 +35,76 @@
 
 ---
 
-## 1. Sheets Service
+## 1. Leads Service
 
-> Google Sheets CRUD operations - ใจกลางของระบบ
+> Lead CRUD operations via Supabase - ใจกลางของระบบ
 
 ### Location
-`src/services/sheets.service.ts`
+`src/services/leads.service.ts`
 
 ### Responsibilities
 - เพิ่ม/อ่าน/อัปเดต Lead data
-- Race Condition Protection (Version column)
-- Sales Team lookup
+- Race Condition Protection (Version column + optimistic locking)
+- UUID-based identification
 
 ### Methods
 
-#### `addLead(lead: LeadRow): Promise<number>`
-เพิ่ม Lead ใหม่ลง Sheets
+#### `addLead(lead: Lead): Promise<SupabaseLead>`
+เพิ่ม Lead ใหม่ลง Supabase
 
 ```typescript
-const rowNumber = await sheetsService.addLead({
+const supabaseLead = await addLead({
   email: 'customer@company.com',
   company: 'ACME Corp',
   customerName: 'John Doe',
   phone: '0812345678',
-  // ... other fields
 });
-// Returns: 42 (row number)
+// Returns: { id: 'uuid', version: 1, created_at, updated_at }
 ```
 
-#### `getLeadByRow(rowNumber: number): Promise<LeadRow | null>`
-ดึงข้อมูล Lead ตาม row number
+#### `getLeadById(id: string): Promise<SupabaseLead | null>`
+ดึงข้อมูล Lead ตาม UUID
 
-```typescript
-const lead = await sheetsService.getLeadByRow(42);
-// Returns: LeadRow object or null
-```
-
-#### `updateLeadStatus(rowNumber: number, status: string, userId: string): Promise<void>`
-อัปเดตสถานะ Lead พร้อม Race Condition check
-
-```typescript
-await sheetsService.updateLeadStatus(42, 'contacted', 'U123456789');
-// Throws RaceConditionError if already claimed by someone else
-```
-
-#### `claimLead(rowNumber: number, userId: string, userName: string): Promise<ClaimResult>`
+#### `claimLead(id: string, userId: string, userName: string): Promise<ClaimResult>`
 รับงาน Lead พร้อมตรวจสอบ Race Condition
 
 ```typescript
-const result = await sheetsService.claimLead(42, 'U123', 'John');
-// Returns: { success: true, lead: LeadRow }
-// Or: { success: false, owner: 'Jane' }
+const result = await claimLead('lead-uuid', 'U123', 'John');
+// Returns: { success: true, lead: LeadRow, alreadyClaimed: false, isNewClaim: true }
 ```
 
-#### `getSalesTeamMember(userId: string): Promise<SalesTeamMember | null>`
-ค้นหาข้อมูลเซลล์จาก LINE User ID
+#### `getAllLeads(): Promise<LeadRow[]>`
+ดึง Lead ทั้งหมดสำหรับ Admin Dashboard
 
-```typescript
-const member = await sheetsService.getSalesTeamMember('U123456789');
-// Returns: { userId, name, email, phone } or null
-```
+---
 
-#### `healthCheck(): Promise<HealthCheckResult>`
-ตรวจสอบการเชื่อมต่อ Google Sheets
+## 1b. Sales Team Service
 
-```typescript
-const health = await sheetsService.healthCheck();
-// Returns: { healthy: true, latency: 150 }
-```
+> Sales Team CRUD via Supabase
 
-### Error Handling
-- Retry 3 ครั้งด้วย exponential backoff
-- Circuit Breaker pattern
-- Fallback to DLQ on persistent failure
+### Location
+`src/services/sales-team.service.ts`
+
+### Key Methods
+- `getSalesTeamMember(userId)` — ค้นหาด้วย LINE User ID
+- `getUserByEmail(email)` — ค้นหาด้วย email (สำหรับ admin auth)
+- `linkLINEAccount(email, lineUserId)` — เชื่อม LINE account (race-safe)
+- `getSalesTeamAll()` — ดึงทั้งหมด
+- `createSalesTeamMember(data)` / `updateSalesTeamMember(id, data)` — CRUD
+
+---
+
+## 1c. Status History Service
+
+> Status History tracking via Supabase
+
+### Location
+`src/services/status-history.service.ts`
+
+### Key Methods
+- `addStatusHistory(data)` — บันทึกการเปลี่ยนสถานะ (fire-and-forget, catches all errors)
+- `getStatusHistory(leadId)` — ดึงประวัติสถานะ
+- `getAllStatusHistory()` — ดึงทั้งหมดสำหรับ activity log
 
 ---
 
@@ -278,8 +275,7 @@ const isValid = lineService.verifySignature(rawBody, signature);
 
 ### Responsibilities
 - ตรวจสอบ Lead ซ้ำด้วย email + campaignId
-- Cache ใน Memory และ Redis
-- บันทึกลง Google Sheets
+- Supabase upsert with `ignoreDuplicates: true`
 
 ### Methods
 
@@ -319,10 +315,8 @@ const key = `${email.toLowerCase()}:${campaignId}`;
 // Example: "customer@company.com:12345"
 ```
 
-### Cache Layers
-1. **Memory Cache** - LRU Cache, 1000 items, 24h TTL
-2. **Redis** - Optional, shared across instances
-3. **Google Sheets** - Persistent storage
+### Storage
+- **Supabase** - UNIQUE constraint on `key` column prevents duplicates via upsert
 
 ---
 
@@ -348,7 +342,7 @@ deadLetterQueue.add({
   id: 'dlq-123',
   type: 'brevo_webhook',
   payload: webhookData,
-  error: 'Google Sheets API timeout',
+  error: 'Supabase timeout',
   retryCount: 3,
   timestamp: new Date().toISOString()
 });
@@ -462,13 +456,13 @@ const result = await campaignStatsService.recordCampaignEvent({
 ```
 1. Check duplicate (Event_ID)
 2. Write event → Campaign_Events (source of truth)
-3. Count unique emails from sheet (AFTER write)
-4. Update Campaign_Stats with accurate count
+3. Count unique emails from table (AFTER write)
+4. Update campaign_stats with accurate count
 ```
 
-### Google Sheets
-- **Campaign_Events**: Raw event log (immutable source of truth)
-- **Campaign_Stats**: Aggregated metrics (derived, can be recalculated)
+### Supabase Tables
+- **campaign_events**: Raw event log (immutable source of truth)
+- **campaign_stats**: Aggregated metrics (derived, can be recalculated)
 
 ---
 
@@ -505,14 +499,14 @@ processLeadInBackground(payload, correlationId).catch(err => {
 ```
 1. Update status → "processing"
 2. AI Enrichment (Gemini + Google Search Grounding)
-3. Save to Google Sheets (with UUID, timestamps)
+3. Save to Supabase (with UUID, timestamps)
 4. Send LINE notification (fire-and-forget)
 5. Update status → "completed" or "failed"
 ```
 
 ### Error Handling
 - AI failure → ใช้ default values, continue processing
-- Sheets failure → Add to DLQ, notify LINE with error
+- Supabase failure → Add to DLQ, notify LINE with error
 - LINE failure → Log error only (non-critical)
 
 ---
@@ -547,7 +541,7 @@ Mark as failed พร้อม error message
 const status = processingStatusService.getStatus('abc-123');
 // Returns: { status: 'processing', startTime: Date, correlationId: 'abc-123' }
 // Or: { status: 'completed', startTime: Date, endTime: Date, correlationId: 'abc-123' }
-// Or: { status: 'failed', startTime: Date, endTime: Date, error: 'Google Sheets timeout', correlationId: 'abc-123' }
+// Or: { status: 'failed', startTime: Date, endTime: Date, error: 'Supabase timeout', correlationId: 'abc-123' }
 ```
 
 ---
@@ -556,22 +550,19 @@ const status = processingStatusService.getStatus('abc-123');
 
 ### Singleton Pattern
 
-ทุก services ใช้ singleton pattern:
+Services export functions (not classes) — module-level singletons:
 
 ```typescript
-// src/services/sheets.service.ts
-class SheetsService {
-  private static instance: SheetsService;
+// src/services/leads.service.ts
+import { supabase } from '../lib/supabase.js';
 
-  static getInstance(): SheetsService {
-    if (!SheetsService.instance) {
-      SheetsService.instance = new SheetsService();
-    }
-    return SheetsService.instance;
-  }
-}
+export async function addLead(lead: Lead): Promise<SupabaseLead> { ... }
+export async function getLeadById(id: string): Promise<SupabaseLead | null> { ... }
+export async function claimLead(...): Promise<ClaimResult> { ... }
+export async function getAllLeads(): Promise<LeadRow[]> { ... }
 
-export const sheetsService = SheetsService.getInstance();
+// Compatibility wrapper for consumers expecting object syntax
+export const leadsService = { addLead, getLeadById, claimLead, getAllLeads };
 ```
 
 ### Dependency Injection
@@ -580,7 +571,7 @@ Services import กันโดยตรง:
 
 ```typescript
 // webhook.controller.ts
-import { sheetsService } from '../services/sheets.service.js';
+import * as leadsService from '../services/leads.service.js';
 import { geminiService } from '../services/gemini.service.js';
 import { lineService } from '../services/line.service.js';
 import { deduplicationService } from '../services/deduplication.service.js';
@@ -636,18 +627,20 @@ export class CircuitBreaker {
 
 ```typescript
 // src/app.ts
+import { checkSupabaseHealth } from './lib/supabase.js';
+
 app.get('/health', async (req, res) => {
-  const [sheets, gemini, line] = await Promise.all([
-    sheetsService.healthCheck(),
+  const [supabaseHealth, gemini, line] = await Promise.all([
+    supabaseHealthCheck(),  // wraps checkSupabaseHealth() with latency
     geminiService.healthCheck(),
     lineService.healthCheck(),
   ]);
 
-  const allHealthy = sheets.healthy && gemini.healthy && line.healthy;
+  const allHealthy = supabaseHealth.healthy && gemini.healthy && line.healthy;
 
   res.status(allHealthy ? 200 : 503).json({
     status: allHealthy ? 'healthy' : 'degraded',
-    services: { sheets, gemini, line }
+    services: { supabase: supabaseHealth, gemini, line }
   });
 });
 ```

@@ -13,8 +13,8 @@
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                    │
 │   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────────┐   │
-│   │  Brevo  │    │  LINE   │    │ Gemini  │    │   Google    │   │
-│   │  Email  │    │   OA    │    │   AI    │    │   Sheets    │   │
+│   │  Brevo  │    │  LINE   │    │ Gemini  │    │  Supabase   │   │
+│   │  Email  │    │   OA    │    │   AI    │    │ (PostgreSQL)│   │
 │   └────┬────┘    └────┬────┘    └────┬────┘    └──────┬──────┘   │
 │        │              │              │                 │          │
 └────────┼──────────────┼──────────────┼─────────────────┼──────────┘
@@ -33,7 +33,7 @@
 │   ┌────────────────────────────────────────────────────────────┐  │
 │   │                     Services Layer                          │  │
 │   ├─────────┬──────────┬─────────┬────────────┬───────────────┤  │
-│   │ Sheets  │ Gemini   │  LINE   │ Dedup      │ Campaign      │  │
+│   │ Leads   │ Gemini   │  LINE   │ Dedup      │ Campaign      │  │
 │   │ Service │ Service  │ Service │ Service    │ Stats         │  │
 │   └─────────┴──────────┴─────────┴────────────┴───────────────┘  │
 │                                                                    │
@@ -114,7 +114,7 @@ Brevo Email Campaign
 │ 1. Validate payload│
 │ 2. Check duplicate │
 │ 3. Gemini AI enrich│
-│ 4. Save to Sheets  │
+│ 4. Save to Supabase│
 │ 5. LINE notify     │
 └───────────────────┘
 ```
@@ -134,10 +134,10 @@ Brevo Email Event (delivered/opened/click)
 ┌────────────────────────┐
 │ 1. Validate event      │
 │ 2. Deduplicate by ID   │
-│ 3. Save to Campaign_   │
-│    Events sheet        │
-│ 4. Update Campaign_    │
-│    Stats aggregates    │
+│ 3. Save to campaign_   │
+│    events table        │
+│ 4. Update campaign_    │
+│    stats aggregates    │
 └────────────────────────┘
 ```
 
@@ -164,7 +164,7 @@ Sales taps button in LINE
 │ 1. Parse postback  │
 │ 2. Race condition  │
 │    check (version) │
-│ 3. Update Sheets   │
+│ 3. Update Supabase │
 │ 4. Add to history  │
 │ 5. Reply to LINE   │
 └───────────────────┘
@@ -174,23 +174,25 @@ Sales taps button in LINE
 
 ### 4. Backend → External APIs
 
-**Google Sheets API**
+**Supabase (PostgreSQL)**
 ```
 ┌─────────────────┐
-│ sheets.service  │
+│ leads.service   │
+│ sales-team.svc  │
+│ status-history  │
+│ campaign-stats  │
+│ dedup.service   │
 │                 │
-│ - Circuit       │
-│   Breaker       │
-│ - Retry with    │
-│   backoff       │
-│ - Connection    │
-│   pooling       │
+│ - Supabase JS   │
+│   client        │
+│ - Parameterized │
+│   queries       │
 └────────┬────────┘
-         │ googleapis
+         │ @supabase/supabase-js
          ▼
 ┌─────────────────┐
-│ Google Sheets   │
-│ API v4          │
+│ Supabase        │
+│ PostgreSQL      │
 └─────────────────┘
 ```
 
@@ -260,7 +262,7 @@ Sales taps button in LINE
      │                ├───────────────►│                │
      │                │                │                │
      │                │ 7. Role from   │                │
-     │                │    Sheets      │                │
+     │                │    Supabase    │                │
      │                │◄───────────────┤                │
      │                │                │                │
      │ 8. Session     │                │                │
@@ -274,12 +276,12 @@ Sales taps button in LINE
 
 | Flow | Trigger | Source | Destination | Auth |
 |------|---------|--------|-------------|------|
-| New Lead | Brevo click | Brevo Webhook | Google Sheets | Webhook secret |
-| Email Event | Email activity | Brevo Webhook | Sheets (Events) | Webhook secret |
-| Sales Action | LINE postback | LINE Webhook | Google Sheets | LINE signature |
+| New Lead | Brevo click | Brevo Webhook | Supabase (leads) | Webhook secret |
+| Email Event | Email activity | Brevo Webhook | Supabase (campaign_events) | Webhook secret |
+| Sales Action | LINE postback | LINE Webhook | Supabase (leads) | LINE signature |
 | Dashboard View | User request | Dashboard | Backend API | Google ID Token |
 | Export | Admin request | Dashboard | Backend → File | Google ID Token |
-| Team Edit | Admin action | Dashboard | Backend → Sheets | Google ID Token |
+| Team Edit | Admin action | Dashboard | Backend → Supabase | Google ID Token |
 
 ---
 
@@ -287,7 +289,7 @@ Sales taps button in LINE
 
 ### Circuit Breaker Pattern
 ```
-Google Sheets / LINE / Gemini
+Supabase / LINE / Gemini
         │
         ▼
 ┌───────────────────┐
@@ -321,10 +323,9 @@ Failed Events → DLQ (in-memory/Redis)
 
 ### Backend (.env)
 ```bash
-# Google Sheets
-GOOGLE_SERVICE_ACCOUNT_EMAIL=...
-GOOGLE_PRIVATE_KEY=...
-GOOGLE_SHEET_ID=...
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
 
 # Gemini AI
 GEMINI_API_KEY=...

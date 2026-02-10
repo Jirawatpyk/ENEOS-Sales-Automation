@@ -18,9 +18,8 @@ The following values are **hardcoded as dummy test values** in `ci.yml` and do N
 |----------|-------|---------|
 | `NODE_ENV` | `test` | Test mode |
 | `BREVO_WEBHOOK_SECRET` | `test-secret` | Brevo webhook validation (mocked) |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | `test@test.iam...` | Google Sheets (mocked) |
-| `GOOGLE_PRIVATE_KEY` | `test-key` | Google auth (mocked) |
-| `GOOGLE_SHEET_ID` | `test-sheet-id` | Sheet ID (mocked) |
+| `SUPABASE_URL` | `https://test.supabase.co` | Supabase (mocked) |
+| `SUPABASE_SERVICE_ROLE_KEY` | `test-service-role-key` | Supabase auth (mocked) |
 | `GEMINI_API_KEY` | `test-api-key` | Gemini AI (mocked) |
 | `LINE_CHANNEL_ACCESS_TOKEN` | `test-token` | LINE SDK (mocked) |
 | `LINE_CHANNEL_SECRET` | `test-secret` | LINE signature (mocked) |

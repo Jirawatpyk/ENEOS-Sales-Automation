@@ -4,11 +4,10 @@
 
 ก่อน Deploy ต้องเตรียมสิ่งเหล่านี้:
 
-### 1. Google Cloud Setup
-1. สร้าง Project ใน [Google Cloud Console](https://console.cloud.google.com)
-2. เปิดใช้งาน Google Sheets API
-3. สร้าง Service Account และดาวน์โหลด JSON key
-4. Share Google Sheet ให้ Service Account email
+### 1. Supabase Setup
+1. สร้าง Project ใน [Supabase Dashboard](https://supabase.com/dashboard)
+2. รัน migration SQL เพื่อสร้าง tables (leads, sales_team, status_history, deduplication_log, campaign_events, campaign_stats)
+3. จด Project URL และ Service Role Key
 
 ### 2. Google Gemini API
 1. ไปที่ [Google AI Studio](https://aistudio.google.com/apikey)
@@ -51,9 +50,8 @@ railway init
 ```
 NODE_ENV=production
 BREVO_WEBHOOK_SECRET=your_secret
-GOOGLE_SERVICE_ACCOUNT_EMAIL=your@email.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-GOOGLE_SHEET_ID=your_sheet_id
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 GEMINI_API_KEY=your_gemini_key
 LINE_CHANNEL_ACCESS_TOKEN=your_line_token
 LINE_CHANNEL_SECRET=your_line_secret
@@ -163,7 +161,7 @@ Response:
 {
   "status": "healthy",
   "services": {
-    "googleSheets": { "status": "up" },
+    "supabase": { "status": "up" },
     "geminiAI": { "status": "up" },
     "lineAPI": { "status": "up" }
   }
@@ -182,7 +180,7 @@ Response:
 - [ ] ใช้ HTTPS เท่านั้น
 - [ ] ตั้ง Environment Variables ผ่าน Dashboard (ไม่เก็บใน code)
 - [ ] ไม่ commit `.env` file
-- [ ] ไม่ commit Google Service Account JSON
+- [ ] ไม่ commit Supabase Service Role Key
 - [ ] ตั้ง Rate Limiting
 - [ ] ตั้ง CORS ถ้าต้องการ
 
@@ -190,9 +188,9 @@ Response:
 
 ## 🆘 Troubleshooting
 
-### Error: Google Sheets Authentication Failed
-- ตรวจสอบว่า Share Sheet ให้ Service Account แล้ว
-- ตรวจสอบว่า Private Key มี `\n` ถูกต้อง (ใช้ double quotes)
+### Error: Supabase Connection Failed
+- ตรวจสอบว่า SUPABASE_URL ถูกต้อง
+- ตรวจสอบว่า SUPABASE_SERVICE_ROLE_KEY ยังไม่หมดอายุ
 
 ### Error: LINE Signature Invalid
 - ตรวจสอบ Channel Secret

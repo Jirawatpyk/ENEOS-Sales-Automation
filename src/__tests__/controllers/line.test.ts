@@ -11,7 +11,7 @@ import {
   mockLineWebhookBody,
   mockLineProfile,
 } from '../mocks/line.mock.js';
-import { mockLeadRow, mockClaimedLeadRow } from '../mocks/google-sheets.mock.js';
+import { mockLeadRow, mockClaimedLeadRow } from '../mocks/leads.mock.js';
 
 // Mock leads service (replaces sheetsService for lead operations)
 vi.mock('../../services/leads.service.js', () => ({

@@ -197,8 +197,8 @@ development_status:
   9-1b-migrate-controllers-line-postback: done  # Controllers + LINE Postback (Integration Layer) — Code review APPROVED (2026-02-09)
   9-2-migrate-campaign-services: done         # Campaign Events + Stats + delete Campaign_Contacts - Code review APPROVED (2026-02-09)
   9-3-migrate-sales-team-status-history: done             # Sales_Team + Status_History services — 3 review passes, 16 issues found, all fixed (2026-02-09)
-  9-4-cleanup-google-sheets-docs: ready-for-dev          # Remove Google Sheets + update docs — Story created (2026-02-09)
-  9-5-lead-detail-campaign-timeline: backlog          # Lead Detail + Campaign Engagement Timeline
+  9-4-cleanup-google-sheets-docs: done                    # Remove Google Sheets + update docs — Code review APPROVED (2026-02-10)
+  9-5-lead-detail-campaign-timeline: ready-for-dev     # Lead Detail + Campaign Engagement Timeline
   9-6-frontend-type-updates: backlog                  # Dashboard TypeScript type updates for UUID
   epic-9-retrospective: optional
 
@@ -271,7 +271,7 @@ development_status:
 #   - 9-1b Migrate Controllers + LINE Postback: ✅ done (Code review APPROVED 2026-02-09) — 1550 tests, 6 review fixes
 #   - 9-2 Migrate Campaign Services: ✅ done (Code review APPROVED 2026-02-09) — 1472 tests, 4 review fixes
 #   - 9-3 Migrate Sales_Team + Status_History: ✅ done (Code review APPROVED 2026-02-09) — 1505 tests, 9 review fixes
-#   - 9-4 Cleanup Google Sheets + Docs: 📝 ready-for-dev (Story created 2026-02-09)
+#   - 9-4 Cleanup Google Sheets + Docs: ✅ done (Code review APPROVED 2026-02-10) — 1412 tests, 10 review fixes
 #   - 9-5 Lead Detail + Campaign Timeline: 📋 backlog
 #   - 9-6 Frontend Type Updates: 📋 backlog
 #

@@ -25,19 +25,11 @@ services:
       - key: BREVO_WEBHOOK_SECRET
         sync: false # Must set manually
 
-      # Google (set in Render dashboard)
-      - key: GOOGLE_SERVICE_ACCOUNT_EMAIL
+      # Supabase (set in Render dashboard)
+      - key: SUPABASE_URL
         sync: false
-      - key: GOOGLE_PRIVATE_KEY
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: GOOGLE_SHEET_ID
-        sync: false
-      - key: LEADS_SHEET_NAME
-        value: Leads
-      - key: DEDUP_SHEET_NAME
-        value: Deduplication_Log
-      - key: SALES_TEAM_SHEET_NAME
-        value: Sales_Team
 
       # Gemini (set in Render dashboard)
       - key: GEMINI_API_KEY

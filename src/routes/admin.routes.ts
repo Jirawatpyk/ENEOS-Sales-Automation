@@ -153,7 +153,7 @@ router.get('/leads', requireViewer, asyncHandler(getLeads));
  * ดึงข้อมูล lead detail พร้อม history
  *
  * Params:
- * - id: row number ใน Google Sheets
+ * - id: lead UUID in Supabase
  *
  * Access: viewer, manager, admin
  */

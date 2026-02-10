@@ -9,131 +9,138 @@
 
 ## Overview
 
-The Backend uses **Google Sheets as the primary database**. This is NOT a traditional SQL/NoSQL database:
-- Row number = Primary Key
-- Version column = Optimistic locking
-- No transactions (use circuit breaker + retry)
+The Backend uses **Supabase (PostgreSQL)** as the primary database:
+- UUID = Primary Key (for leads, uses `lead_<uuid>` format)
+- `version` column = Optimistic locking
+- Row Level Security (RLS) via service role key
+- Parameterized queries prevent SQL injection
 
 ---
 
-## Google Sheets Structure
+## Supabase PostgreSQL Tables
 
-### 1. Leads (Main Database)
+### 1. leads (Main Database)
 
-| Column | Field Name | Type | Description |
-|--------|-----------|------|-------------|
-| A | Date | string | Lead creation date (ISO 8601) |
-| B | Customer_Name | string | Customer full name |
-| C | Email | string | Customer email |
-| D | Phone | string | Phone number (Thai format) |
-| E | Company | string | Company name |
-| F | Industry_AI | string | AI-classified industry |
-| G | Website | string | Company website |
-| H | Capital | string | Registered capital (from DBD) |
-| I | Status | LeadStatus | new/claimed/contacted/closed/lost/unreachable |
-| J | Sales_Owner_ID | string | LINE User ID of assigned sales |
-| K | Sales_Owner_Name | string | Sales person name |
-| L | Campaign_ID | string | Brevo campaign ID |
-| M | Campaign_Name | string | Brevo campaign name |
-| N | Email_Subject | string | Email subject line |
-| O | Source | string | Lead source (e.g., brevo_click) |
-| P | Lead_ID | string | Brevo contact ID |
-| Q | Event_ID | string | Brevo event ID |
-| R | Clicked_At | string | Email click timestamp |
-| S | Talking_Point | string | AI-generated talking point |
-| T | Closed_At | string | Closed timestamp |
-| U | Lost_At | string | Lost timestamp |
-| V | Unreachable_At | string | Unreachable timestamp |
-| W | Version | number | Optimistic lock version |
-| X | Lead_Source | string | Lead source categorization |
-| Y | Job_Title | string | Contact's job title |
-| Z | City | string | Contact's city |
-| AA | Lead_UUID | string | UUID for Supabase migration |
-| AB | Created_At | string | ISO 8601 timestamp |
-| AC | Updated_At | string | ISO 8601 timestamp |
-| AD | Contacted_At | string | When sales claimed lead |
-| AE | Juristic_ID | string | DBD registration number |
-| AF | DBD_Sector | string | DBD sector code |
-| AG | Province | string | Province from DBD |
-| AH | Full_Address | string | Full company address |
-
----
-
-### 2. Sales_Team
-
-| Column | Field Name | Type | Description |
-|--------|-----------|------|-------------|
-| A | LINE_User_ID | string | LINE User ID (can be null for manual members) |
-| B | Name | string | Display name |
-| C | Email | string | @eneos.co.th email |
-| D | Phone | string | Phone number |
-| E | Role | string | admin or sales |
-| F | Created_At | string | ISO 8601 timestamp |
-| G | Status | string | active or inactive |
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint (PK) | Auto-increment primary key |
+| lead_uuid | text (UNIQUE) | UUID identifier `lead_<uuid>` |
+| date | text | Lead creation date (ISO 8601) |
+| customer_name | text | Customer full name |
+| email | text | Customer email |
+| phone | text | Phone number (Thai format) |
+| company | text | Company name |
+| industry_ai | text | AI-classified industry |
+| website | text | Company website |
+| capital | text | Registered capital (from DBD) |
+| status | text | new/claimed/contacted/closed/lost/unreachable |
+| sales_owner_id | text | LINE User ID of assigned sales |
+| sales_owner_name | text | Sales person name |
+| campaign_id | text | Brevo campaign ID |
+| campaign_name | text | Brevo campaign name |
+| email_subject | text | Email subject line |
+| source | text | Lead source (e.g., brevo_click) |
+| lead_id | text | Brevo contact ID |
+| event_id | text | Brevo event ID |
+| clicked_at | text | Email click timestamp |
+| talking_point | text | AI-generated talking point |
+| closed_at | text | Closed timestamp |
+| lost_at | text | Lost timestamp |
+| unreachable_at | text | Unreachable timestamp |
+| version | integer | Optimistic lock version |
+| lead_source | text | Lead source categorization |
+| job_title | text | Contact's job title |
+| city | text | Contact's city |
+| created_at | timestamptz | Row creation timestamp |
+| updated_at | timestamptz | Row update timestamp |
+| contacted_at | text | When sales claimed lead |
+| juristic_id | text | DBD registration number |
+| dbd_sector | text | DBD sector code |
+| province | text | Province from DBD |
+| full_address | text | Full company address |
 
 ---
 
-### 3. Status_History (Audit Log)
+### 2. sales_team
 
-| Column | Field Name | Type | Description |
-|--------|-----------|------|-------------|
-| A | Lead_UUID | string | Reference to lead |
-| B | Status | LeadStatus | New status value |
-| C | Changed_By_ID | string | LINE User ID or "System" |
-| D | Changed_By_Name | string | Who made the change |
-| E | Timestamp | string | ISO 8601 timestamp |
-| F | Notes | string | Optional notes |
-
----
-
-### 4. Deduplication_Log
-
-| Column | Field Name | Type | Description |
-|--------|-----------|------|-------------|
-| A | Key | string | email + campaignId hash |
-| B | Email | string | Lead email |
-| C | Campaign_ID | string | Campaign ID |
-| D | Processed_At | string | ISO 8601 timestamp |
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint (PK) | Auto-increment primary key |
+| line_user_id | text (UNIQUE) | LINE User ID (can be null for manual members) |
+| name | text | Display name |
+| email | text (UNIQUE) | @eneos.co.th email |
+| phone | text | Phone number |
+| role | text | admin or sales |
+| created_at | timestamptz | Row creation timestamp |
+| status | text | active or inactive |
 
 ---
 
-### 5. Campaign_Events (Brevo Events)
+### 3. status_history (Audit Log)
 
-| Column | Field Name | Type | Description |
-|--------|-----------|------|-------------|
-| A | Event_ID | number | Unique event ID |
-| B | Campaign_ID | number | Brevo campaign ID |
-| C | Campaign_Name | string | Campaign name |
-| D | Email | string | Recipient email |
-| E | Event | string | delivered/opened/click |
-| F | Event_At | string | Event timestamp |
-| G | Sent_At | string | Email sent timestamp |
-| H | URL | string | Clicked URL (for click events) |
-| I | Tag | string | Brevo tag |
-| J | Segment_IDs | string | Brevo segment IDs |
-| K | Created_At | string | Row creation time |
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint (PK) | Auto-increment primary key |
+| lead_id | bigint (FK) | References leads.id |
+| status | text | New status value |
+| changed_by_id | text | LINE User ID or "System" |
+| changed_by_name | text | Who made the change |
+| timestamp | timestamptz | When the change occurred |
+| notes | text | Optional notes |
 
 ---
 
-### 6. Campaign_Stats (Aggregates)
+### 4. deduplication_log
 
-| Column | Field Name | Type | Description |
-|--------|-----------|------|-------------|
-| A | Campaign_ID | number | Brevo campaign ID |
-| B | Campaign_Name | string | Campaign name |
-| C | Delivered | number | Total delivered |
-| D | Opened | number | Total opens |
-| E | Clicked | number | Total clicks |
-| F | Unique_Opens | number | Unique openers |
-| G | Unique_Clicks | number | Unique clickers |
-| H | Open_Rate | number | Opens / Delivered * 100 |
-| I | Click_Rate | number | Clicks / Delivered * 100 |
-| J | Hard_Bounce | number | (Future) |
-| K | Soft_Bounce | number | (Future) |
-| L | Unsubscribe | number | (Future) |
-| M | Spam | number | (Future) |
-| N | First_Event | string | First event timestamp |
-| O | Last_Updated | string | Last update timestamp |
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint (PK) | Auto-increment primary key |
+| key | text (UNIQUE) | email + campaignId composite key |
+| email | text | Lead email |
+| campaign_id | text | Campaign ID |
+| processed_at | timestamptz | When processed |
+
+---
+
+### 5. campaign_events (Brevo Events)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint (PK) | Auto-increment primary key |
+| event_id | text (UNIQUE) | Unique event ID from Brevo |
+| campaign_id | text | Brevo campaign ID |
+| campaign_name | text | Campaign name |
+| email | text | Recipient email |
+| event | text | delivered/opened/click |
+| event_at | text | Event timestamp |
+| sent_at | text | Email sent timestamp |
+| url | text | Clicked URL (for click events) |
+| tag | text | Brevo tag |
+| segment_ids | text | Brevo segment IDs |
+| created_at | timestamptz | Row creation time |
+
+---
+
+### 6. campaign_stats (Aggregates)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | bigint (PK) | Auto-increment primary key |
+| campaign_id | text (UNIQUE) | Brevo campaign ID |
+| campaign_name | text | Campaign name |
+| delivered | integer | Total delivered |
+| opened | integer | Total opens |
+| clicked | integer | Total clicks |
+| unique_opens | integer | Unique openers |
+| unique_clicks | integer | Unique clickers |
+| open_rate | numeric | Opens / Delivered * 100 |
+| click_rate | numeric | Clicks / Delivered * 100 |
+| hard_bounce | integer | (Future) |
+| soft_bounce | integer | (Future) |
+| unsubscribe | integer | (Future) |
+| spam | integer | (Future) |
+| first_event | text | First event timestamp |
+| last_updated | text | Last update timestamp |
 
 ---
 
@@ -328,28 +335,32 @@ class ExternalServiceError extends AppError { } // 502
 ### Race Condition Protection
 
 ```typescript
-// Pattern for status updates
-async function updateLeadStatus(rowNumber: number, newStatus: LeadStatus, salesId: string) {
-  // 1. Read current row with version
-  const lead = await getLeadByRow(rowNumber);
+// Pattern for status updates (Supabase with optimistic locking)
+async function claimLead(leadUuid: string, salesId: string, salesName: string) {
+  // 1. Read current lead with version
+  const lead = await getLeadById(leadUuid);
 
-  // 2. Check if already claimed
-  if (lead.salesOwnerId && lead.salesOwnerId !== salesId) {
-    throw new RaceConditionError('Lead already claimed by another sales');
-  }
-
-  // 3. Update with version check
-  await updateRow(rowNumber, { ...updates, version: lead.version + 1 });
+  // 2. Atomic update with version check
+  const { data, error } = await supabase
+    .from('leads')
+    .update({ sales_owner_id: salesId, version: lead.version + 1 })
+    .eq('lead_uuid', leadUuid)
+    .eq('version', lead.version)    // Optimistic lock
+    .is('sales_owner_id', null)     // Race-safe: only if unclaimed
+    .select()
+    .single();
 }
 ```
 
 ### Deduplication
 
 ```typescript
-// Unique key: email + campaignId
+// Unique key: email + campaignId (Supabase upsert with ignoreDuplicates)
 const key = `${email.toLowerCase()}:${campaignId}`;
-const exists = await checkDuplicateLog(key);
-if (exists) throw new DuplicateLeadError(email, 'brevo');
+const { data, error } = await supabase
+  .from('deduplication_log')
+  .upsert({ key, email, campaign_id: campaignId }, { ignoreDuplicates: true });
+// If no row returned → duplicate exists
 ```
 
 ---

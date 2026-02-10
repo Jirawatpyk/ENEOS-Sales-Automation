@@ -2,16 +2,16 @@
 
 ระบบ Sales Automation ครบวงจรสำหรับ ENEOS Thailand พัฒนาด้วย Node.js + TypeScript
 
-## 🎯 Features
+## Features
 
 - **Brevo Integration** - รับ Lead อัตโนมัติจาก Email Click Events
 - **Gemini AI** - วิเคราะห์ข้อมูลบริษัทลูกค้าอัตโนมัติ
-- **Google Sheets** - Database สำหรับเก็บข้อมูล Lead
+- **Supabase** - PostgreSQL Database สำหรับเก็บข้อมูล Lead, Sales Team, Campaign Events
 - **LINE OA** - แจ้งเตือนทีมขายด้วย Flex Message + กดรับงานได้เลย
-- **Race Condition Protection** - ป้องกันการแย่งงานระหว่างเซลล์
+- **Race Condition Protection** - ป้องกันการแย่งงานระหว่างเซลล์ (optimistic locking)
 - **Deduplication** - ป้องกัน Lead ซ้ำซ้อน
 
-## 🔄 Data Flow
+## Data Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -21,7 +21,7 @@
 │         ↓                                                    │
 │  Gemini AI (วิเคราะห์บริษัท)                                   │
 │         ↓                                                    │
-│  Google Sheets (บันทึก Lead)                                 │
+│  Supabase (บันทึก Lead)                                      │
 │         ↓                                                    │
 │  LINE OA (ส่ง Flex Message ไป Group)                         │
 └─────────────────────────────────────────────────────────────┘
@@ -31,18 +31,18 @@
 ├─────────────────────────────────────────────────────────────┤
 │  Sales กดปุ่มใน LINE → Webhook → Check Race Condition        │
 │         ↓                                                    │
-│  Update Google Sheets (Status + Owner)                      │
+│  Update Supabase (Status + Owner via optimistic locking)    │
 │         ↓                                                    │
 │  Reply LINE (ยืนยัน/แจ้งเตือน)                                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - Node.js 20+
-- Google Cloud Service Account
+- Supabase Project (PostgreSQL)
 - LINE Official Account
 - Brevo Account
 - Google Gemini API Key
@@ -68,10 +68,9 @@ cp .env.example .env
 Edit `.env` file with your credentials:
 
 ```env
-# Google Sheets
-GOOGLE_SERVICE_ACCOUNT_EMAIL=your-sa@project.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-GOOGLE_SHEET_ID=your_sheet_id
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # Gemini AI
 GEMINI_API_KEY=your_gemini_api_key
@@ -121,7 +120,7 @@ docker-compose logs -f
 docker-compose down
 ```
 
-## 📡 API Endpoints
+## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -131,57 +130,26 @@ docker-compose down
 | POST | `/webhook/brevo` | Brevo Webhook (Scenario A) |
 | POST | `/webhook/line` | LINE Webhook (Scenario B) |
 
-## 📊 Google Sheets Setup
+## Supabase Database
 
-Create a Google Sheet with the following structure:
+The system uses Supabase PostgreSQL with the following tables:
 
-### Sheet 1: `Leads`
+### `leads`
+Primary table for lead data — UUID primary key, optimistic locking via `version` column.
 
-| Column | Header |
-|--------|--------|
-| A | Date |
-| B | Customer Name |
-| C | Email |
-| D | Phone |
-| E | Company |
-| F | Industry_AI |
-| G | Website |
-| H | Capital |
-| I | Status |
-| J | Sales_Owner_ID |
-| K | Sales_Owner_Name |
-| L | Campaign_ID |
-| M | Campaign_Name |
-| N | Email_Subject |
-| O | Source |
-| P | Lead_ID |
-| Q | Event_ID |
-| R | Clicked_At |
-| S | Talking_Point |
-| T | Closed_At |
-| U | Lost_At |
-| V | Unreachable_At |
-| W | Version |
+### `deduplication_log`
+Prevents duplicate leads using `email + campaign_id` unique constraint.
 
-### Sheet 2: `Deduplication_Log`
+### `sales_team`
+User mapping — LINE User ID to sales team member details.
 
-| Column | Header |
-|--------|--------|
-| A | Key |
-| B | Email |
-| C | Campaign_ID |
-| D | Processed_At |
+### `status_history`
+Audit log for lead status changes.
 
-### Sheet 3: `Sales_Team`
+### `campaign_events` / `campaign_stats`
+Campaign event tracking and aggregate metrics.
 
-| Column | Header |
-|--------|--------|
-| A | LINE_User_ID |
-| B | Name |
-| C | Email |
-| D | Phone |
-
-## 🔐 Security Features
+## Security Features
 
 - **Helmet** - Security headers
 - **Rate Limiting** - Protect against abuse
@@ -190,19 +158,24 @@ Create a Google Sheet with the following structure:
 - **Graceful Shutdown** - Clean shutdown on SIGTERM/SIGINT
 - **Error Handling** - Centralized error handling
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 src/
 ├── config/          # Configuration & environment
 ├── controllers/     # Request handlers
+├── lib/             # Supabase client
 ├── middleware/      # Express middleware
 ├── routes/          # API routes
 ├── services/        # Business logic
-│   ├── sheets.service.ts      # Google Sheets operations
-│   ├── gemini.service.ts      # AI analysis
-│   ├── line.service.ts        # LINE messaging
-│   └── deduplication.service.ts # Lead deduplication
+│   ├── leads.service.ts          # Lead CRUD (Supabase)
+│   ├── sales-team.service.ts     # Sales team CRUD (Supabase)
+│   ├── status-history.service.ts # Status history (Supabase)
+│   ├── campaign-stats.service.ts # Campaign events & stats (Supabase)
+│   ├── deduplication.service.ts  # Lead deduplication (Supabase)
+│   ├── gemini.service.ts         # AI analysis
+│   ├── line.service.ts           # LINE messaging
+│   └── dead-letter-queue.service.ts # Failed event tracking
 ├── templates/       # LINE Flex Message templates
 ├── types/           # TypeScript type definitions
 ├── utils/           # Utility functions
@@ -213,31 +186,31 @@ src/
 └── app.ts           # Main application entry
 ```
 
-## 📈 Monitoring
+## Monitoring
 
 ### Health Check Response
 
 ```json
 {
   "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00.000Z",
+  "timestamp": "2026-01-01T00:00:00.000Z",
   "version": "1.0.0",
   "services": {
-    "googleSheets": { "status": "up", "latency": 150 },
+    "supabase": { "status": "up", "latency": 50 },
     "geminiAI": { "status": "up", "latency": 500 },
     "lineAPI": { "status": "up", "latency": 100 }
   }
 }
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-1. **Google Sheets Auth Failed**
-   - ตรวจสอบ Service Account Email
-   - ตรวจสอบ Private Key (ต้องมี `\n` ครบถ้วน)
-   - Share Sheet ให้ Service Account
+1. **Supabase Connection Failed**
+   - ตรวจสอบ `SUPABASE_URL` ว่าถูกต้อง
+   - ตรวจสอบ `SUPABASE_SERVICE_ROLE_KEY` ว่าเป็น service role key (ไม่ใช่ anon key)
+   - ตรวจสอบว่า tables ถูกสร้างครบ (leads, deduplication_log, sales_team, etc.)
 
 2. **LINE Signature Invalid**
    - ตรวจสอบ Channel Secret
@@ -248,7 +221,7 @@ src/
    - ตรวจสอบ Rate Limit
    - ระบบจะ fallback ใช้ค่า default อัตโนมัติ
 
-## 📚 Documentation
+## Documentation
 
 | Document | Description |
 |----------|-------------|
@@ -263,7 +236,7 @@ src/
 - **Swagger UI**: `/api-docs`
 - **OpenAPI Spec**: `/api-docs.json`
 
-## 📈 Monitoring
+## Monitoring
 
 | Endpoint | Description |
 |----------|-------------|
@@ -273,10 +246,10 @@ src/
 | `/metrics` | Prometheus metrics |
 | `/metrics/summary` | Human-readable metrics JSON |
 
-## 📝 License
+## License
 
 UNLICENSED - ENEOS Thailand Internal Use Only
 
-## 👥 Contributors
+## Contributors
 
 - ENEOS Thailand Digital Team

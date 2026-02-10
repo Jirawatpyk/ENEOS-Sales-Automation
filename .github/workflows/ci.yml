@@ -82,9 +82,8 @@ jobs:
         env:
           NODE_ENV: test
           BREVO_WEBHOOK_SECRET: test-secret
-          GOOGLE_SERVICE_ACCOUNT_EMAIL: test@test.iam.gserviceaccount.com
-          GOOGLE_PRIVATE_KEY: test-key
-          GOOGLE_SHEET_ID: test-sheet-id
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
           GEMINI_API_KEY: test-api-key
           LINE_CHANNEL_ACCESS_TOKEN: test-token
           LINE_CHANNEL_SECRET: test-secret
@@ -173,9 +172,8 @@ jobs:
         env:
           NODE_ENV: test
           BREVO_WEBHOOK_SECRET: test-secret
-          GOOGLE_SERVICE_ACCOUNT_EMAIL: test@test.iam.gserviceaccount.com
-          GOOGLE_PRIVATE_KEY: test-key
-          GOOGLE_SHEET_ID: test-sheet-id
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
           GEMINI_API_KEY: test-api-key
           LINE_CHANNEL_ACCESS_TOKEN: test-token
           LINE_CHANNEL_SECRET: test-secret
@@ -205,9 +203,8 @@ jobs:
         env:
           NODE_ENV: test
           BREVO_WEBHOOK_SECRET: test-secret
-          GOOGLE_SERVICE_ACCOUNT_EMAIL: test@test.iam.gserviceaccount.com
-          GOOGLE_PRIVATE_KEY: test-key
-          GOOGLE_SHEET_ID: test-sheet-id
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
           GEMINI_API_KEY: test-api-key
           LINE_CHANNEL_ACCESS_TOKEN: test-token
           LINE_CHANNEL_SECRET: test-secret

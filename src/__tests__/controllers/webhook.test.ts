@@ -40,6 +40,10 @@ vi.mock('../../config/index.js', () => ({
       lineNotifications: true,
     },
     isProd: false,
+    supabase: {
+      url: 'http://localhost:54321',
+      serviceRoleKey: 'test-service-role-key',
+    },
   },
 }));
 

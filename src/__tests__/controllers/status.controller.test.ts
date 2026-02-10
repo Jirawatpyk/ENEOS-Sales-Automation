@@ -52,7 +52,10 @@ describe('Status Controller', () => {
         email: 'test@example.com',
         company: 'Test Corp',
         status: 'completed',
+        progress: 100,
         startedAt: '2024-01-15T10:00:00.000Z',
+        createdAt: '2024-01-15T10:00:00.000Z',
+        updatedAt: '2024-01-15T10:00:15.000Z',
         completedAt: '2024-01-15T10:00:15.000Z',
         rowNumber: 42,
         industry: 'Technology',
@@ -114,7 +117,10 @@ describe('Status Controller', () => {
         email: 'test@example.com',
         company: 'Test Corp',
         status: 'pending',
+        progress: 0,
         startedAt: '2024-01-15T10:00:00.000Z',
+        createdAt: '2024-01-15T10:00:00.000Z',
+        updatedAt: '2024-01-15T10:00:00.000Z',
       };
 
       vi.mocked(processingStatusService.get).mockReturnValue(mockStatus);
@@ -153,7 +159,11 @@ describe('Status Controller', () => {
         email: 'test@example.com',
         company: 'Test Corp',
         status: 'processing',
+        progress: 40,
+        currentStep: 'Saving to database',
         startedAt: '2024-01-15T10:00:00.000Z',
+        createdAt: '2024-01-15T10:00:00.000Z',
+        updatedAt: '2024-01-15T10:00:05.000Z',
       };
 
       vi.mocked(processingStatusService.get).mockReturnValue(mockStatus);
@@ -179,7 +189,11 @@ describe('Status Controller', () => {
         email: 'test@example.com',
         company: 'Test Corp',
         status: 'failed',
+        progress: 100,
+        currentStep: 'Failed',
         startedAt: '2024-01-15T10:00:00.000Z',
+        createdAt: '2024-01-15T10:00:00.000Z',
+        updatedAt: '2024-01-15T10:00:05.000Z',
         completedAt: '2024-01-15T10:00:05.000Z',
         error: 'Gemini API timeout',
         duration: 5.0,
@@ -212,7 +226,10 @@ describe('Status Controller', () => {
           email: 'test1@example.com',
           company: 'Company A',
           status: 'completed',
+          progress: 100,
           startedAt: '2024-01-15T10:00:00.000Z',
+          createdAt: '2024-01-15T10:00:00.000Z',
+          updatedAt: '2024-01-15T10:00:15.000Z',
           completedAt: '2024-01-15T10:00:15.000Z',
         },
         {
@@ -220,14 +237,21 @@ describe('Status Controller', () => {
           email: 'test2@example.com',
           company: 'Company B',
           status: 'processing',
+          progress: 40,
+          currentStep: 'Saving to database',
           startedAt: '2024-01-15T10:01:00.000Z',
+          createdAt: '2024-01-15T10:01:00.000Z',
+          updatedAt: '2024-01-15T10:01:05.000Z',
         },
         {
           correlationId: '770e8400-e29b-41d4-a716-446655440002',
           email: 'test3@example.com',
           company: 'Company C',
           status: 'pending',
+          progress: 0,
           startedAt: '2024-01-15T10:02:00.000Z',
+          createdAt: '2024-01-15T10:02:00.000Z',
+          updatedAt: '2024-01-15T10:02:00.000Z',
         },
       ];
 
@@ -240,7 +264,7 @@ describe('Status Controller', () => {
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
-        count: 3,
+        total: 3,
         data: mockStatuses,
       });
     });
@@ -255,7 +279,7 @@ describe('Status Controller', () => {
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
-        count: 0,
+        total: 0,
         data: [],
       });
     });
@@ -267,14 +291,20 @@ describe('Status Controller', () => {
           email: 'test1@example.com',
           company: 'Company A',
           status: 'completed',
+          progress: 100,
           startedAt: '2024-01-15T10:00:00.000Z',
+          createdAt: '2024-01-15T10:00:00.000Z',
+          updatedAt: '2024-01-15T10:00:15.000Z',
         },
         {
           correlationId: '660e8400-e29b-41d4-a716-446655440001',
           email: 'test2@example.com',
           company: 'Company B',
           status: 'failed',
+          progress: 100,
           startedAt: '2024-01-15T10:01:00.000Z',
+          createdAt: '2024-01-15T10:01:00.000Z',
+          updatedAt: '2024-01-15T10:01:05.000Z',
           error: 'Test error',
         },
       ];
@@ -287,7 +317,7 @@ describe('Status Controller', () => {
 
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          count: 2,
+          total: 2,
         })
       );
     });

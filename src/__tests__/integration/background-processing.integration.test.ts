@@ -371,7 +371,7 @@ describe('Background Processing Integration Tests', () => {
         .expect(200);
 
       expect(adminResponse.body.success).toBe(true);
-      expect(adminResponse.body.count).toBeGreaterThanOrEqual(3);
+      expect(adminResponse.body.total).toBeGreaterThanOrEqual(3);
       expect(Array.isArray(adminResponse.body.data)).toBe(true);
     });
 

@@ -56,7 +56,7 @@ export function getAllProcessingStatuses(_req: Request, res: Response): void {
 
   res.status(200).json({
     success: true,
-    count: statuses.length,
+    total: statuses.length,
     data: statuses,
   });
 }

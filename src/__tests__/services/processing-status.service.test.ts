@@ -41,7 +41,11 @@ describe('ProcessingStatusService', () => {
       expect(status?.email).toBe(email);
       expect(status?.company).toBe(company);
       expect(status?.status).toBe('pending');
+      expect(status?.progress).toBe(0);
+      expect(status?.currentStep).toBe('Waiting to process');
       expect(status?.startedAt).toBeDefined();
+      expect(status?.createdAt).toBeDefined();
+      expect(status?.updatedAt).toBeDefined();
       expect(status?.completedAt).toBeUndefined();
     });
 
@@ -56,14 +60,23 @@ describe('ProcessingStatusService', () => {
   });
 
   describe('startProcessing', () => {
-    it('should update status to processing', () => {
+    it('should update status to processing with progress and step', () => {
+      vi.useFakeTimers();
       const correlationId = '550e8400-e29b-41d4-a716-446655440000';
 
       processingStatusService.create(correlationId, 'test@example.com', 'Test Corp');
+      const beforeUpdate = processingStatusService.get(correlationId)?.updatedAt;
+
+      vi.advanceTimersByTime(100);
       processingStatusService.startProcessing(correlationId);
 
       const status = processingStatusService.get(correlationId);
       expect(status?.status).toBe('processing');
+      expect(status?.progress).toBe(10);
+      expect(status?.currentStep).toBe('Starting processing');
+      expect(status?.updatedAt).toBeDefined();
+      expect(status?.updatedAt).not.toBe(beforeUpdate);
+      vi.useRealTimers();
     });
 
     it('should not crash if status not found', () => {
@@ -71,6 +84,42 @@ describe('ProcessingStatusService', () => {
 
       expect(() => {
         processingStatusService.startProcessing(correlationId);
+      }).not.toThrow();
+    });
+  });
+
+  describe('updateProgress', () => {
+    it('should update progress and currentStep', () => {
+      const correlationId = '550e8400-e29b-41d4-a716-446655440000';
+
+      processingStatusService.create(correlationId, 'test@example.com', 'Test Corp');
+      processingStatusService.startProcessing(correlationId);
+      processingStatusService.updateProgress(correlationId, 40, 'Saving to database');
+
+      const status = processingStatusService.get(correlationId);
+      expect(status?.progress).toBe(40);
+      expect(status?.currentStep).toBe('Saving to database');
+    });
+
+    it('should update updatedAt timestamp', () => {
+      vi.useFakeTimers();
+      const correlationId = '550e8400-e29b-41d4-a716-446655440000';
+
+      processingStatusService.create(correlationId, 'test@example.com', 'Test Corp');
+      const beforeUpdate = processingStatusService.get(correlationId)?.updatedAt;
+
+      vi.advanceTimersByTime(100);
+      processingStatusService.updateProgress(correlationId, 70, 'Sending LINE notification');
+
+      const status = processingStatusService.get(correlationId);
+      expect(status?.updatedAt).toBeDefined();
+      expect(status?.updatedAt).not.toBe(beforeUpdate);
+      vi.useRealTimers();
+    });
+
+    it('should not crash if status not found', () => {
+      expect(() => {
+        processingStatusService.updateProgress('non-existent-id', 50, 'Test step');
       }).not.toThrow();
     });
   });
@@ -85,7 +134,10 @@ describe('ProcessingStatusService', () => {
 
       const status = processingStatusService.get(correlationId);
       expect(status?.status).toBe('completed');
+      expect(status?.progress).toBe(100);
+      expect(status?.currentStep).toBe('Completed');
       expect(status?.completedAt).toBeDefined();
+      expect(status?.updatedAt).toBeDefined();
       expect(status?.rowNumber).toBe(42);
       expect(status?.industry).toBe('Manufacturing');
       expect(status?.confidence).toBe(0.95);
@@ -122,7 +174,10 @@ describe('ProcessingStatusService', () => {
 
       const status = processingStatusService.get(correlationId);
       expect(status?.status).toBe('failed');
+      expect(status?.progress).toBe(100);
+      expect(status?.currentStep).toBe('Failed');
       expect(status?.completedAt).toBeDefined();
+      expect(status?.updatedAt).toBeDefined();
       expect(status?.error).toBe('Gemini API timeout');
       expect(status?.duration).toBe(5.0);
     });

@@ -8,6 +8,7 @@ import type { NormalizedBrevoPayload, CompanyAnalysis } from '../../types/index.
 
 // Mock all dependencies
 const mockStartProcessing = vi.fn();
+const mockUpdateProgress = vi.fn();
 const mockComplete = vi.fn();
 const mockFail = vi.fn();
 
@@ -20,6 +21,7 @@ const mockDLQAdd = vi.fn();
 vi.mock('../../services/processing-status.service.js', () => ({
   processingStatusService: {
     startProcessing: mockStartProcessing,
+    updateProgress: mockUpdateProgress,
     complete: mockComplete,
     fail: mockFail,
   },

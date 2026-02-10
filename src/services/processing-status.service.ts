@@ -10,7 +10,11 @@ export interface ProcessingStatus {
   email: string;
   company: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number; // 0-100
+  currentStep?: string;
   startedAt: string;
+  createdAt: string;
+  updatedAt: string;
   completedAt?: string;
   rowNumber?: number;
   industry?: string;
@@ -32,12 +36,17 @@ class ProcessingStatusService {
    * Create new processing status
    */
   create(correlationId: string, email: string, company: string): void {
+    const now = new Date().toISOString();
     const status: ProcessingStatus = {
       correlationId,
       email,
       company,
       status: 'pending',
-      startedAt: new Date().toISOString(),
+      progress: 0,
+      currentStep: 'Waiting to process',
+      startedAt: now,
+      createdAt: now,
+      updatedAt: now,
     };
 
     this.statuses.set(correlationId, status);
@@ -64,6 +73,21 @@ class ProcessingStatusService {
       return;
     }
     status.status = 'processing';
+    status.progress = 10;
+    status.currentStep = 'Starting processing';
+    status.updatedAt = new Date().toISOString();
+    this.statuses.set(correlationId, status);
+  }
+
+  /**
+   * Update progress mid-processing
+   */
+  updateProgress(correlationId: string, progress: number, currentStep: string): void {
+    const status = this.statuses.get(correlationId);
+    if (!status) {return;}
+    status.progress = progress;
+    status.currentStep = currentStep;
+    status.updatedAt = new Date().toISOString();
     this.statuses.set(correlationId, status);
   }
 
@@ -82,8 +106,12 @@ class ProcessingStatusService {
       logger.warn('Cannot complete - status not found', { correlationId });
       return;
     }
+    const now = new Date().toISOString();
     status.status = 'completed';
-    status.completedAt = new Date().toISOString();
+    status.progress = 100;
+    status.currentStep = 'Completed';
+    status.completedAt = now;
+    status.updatedAt = now;
     status.rowNumber = rowNumber;
     status.industry = industry;
     status.confidence = confidence;
@@ -102,8 +130,12 @@ class ProcessingStatusService {
       logger.warn('Cannot mark as failed - status not found', { correlationId });
       return;
     }
+    const now = new Date().toISOString();
     status.status = 'failed';
-    status.completedAt = new Date().toISOString();
+    status.progress = 100;
+    status.currentStep = 'Failed';
+    status.completedAt = now;
+    status.updatedAt = now;
     status.error = error;
     status.duration = duration;
     this.statuses.set(correlationId, status);

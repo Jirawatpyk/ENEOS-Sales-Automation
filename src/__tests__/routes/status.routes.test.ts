@@ -231,7 +231,7 @@ describe('Status Routes', () => {
 
       expect(response.body).toEqual({
         success: true,
-        count: 2,
+        total: 2,
         data: mockStatuses,
       });
     });
@@ -246,7 +246,7 @@ describe('Status Routes', () => {
 
       expect(response.body).toEqual({
         success: true,
-        count: 0,
+        total: 0,
         data: [],
       });
     });
@@ -284,7 +284,7 @@ describe('Status Routes', () => {
         .set('Authorization', 'Bearer valid-admin-token')
         .expect(200);
 
-      expect(response.body.count).toBe(3);
+      expect(response.body.total).toBe(3);
       expect(response.body.data.length).toBe(3);
     });
   });

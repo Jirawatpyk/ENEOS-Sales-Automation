@@ -29,6 +29,7 @@ export async function processLeadInBackground(
   try {
     // Update status to processing
     processingStatusService.startProcessing(correlationId);
+    processingStatusService.updateProgress(correlationId, 10, 'AI enrichment & campaign lookup');
 
     logger.info('Background processing started', {
       correlationId,
@@ -90,6 +91,8 @@ export async function processLeadInBackground(
       duration: Date.now() - parallelStartTime,
     });
 
+    processingStatusService.updateProgress(correlationId, 40, 'Saving to database');
+
     // Step 2: Save to Supabase
     const lead: Partial<Lead> = {
       date: formatDateForSheets(),
@@ -138,6 +141,8 @@ export async function processLeadInBackground(
       createdAt: savedLead.created_at,
       updatedAt: savedLead.updated_at,
     };
+
+    processingStatusService.updateProgress(correlationId, 70, 'Sending LINE notification');
 
     // Step 3: Send LINE notification
     if (config.features.lineNotifications) {

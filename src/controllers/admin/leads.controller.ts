@@ -336,6 +336,7 @@ export async function getLeadById(
 
     const leadDetail: LeadDetailResponse = {
       row: lead.rowNumber,
+      leadUuid: supabaseLead!.id,
       date: lead.date,
       customerName: lead.customerName,
       email: lead.email,

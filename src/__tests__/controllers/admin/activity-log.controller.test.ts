@@ -239,6 +239,7 @@ describe('Activity Log Controller', () => {
                 status: 'contacted',
                 lead: expect.objectContaining({
                   row: 5,
+                  leadUuid: 'lead_abc123',
                   company: 'บริษัท เทสต์ จำกัด',
                   customerName: 'คุณสมชาย',
                   email: 'somchai@test.co.th',
@@ -535,6 +536,7 @@ describe('Activity Log Controller', () => {
       const firstEntry = responseData.data.entries[0];
       expect(firstEntry.lead).toMatchObject({
         row: 5,
+        leadUuid: 'lead_abc123',
         company: 'บริษัท เทสต์ จำกัด',
         customerName: 'คุณสมชาย',
         email: 'somchai@test.co.th',

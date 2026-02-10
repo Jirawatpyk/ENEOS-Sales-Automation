@@ -153,6 +153,7 @@ export interface ActivityItem {
   salesId: string;
   salesName: string;
   leadId: number;          // Row number
+  leadUuid: string;        // Supabase UUID — primary identifier
   company: string;
   customerName: string;
   timestamp: string;       // ISO 8601
@@ -195,6 +196,7 @@ export interface LeadsListResponse {
  */
 export interface LeadItem {
   row: number;                    // Legacy field (preserved for Dashboard API compatibility)
+  leadUuid: string;               // Supabase UUID — primary identifier
   date: string;                   // ISO 8601
   customerName: string;
   email: string;
@@ -261,6 +263,7 @@ export interface TimelineEntry {
  */
 export interface LeadDetailResponse {
   row: number;
+  leadUuid: string;               // Supabase UUID — primary identifier
   date: string;
   customerName: string;
   email: string;

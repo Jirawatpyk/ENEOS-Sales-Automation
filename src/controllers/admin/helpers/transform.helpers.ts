@@ -33,6 +33,7 @@ export function getActivityTimestamp(lead: LeadRow): string {
 export function leadRowToLeadItem(lead: LeadRow): LeadItem {
   return {
     row: lead.rowNumber,
+    leadUuid: lead.leadUUID || '', // Always set from Supabase; guard for Lead type allowing null
     date: lead.date,
     customerName: lead.customerName,
     email: lead.email,
@@ -75,11 +76,12 @@ export function leadRowToLeadItem(lead: LeadRow): LeadItem {
  */
 export function leadRowToActivityItem(lead: LeadRow): ActivityItem {
   return {
-    id: `act_${lead.rowNumber}`,
+    id: `act_${lead.leadUUID || lead.rowNumber}`,
     type: lead.status as ActivityItem['type'],
     salesId: lead.salesOwnerId || '',
     salesName: lead.salesOwnerName || 'Unknown',
     leadId: lead.rowNumber,
+    leadUuid: lead.leadUUID || '',
     company: lead.company,
     customerName: lead.customerName,
     timestamp: getActivityTimestamp(lead),

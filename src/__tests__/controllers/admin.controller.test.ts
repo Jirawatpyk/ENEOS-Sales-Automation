@@ -997,6 +997,7 @@ describe('Admin Controller', () => {
       const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(response.success).toBe(true);
       expect(response.data.row).toBe(5);
+      expect(response.data).toHaveProperty('leadUuid');
       expect(response.data.customerName).toBe('Test Customer');
       expect(response.data).toHaveProperty('history');
       expect(response.data).toHaveProperty('metrics');

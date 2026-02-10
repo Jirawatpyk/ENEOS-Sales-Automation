@@ -161,16 +161,22 @@ export async function getDashboard(
         return new Date(bTime).getTime() - new Date(aTime).getTime();
       })
       .slice(0, DASHBOARD.RECENT_ACTIVITY_LIMIT)
-      .map((lead) => ({
-        id: `act_${lead.rowNumber}`,
-        type: lead.status as ActivityItem['type'],
-        salesId: lead.salesOwnerId || '',
-        salesName: lead.salesOwnerName || 'Unknown',
-        leadId: lead.rowNumber,
-        company: lead.company,
-        customerName: lead.customerName,
-        timestamp: getActivityTimestamp(lead),
-      }));
+      .map((lead) => {
+        if (!lead.leadUUID) {
+          logger.warn('Lead missing UUID in dashboard activity', { rowNumber: lead.rowNumber, email: lead.email });
+        }
+        return {
+          id: `act_${lead.leadUUID || lead.rowNumber}`,
+          type: lead.status as ActivityItem['type'],
+          salesId: lead.salesOwnerId || '',
+          salesName: lead.salesOwnerName || 'Unknown',
+          leadId: lead.rowNumber,
+          leadUuid: lead.leadUUID || '',
+          company: lead.company,
+          customerName: lead.customerName,
+          timestamp: getActivityTimestamp(lead),
+        };
+      });
 
     // Alerts
     const alerts: Alert[] = [];

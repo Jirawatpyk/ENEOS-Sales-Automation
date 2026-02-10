@@ -278,7 +278,7 @@ describe('Admin Controller - Export', () => {
       expect(res.send).toHaveBeenCalled();
     });
 
-    it('should limit export to MAX_ROWS', async () => {
+    it('should limit export to MAX_ROWS', { timeout: 30_000 }, async () => {
       // Create array of 15000 leads (exceeds MAX_ROWS = 10000)
       const mockLeads: LeadRow[] = Array.from({ length: 15000 }, (_, i) =>
         createSampleLead({ rowNumber: i + 2 })

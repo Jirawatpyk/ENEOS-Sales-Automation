@@ -57,6 +57,10 @@ vi.mock('../../services/leads.service.js', () => ({
   claimLead: (...args: unknown[]) => mockClaimLead(...args),
 }));
 
+vi.mock('../../services/sales-team.service.js', () => ({
+  ensureSalesTeamMember: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../services/dead-letter-queue.service.js', () => ({
   addFailedLinePostback: (...args: unknown[]) => mockAddFailedLinePostback(...args),
 }));

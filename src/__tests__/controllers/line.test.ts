@@ -61,6 +61,10 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }));
 
+vi.mock('../../services/sales-team.service.js', () => ({
+  ensureSalesTeamMember: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../services/dead-letter-queue.service.js', () => ({
   addFailedLinePostback: vi.fn().mockReturnValue('dlq-123'),
   deadLetterQueue: {

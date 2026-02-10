@@ -39,6 +39,51 @@ function mapToSalesTeamMemberFull(row: Record<string, unknown>): SalesTeamMember
 // ===========================================
 
 /**
+ * Ensure a LINE user exists in sales_team (auto-create if not found)
+ * Called after claimLead — creates an "unlinked" entry so Admin can link later.
+ * Fire-and-forget: catches all errors internally, never throws.
+ */
+export async function ensureSalesTeamMember(lineUserId: string, displayName: string): Promise<void> {
+  try {
+    // Check if already exists
+    const { data: existing } = await supabase
+      .from('sales_team')
+      .select('line_user_id')
+      .eq('line_user_id', lineUserId)
+      .maybeSingle();
+
+    if (existing) {return;} // Already in sales_team
+
+    // Insert new unlinked LINE account (no email — Admin links later)
+    const { error } = await supabase
+      .from('sales_team')
+      .insert({
+        line_user_id: lineUserId,
+        name: displayName,
+        email: null,
+        phone: null,
+        role: 'sales',
+        status: 'active',
+      });
+
+    if (error) {
+      // 23505 = unique constraint — another request already inserted
+      if (error.code === '23505') {return;}
+      logger.warn('Failed to auto-create sales team member', { lineUserId, error: error.message });
+      return;
+    }
+
+    logger.info('Auto-created sales team member from LINE claim', { lineUserId, displayName });
+  } catch (err) {
+    // Fire-and-forget — never block the claim flow
+    logger.warn('ensureSalesTeamMember failed (non-fatal)', {
+      lineUserId,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
+}
+
+/**
  * Get sales team member by LINE User ID (AC #1)
  * SELECT line_user_id, name, email, phone FROM sales_team WHERE line_user_id = $1
  */

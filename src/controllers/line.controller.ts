@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { lineLogger as logger } from '../utils/logger.js';
 import * as leadsService from '../services/leads.service.js';
+import { ensureSalesTeamMember } from '../services/sales-team.service.js';
 import { lineService } from '../services/line.service.js';
 import { addFailedLinePostback } from '../services/dead-letter-queue.service.js';
 import {
@@ -193,6 +194,9 @@ async function processLineEvent(event: LineWebhookEventInput): Promise<void> {
       });
       return;
     }
+
+    // Ensure LINE user exists in sales_team (fire-and-forget)
+    ensureSalesTeamMember(userId, userName).catch(() => {});
 
     // Check if this is a NEW claim or owner updating status
     if (result.isNewClaim) {

@@ -16,6 +16,7 @@ const mockGetLeadByIdSupa = vi.fn();
 const mockSupabaseLeadToLeadRow = vi.fn();
 const mockGetLeadsWithPagination = vi.fn();
 const mockGetDistinctFilterValues = vi.fn();
+const mockGetCampaignEventsByEmail = vi.fn();
 
 vi.mock('../../services/sales-team.service.js', () => ({
   salesTeamService: {
@@ -26,6 +27,12 @@ vi.mock('../../services/sales-team.service.js', () => ({
 vi.mock('../../services/status-history.service.js', () => ({
   statusHistoryService: {
     getStatusHistory: (leadId: string) => mockGetStatusHistory(leadId),
+  },
+}));
+
+vi.mock('../../services/campaign-stats.service.js', () => ({
+  campaignStatsService: {
+    getCampaignEventsByEmail: (email: string) => mockGetCampaignEventsByEmail(email),
   },
 }));
 
@@ -128,6 +135,7 @@ describe('Admin Controller', () => {
     mockGetStatusHistory.mockResolvedValue([]); // Default to empty history (fallback mode)
     mockGetLeadByIdSupa.mockResolvedValue(null);
     mockSupabaseLeadToLeadRow.mockReturnValue(null);
+    mockGetCampaignEventsByEmail.mockResolvedValue([]);
     mockGetLeadsWithPagination.mockResolvedValue({ data: [], total: 0 });
     mockGetDistinctFilterValues.mockResolvedValue({
       owners: [],
@@ -1383,6 +1391,166 @@ describe('Admin Controller', () => {
       expect(response.data.dbdSector).toBeNull();
       expect(response.data.province).toBeNull();
       expect(response.data.fullAddress).toBeNull();
+    });
+
+    // Story 9-5: Campaign Events + Timeline Tests
+    it('should include campaignEvents[] when lead has campaign events', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({ rowNumber: 5, email: 'user@example.com' });
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
+
+      mockGetCampaignEventsByEmail.mockResolvedValue([
+        {
+          campaignId: '100',
+          campaignName: 'BMF2026',
+          event: 'click',
+          eventAt: '2026-02-01T12:00:00.000Z',
+          url: 'https://example.com/promo',
+        },
+        {
+          campaignId: '100',
+          campaignName: 'BMF2026',
+          event: 'opened',
+          eventAt: '2026-02-01T10:00:00.000Z',
+          url: null,
+        },
+      ]);
+
+      await getLeadById(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.campaignEvents).toHaveLength(2);
+      expect(response.data.campaignEvents[0].event).toBe('click');
+      expect(response.data.campaignEvents[1].event).toBe('opened');
+    });
+
+    it('should return campaignEvents: [] when lead has no campaign events', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({ rowNumber: 5 });
+      mockGetLeadByIdSupa.mockResolvedValue({ id: String(lead.rowNumber) });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
+
+      mockGetCampaignEventsByEmail.mockResolvedValue([]);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.campaignEvents).toEqual([]);
+    });
+
+    it('should merge timeline from status history + campaign events sorted chronologically', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        status: 'contacted',
+        salesOwnerId: 'sales-001',
+        salesOwnerName: 'Sales Person',
+        leadUUID: 'lead_timeline-test',
+      });
+      mockGetLeadByIdSupa.mockResolvedValue({ id: 'lead_timeline-test' });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
+
+      // Status history entries
+      mockGetStatusHistory.mockResolvedValue([
+        {
+          leadUUID: 'lead_timeline-test',
+          status: 'new',
+          changedById: 'system',
+          changedByName: 'System',
+          timestamp: '2026-02-01T08:00:00.000Z',
+        },
+        {
+          leadUUID: 'lead_timeline-test',
+          status: 'contacted',
+          changedById: 'sales-001',
+          changedByName: 'Sales Person',
+          timestamp: '2026-02-01T12:00:00.000Z',
+        },
+      ]);
+
+      // Campaign events
+      mockGetCampaignEventsByEmail.mockResolvedValue([
+        {
+          campaignId: '100',
+          campaignName: 'BMF2026',
+          event: 'delivered',
+          eventAt: '2026-02-01T07:00:00.000Z',
+          url: null,
+        },
+        {
+          campaignId: '100',
+          campaignName: 'BMF2026',
+          event: 'click',
+          eventAt: '2026-02-01T10:00:00.000Z',
+          url: 'https://example.com',
+        },
+      ]);
+
+      await getLeadById(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const timeline = response.data.timeline;
+
+      expect(timeline).toHaveLength(4);
+      // Sorted newest first: contacted (12:00), click (10:00), new (08:00), delivered (07:00)
+      expect(timeline[0].type).toBe('status_change');
+      expect(timeline[0].status).toBe('contacted');
+      expect(timeline[1].type).toBe('campaign_event');
+      expect(timeline[1].event).toBe('click');
+      expect(timeline[2].type).toBe('status_change');
+      expect(timeline[2].status).toBe('new');
+      expect(timeline[3].type).toBe('campaign_event');
+      expect(timeline[3].event).toBe('delivered');
+    });
+
+    it('should handle campaign event fetch failure gracefully', async () => {
+      const req = createMockRequest({ params: { id: '5' } });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      const lead = createSampleLead({
+        rowNumber: 5,
+        status: 'contacted',
+        salesOwnerId: 'sales-001',
+        salesOwnerName: 'Sales Person',
+        leadUUID: 'lead_err-test',
+      });
+      mockGetLeadByIdSupa.mockResolvedValue({ id: 'lead_err-test' });
+      mockSupabaseLeadToLeadRow.mockReturnValue(lead);
+
+      mockGetStatusHistory.mockResolvedValue([
+        {
+          leadUUID: 'lead_err-test',
+          status: 'new',
+          changedById: 'system',
+          changedByName: 'System',
+          timestamp: '2026-02-01T08:00:00.000Z',
+        },
+      ]);
+
+      // Campaign events fetch fails
+      mockGetCampaignEventsByEmail.mockRejectedValue(new Error('DB error'));
+
+      await getLeadById(req, res, next);
+
+      // Should still return 200 with empty campaignEvents
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.campaignEvents).toEqual([]);
+      // Timeline only contains status history entries
+      expect(response.data.timeline).toHaveLength(1);
+      expect(response.data.timeline[0].type).toBe('status_change');
     });
   });
 

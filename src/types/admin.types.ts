@@ -233,6 +233,28 @@ export interface LeadItem {
   fullAddress: string | null;
 }
 
+/** Campaign event for lead detail timeline */
+export interface LeadCampaignEvent {
+  campaignId: string;
+  campaignName: string;
+  event: string;           // delivered | opened | click
+  eventAt: string;         // ISO 8601
+  url: string | null;      // URL for click events
+}
+
+/** Unified timeline entry (campaign event or status change) */
+export interface TimelineEntry {
+  type: 'campaign_event' | 'status_change';
+  timestamp: string;       // ISO 8601
+  // Campaign event fields
+  event?: string;
+  campaignName?: string;
+  url?: string | null;
+  // Status change fields
+  status?: LeadStatus;
+  changedBy?: string;
+}
+
 /**
  * Lead Detail Response
  * GET /api/admin/leads/:id
@@ -274,6 +296,9 @@ export interface LeadDetailResponse {
   province: string | null;
   /** Full company address - ที่อยู่เต็มของบริษัท from DBD registration */
   fullAddress: string | null;
+  // Campaign engagement timeline (Story 9-5)
+  campaignEvents: LeadCampaignEvent[];
+  timeline: TimelineEntry[];
 }
 
 /**

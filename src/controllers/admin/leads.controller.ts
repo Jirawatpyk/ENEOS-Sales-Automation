@@ -7,6 +7,7 @@ import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../utils/logger.js';
 import { salesTeamService } from '../../services/sales-team.service.js';
 import { statusHistoryService } from '../../services/status-history.service.js';
+import { campaignStatsService } from '../../services/campaign-stats.service.js';
 import * as leadsService from '../../services/leads.service.js';
 import {
   AdminApiResponse,
@@ -18,6 +19,8 @@ import {
   PaginationMeta,
   AppliedFilters,
   AvailableFilters,
+  type LeadCampaignEvent,
+  type TimelineEntry,
 } from '../../types/admin.types.js';
 import {
   leadsQuerySchema,
@@ -198,10 +201,16 @@ export async function getLeadById(
       return;
     }
 
-    // Get status history from Supabase (FK-based: use supabaseLead.id)
-    const historyEntries = supabaseLead
-      ? await statusHistoryService.getStatusHistory(supabaseLead.id)
-      : [];
+    // Get status history + campaign events in parallel (Story 9-5)
+    const [historyEntries, campaignEvents] = await Promise.all([
+      supabaseLead
+        ? statusHistoryService.getStatusHistory(supabaseLead.id)
+        : Promise.resolve([]),
+      campaignStatsService.getCampaignEventsByEmail(lead.email).catch((err) => {
+        logger.warn('Failed to fetch campaign events for lead', { err, leadId });
+        return [] as LeadCampaignEvent[];
+      }),
+    ]);
 
     let history: StatusHistoryItem[];
 
@@ -257,6 +266,34 @@ export async function getLeadById(
 
     // Sort history (newest first)
     history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    // Build unified timeline (Story 9-5: AC #4)
+    const timeline: TimelineEntry[] = [];
+
+    for (const h of history) {
+      timeline.push({
+        type: 'status_change',
+        timestamp: h.timestamp,
+        status: h.status,
+        changedBy: h.by,
+      });
+    }
+
+    for (const e of campaignEvents) {
+      timeline.push({
+        type: 'campaign_event',
+        timestamp: e.eventAt,
+        event: e.event,
+        campaignName: e.campaignName,
+        url: e.url,
+      });
+    }
+
+    timeline.sort((a, b) => {
+      const timeB = new Date(b.timestamp).getTime() || 0;
+      const timeA = new Date(a.timestamp).getTime() || 0;
+      return timeB - timeA;
+    });
 
     // คำนวณ metrics (หน่วยเป็นนาที)
     let closingTime = 0;
@@ -332,6 +369,9 @@ export async function getLeadById(
       dbdSector: lead.dbdSector ?? null,
       province: lead.province ?? null,
       fullAddress: lead.fullAddress ?? null,
+      // Campaign engagement timeline (Story 9-5)
+      campaignEvents,
+      timeline,
     };
 
     const response: AdminApiResponse<LeadDetailResponse> = {

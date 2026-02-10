@@ -50,6 +50,7 @@ import {
   getAllCampaignStats,
   getCampaignStatsById,
   getCampaignEvents,
+  getCampaignEventsByEmail,
 } from '../../services/campaign-stats.service.js';
 
 // ===========================================
@@ -705,6 +706,136 @@ describe('CampaignStatsService (Supabase)', () => {
   });
 
   // ===========================================
+  // getCampaignEventsByEmail Tests (Story 9-5: AC #1, #2, #3)
+  // ===========================================
+
+  describe('getCampaignEventsByEmail', () => {
+    it('should return events sorted by event_at desc when events exist', async () => {
+      vi.clearAllMocks();
+      resetMockChain();
+
+      mockSupabase.order.mockResolvedValueOnce({
+        data: [
+          {
+            campaign_id: '100', campaign_name: 'BMF2026',
+            event: 'click', event_at: '2026-02-01T12:00:00.000Z',
+            url: 'https://example.com/promo',
+          },
+          {
+            campaign_id: '100', campaign_name: 'BMF2026',
+            event: 'opened', event_at: '2026-02-01T10:00:00.000Z',
+            url: null,
+          },
+          {
+            campaign_id: '100', campaign_name: 'BMF2026',
+            event: 'delivered', event_at: '2026-02-01T09:00:00.000Z',
+            url: null,
+          },
+        ],
+        error: null,
+      });
+
+      const result = await getCampaignEventsByEmail('user@example.com');
+
+      expect(result).toHaveLength(3);
+      expect(result[0].event).toBe('click');
+      expect(result[1].event).toBe('opened');
+      expect(result[2].event).toBe('delivered');
+    });
+
+    it('should return empty array when no events for email', async () => {
+      vi.clearAllMocks();
+      resetMockChain();
+
+      mockSupabase.order.mockResolvedValueOnce({
+        data: [],
+        error: null,
+      });
+
+      const result = await getCampaignEventsByEmail('nobody@example.com');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return events with all fields mapped correctly', async () => {
+      vi.clearAllMocks();
+      resetMockChain();
+
+      mockSupabase.order.mockResolvedValueOnce({
+        data: [
+          {
+            campaign_id: '200', campaign_name: 'Q1 Promo',
+            event: 'click', event_at: '2026-02-05T14:30:00.000Z',
+            url: 'https://eneos.co.th/product',
+          },
+        ],
+        error: null,
+      });
+
+      const result = await getCampaignEventsByEmail('test@example.com');
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        campaignId: '200',
+        campaignName: 'Q1 Promo',
+        event: 'click',
+        eventAt: '2026-02-05T14:30:00.000Z',
+        url: 'https://eneos.co.th/product',
+      });
+    });
+
+    it('should handle Supabase error gracefully (return empty array)', async () => {
+      vi.clearAllMocks();
+      resetMockChain();
+
+      mockSupabase.order.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'DB connection failed', code: '500' },
+      });
+
+      const result = await getCampaignEventsByEmail('test@example.com');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should lowercase email before query', async () => {
+      vi.clearAllMocks();
+      resetMockChain();
+
+      mockSupabase.order.mockResolvedValueOnce({
+        data: [],
+        error: null,
+      });
+
+      await getCampaignEventsByEmail('John@EXAMPLE.COM');
+
+      expect(mockSupabase.eq).toHaveBeenCalledWith('email', 'john@example.com');
+    });
+
+    it('should handle null data from Supabase', async () => {
+      vi.clearAllMocks();
+      resetMockChain();
+
+      mockSupabase.order.mockResolvedValueOnce({
+        data: null,
+        error: null,
+      });
+
+      const result = await getCampaignEventsByEmail('test@example.com');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should return empty array for empty email string', async () => {
+      const result = await getCampaignEventsByEmail('');
+
+      expect(result).toEqual([]);
+      // Should not call Supabase at all
+      expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+  });
+
+  // ===========================================
   // Stats Calculation Tests (AC #7)
   // ===========================================
 
@@ -750,6 +881,7 @@ describe('CampaignStatsService (Supabase)', () => {
       expect(campaignStatsService.getAllCampaignStats).toBe(getAllCampaignStats);
       expect(campaignStatsService.getCampaignStatsById).toBe(getCampaignStatsById);
       expect(campaignStatsService.getCampaignEvents).toBe(getCampaignEvents);
+      expect(campaignStatsService.getCampaignEventsByEmail).toBe(getCampaignEventsByEmail);
       expect(campaignStatsService.healthCheck).toBeDefined();
     });
   });

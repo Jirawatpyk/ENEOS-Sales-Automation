@@ -2,7 +2,7 @@
 
 > **Purpose:** Shared API contract document to prevent frontend/backend parameter mismatches.
 > **Created:** Epic 4 Retrospective Action Item #1
-> **Last Updated:** 2026-01-27 (Bugfix: Content-Disposition header format)
+> **Last Updated:** 2026-02-10 (Story 9-5: Campaign engagement timeline)
 
 ## Quick Reference: Parameter Mapping
 
@@ -236,7 +236,31 @@ interface LeadDetailResponse {
       closingTime: number;     // minutes
       age: number;             // minutes
     };
+    campaignEvents: LeadCampaignEvent[];   // Story 9-5: Campaign engagement events
+    timeline: TimelineEntry[];              // Story 9-5: Unified chronological timeline
   };
+}
+
+/** Campaign event for lead detail timeline (Story 9-5) */
+interface LeadCampaignEvent {
+  campaignId: string;
+  campaignName: string;
+  event: string;           // delivered | opened | click
+  eventAt: string;         // ISO 8601
+  url: string | null;      // URL for click events
+}
+
+/** Unified timeline entry merging campaign events + status changes (Story 9-5) */
+interface TimelineEntry {
+  type: 'campaign_event' | 'status_change';
+  timestamp: string;       // ISO 8601 — sorted newest first
+  // Campaign event fields (when type = 'campaign_event')
+  event?: string;
+  campaignName?: string;
+  url?: string | null;
+  // Status change fields (when type = 'status_change')
+  status?: LeadStatus;
+  changedBy?: string;
 }
 ```
 
@@ -672,5 +696,6 @@ export async function GET(request: Request) {
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-02-10 | Story 9-5: Added `campaignEvents[]` and `timeline[]` to GET /api/admin/leads/:id | Amelia (Dev Agent) |
 | 2026-01-26 | Changed `industry` field from Thai to generic English format. Removed `dbdSectorDescription` (merged into `industry`). | Tech Writer + Amelia |
 | 2026-01-19 | Initial version from Epic 4 Retrospective | Amelia (Dev Agent) |

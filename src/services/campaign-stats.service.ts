@@ -10,6 +10,7 @@ import type { NormalizedCampaignEvent } from '../validators/campaign-event.valid
 import type {
   CampaignStatsItem,
   CampaignEventItem,
+  LeadCampaignEvent,
   PaginationMeta,
   CampaignStatsSortBy,
 } from '../types/admin.types.js';
@@ -425,6 +426,38 @@ export async function getCampaignEvents(
 }
 
 // ===========================================
+// Lead-Level Campaign Events (Story 9-5)
+// ===========================================
+
+/**
+ * Get campaign events for a specific email (lead detail timeline)
+ * Returns events sorted by event_at desc (newest first)
+ * Graceful degradation: returns [] on error
+ */
+export async function getCampaignEventsByEmail(email: string): Promise<LeadCampaignEvent[]> {
+  if (!email) {return [];}
+
+  const { data, error } = await supabase
+    .from('campaign_events')
+    .select('campaign_id, campaign_name, event, event_at, url')
+    .eq('email', email.toLowerCase())
+    .order('event_at', { ascending: false });
+
+  if (error) {
+    logger.warn('Failed to get campaign events by email', { error, email });
+    return [];
+  }
+
+  return (data || []).map(row => ({
+    campaignId: String(row.campaign_id),
+    campaignName: row.campaign_name || '',
+    event: row.event,
+    eventAt: row.event_at || '',
+    url: row.url || null,
+  }));
+}
+
+// ===========================================
 // Health Check
 // ===========================================
 
@@ -520,5 +553,6 @@ export const campaignStatsService = {
   getAllCampaignStats,
   getCampaignStatsById,
   getCampaignEvents,
+  getCampaignEventsByEmail,
   healthCheck,
 };

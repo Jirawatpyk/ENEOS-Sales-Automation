@@ -24,6 +24,8 @@ export const DASHBOARD = {
   TOP_SALES_LIMIT: 5,
   /** จำนวน recent activity ที่แสดง */
   RECENT_ACTIVITY_LIMIT: 10,
+  /** จำนวน top campaigns ที่แสดงใน Campaign Summary */
+  CAMPAIGN_SUMMARY_TOP_LIMIT: 3,
 } as const;
 
 // ===========================================

@@ -17,6 +17,7 @@ const mockSupabaseLeadToLeadRow = vi.fn();
 const mockGetLeadsWithPagination = vi.fn();
 const mockGetDistinctFilterValues = vi.fn();
 const mockGetCampaignEventsByEmail = vi.fn();
+const mockGetAllCampaignStats = vi.fn();
 
 vi.mock('../../services/sales-team.service.js', () => ({
   getSalesTeamMember: (id: string) => mockGetSalesTeamMember(id),
@@ -28,6 +29,7 @@ vi.mock('../../services/status-history.service.js', () => ({
 
 vi.mock('../../services/campaign-stats.service.js', () => ({
   getCampaignEventsByEmail: (email: string) => mockGetCampaignEventsByEmail(email),
+  getAllCampaignStats: (...args: unknown[]) => mockGetAllCampaignStats(...args),
 }));
 
 vi.mock('../../services/leads.service.js', () => ({
@@ -130,6 +132,7 @@ describe('Admin Controller', () => {
     mockGetLeadByIdSupa.mockResolvedValue(null);
     mockSupabaseLeadToLeadRow.mockReturnValue(null);
     mockGetCampaignEventsByEmail.mockResolvedValue([]);
+    mockGetAllCampaignStats.mockResolvedValue({ data: [], pagination: { page: 1, limit: 100, total: 0, totalPages: 0, hasNext: false, hasPrev: false } });
     mockGetLeadsWithPagination.mockResolvedValue({ data: [], total: 0 });
     mockGetDistinctFilterValues.mockResolvedValue({
       owners: [],
@@ -167,6 +170,7 @@ describe('Admin Controller', () => {
       expect(response.data).toHaveProperty('summary');
       expect(response.data).toHaveProperty('trends');
       expect(response.data).toHaveProperty('statusDistribution');
+      expect(response.data).toHaveProperty('campaignSummary');
       expect(response.data).toHaveProperty('topSales');
       expect(response.data).toHaveProperty('recentActivity');
       expect(response.data).toHaveProperty('alerts');
@@ -724,6 +728,103 @@ describe('Admin Controller', () => {
       expect(response.data.recentActivity[0].timestamp).toBe(closedTime);
       expect(response.data.recentActivity[1].timestamp).toBe(contactedTime);
       expect(response.data.recentActivity[2].timestamp).toBe(lostTime);
+    });
+
+    // ===========================================
+    // Campaign Summary (Story 2.9)
+    // ===========================================
+
+    it('should include campaignSummary with aggregated metrics', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      mockGetAllLeads.mockResolvedValue([]);
+      mockGetAllCampaignStats.mockResolvedValue({
+        data: [
+          { campaignId: 1, campaignName: 'Campaign A', delivered: 1000, opened: 250, clicked: 60, clickRate: 6.0, openRate: 25.0, uniqueOpens: 200, uniqueClicks: 50, hardBounce: 0, softBounce: 0, unsubscribe: 0, spam: 0, firstEvent: '2026-01-01', lastUpdated: '2026-02-01' },
+          { campaignId: 2, campaignName: 'Campaign B', delivered: 500, opened: 150, clicked: 45, clickRate: 9.0, openRate: 30.0, uniqueOpens: 120, uniqueClicks: 40, hardBounce: 0, softBounce: 0, unsubscribe: 0, spam: 0, firstEvent: '2026-01-15', lastUpdated: '2026-02-05' },
+          { campaignId: 3, campaignName: 'Campaign C', delivered: 2000, opened: 400, clicked: 80, clickRate: 4.0, openRate: 20.0, uniqueOpens: 350, uniqueClicks: 70, hardBounce: 0, softBounce: 0, unsubscribe: 0, spam: 0, firstEvent: '2026-01-20', lastUpdated: '2026-02-08' },
+        ],
+        pagination: { page: 1, limit: 100, total: 3, totalPages: 1, hasNext: false, hasPrev: false },
+      });
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const cs = response.data.campaignSummary;
+
+      expect(cs).not.toBeNull();
+      expect(cs.totalCampaigns).toBe(3);
+      expect(cs.totalDelivered).toBe(3500); // 1000 + 500 + 2000
+      // Weighted averages: opened=800/3500=22.9%, clicked=185/3500=5.3%
+      expect(cs.avgOpenRate).toBeCloseTo(22.9, 1);
+      expect(cs.avgClickRate).toBeCloseTo(5.3, 1);
+    });
+
+    it('should return top 3 campaigns sorted by click rate descending', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      mockGetAllLeads.mockResolvedValue([]);
+      mockGetAllCampaignStats.mockResolvedValue({
+        data: [
+          { campaignId: 1, campaignName: 'Low', delivered: 100, opened: 10, clicked: 2, clickRate: 2.0, openRate: 10.0, uniqueOpens: 8, uniqueClicks: 2, hardBounce: 0, softBounce: 0, unsubscribe: 0, spam: 0, firstEvent: '2026-01-01', lastUpdated: '2026-02-01' },
+          { campaignId: 2, campaignName: 'High', delivered: 100, opened: 30, clicked: 10, clickRate: 10.0, openRate: 30.0, uniqueOpens: 25, uniqueClicks: 9, hardBounce: 0, softBounce: 0, unsubscribe: 0, spam: 0, firstEvent: '2026-01-01', lastUpdated: '2026-02-01' },
+          { campaignId: 3, campaignName: 'Medium', delivered: 100, opened: 20, clicked: 5, clickRate: 5.0, openRate: 20.0, uniqueOpens: 15, uniqueClicks: 4, hardBounce: 0, softBounce: 0, unsubscribe: 0, spam: 0, firstEvent: '2026-01-01', lastUpdated: '2026-02-01' },
+          { campaignId: 4, campaignName: 'Extra', delivered: 100, opened: 5, clicked: 1, clickRate: 1.0, openRate: 5.0, uniqueOpens: 4, uniqueClicks: 1, hardBounce: 0, softBounce: 0, unsubscribe: 0, spam: 0, firstEvent: '2026-01-01', lastUpdated: '2026-02-01' },
+        ],
+        pagination: { page: 1, limit: 100, total: 4, totalPages: 1, hasNext: false, hasPrev: false },
+      });
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      const topCampaigns = response.data.campaignSummary.topCampaigns;
+
+      expect(topCampaigns).toHaveLength(3);
+      expect(topCampaigns[0].campaignName).toBe('High');
+      expect(topCampaigns[0].clickRate).toBe(10.0);
+      expect(topCampaigns[1].campaignName).toBe('Medium');
+      expect(topCampaigns[2].campaignName).toBe('Low');
+    });
+
+    it('should return campaignSummary as null when campaign stats service fails (graceful degradation)', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      mockGetAllLeads.mockResolvedValue([
+        createSampleLead({ status: 'new' }),
+      ]);
+      mockGetAllCampaignStats.mockRejectedValue(new Error('Service unavailable'));
+
+      await getDashboard(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.success).toBe(true);
+      expect(response.data.campaignSummary).toBeNull();
+      // Lead data should still be present
+      expect(response.data.summary.totalLeads).toBe(1);
+    });
+
+    it('should return campaignSummary as null when no campaign stats exist', async () => {
+      const req = createMockRequest();
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      mockGetAllLeads.mockResolvedValue([]);
+      mockGetAllCampaignStats.mockResolvedValue({
+        data: [],
+        pagination: { page: 1, limit: 100, total: 0, totalPages: 0, hasNext: false, hasPrev: false },
+      });
+
+      await getDashboard(req, res, next);
+
+      const response = (res.json as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(response.data.campaignSummary).toBeNull();
     });
   });
 

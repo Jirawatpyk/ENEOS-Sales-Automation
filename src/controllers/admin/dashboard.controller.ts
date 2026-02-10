@@ -10,10 +10,12 @@ import {
   AdminApiResponse,
   DashboardResponse,
   DashboardSummary,
+  CampaignSummary,
   TopSalesPerson,
   ActivityItem,
   Alert,
 } from '../../types/admin.types.js';
+import { getAllCampaignStats } from '../../services/campaign-stats.service.js';
 import { DASHBOARD, ALERTS } from '../../constants/admin.constants.js';
 import { dashboardQuerySchema, safeValidateQuery } from '../../validators/admin.validators.js';
 import {
@@ -225,6 +227,44 @@ export async function getDashboard(
       });
     }
 
+    // Campaign Summary (Story 2.9) — graceful degradation
+    let campaignSummary: CampaignSummary | null = null;
+    try {
+      const campaignResult = await getAllCampaignStats({ page: 1, limit: 100 });
+      const stats = campaignResult.data;
+
+      if (stats.length > 0) {
+        const totalDelivered = stats.reduce((sum, c) => sum + c.delivered, 0);
+        const totalOpened = stats.reduce((sum, c) => sum + c.opened, 0);
+        const totalClicked = stats.reduce((sum, c) => sum + c.clicked, 0);
+        // Weighted average — accurate when campaigns have different delivery volumes
+        const avgOpenRate = totalDelivered > 0 ? (totalOpened / totalDelivered) * 100 : 0;
+        const avgClickRate = totalDelivered > 0 ? (totalClicked / totalDelivered) * 100 : 0;
+
+        // Top 3 by click rate
+        const topCampaigns = [...stats]
+          .sort((a, b) => b.clickRate - a.clickRate)
+          .slice(0, DASHBOARD.CAMPAIGN_SUMMARY_TOP_LIMIT)
+          .map(c => ({
+            campaignId: c.campaignId,
+            campaignName: c.campaignName,
+            clickRate: c.clickRate,
+          }));
+
+        campaignSummary = {
+          totalCampaigns: stats.length,
+          totalDelivered,
+          avgOpenRate: Number(avgOpenRate.toFixed(1)),
+          avgClickRate: Number(avgClickRate.toFixed(1)),
+          topCampaigns,
+        };
+      }
+    } catch (_error) {
+      // Graceful degradation — campaign summary is optional
+      logger.warn('Failed to fetch campaign summary for dashboard');
+      campaignSummary = null;
+    }
+
     const response: AdminApiResponse<DashboardResponse> = {
       success: true,
       data: {
@@ -233,6 +273,7 @@ export async function getDashboard(
           daily: dailyTrends,
         },
         statusDistribution: statusCount,
+        campaignSummary,
         topSales,
         recentActivity,
         alerts,

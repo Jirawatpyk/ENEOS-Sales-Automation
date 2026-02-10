@@ -75,10 +75,10 @@ development_status:
   # EPIC-01 SUMMARY: 5 stories ready (28 ACs, 128 subtasks)
 
   # ============================================================
-  # EPIC-02: Dashboard Overview - COMPLETED
-  # All 8 stories done (2026-01-13)
+  # EPIC-02: Dashboard Overview
+  # Reopened: 2026-02-11 for Campaign Summary enhancement
   # ============================================================
-  epic-2: done
+  epic-2: in-progress
   2-1-kpi-cards: done                     # Must Have - Code review passed 2026-01-13
   2-2-lead-trend-chart: done              # Must Have - Code review passed 2026-01-13
   2-3-status-distribution: done            # Must Have - Done 2026-01-13
@@ -88,8 +88,9 @@ development_status:
   2-6-alerts-panel: done                  # Should Have - Code review passed 2026-01-13
   2-7-date-filter: done                   # Should Have - Code review passed 2026-01-13
   2-8-auto-refresh: done                  # Could Have - Code review passed 2026-01-13
+  2-9-campaign-summary-dashboard: ready-for-dev  # Replace Status Distribution with Campaign Summary (Backend + Frontend)
   epic-2-retrospective: done              # Retrospective completed 2026-01-13
-  # EPIC-02 SUMMARY: 8/8 done (54 ACs, ~180 subtasks)
+  # EPIC-02 SUMMARY: 8/8 done + 1 new (54 ACs, ~180 subtasks)
 
   # ============================================================
   # EPIC-03: Sales Team Performance

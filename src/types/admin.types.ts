@@ -83,6 +83,7 @@ export interface DashboardResponse {
     daily: DailyTrend[];
   };
   statusDistribution: StatusDistribution;
+  campaignSummary: CampaignSummary | null;
   topSales: TopSalesPerson[];
   recentActivity: ActivityItem[];
   alerts: Alert[];
@@ -903,6 +904,32 @@ export interface GetAllStatusHistoryOptions {
   to?: string;                   // ISO date
   status?: string[];             // Filter by status values
   changedBy?: string;            // LINE User ID or 'System'
+}
+
+// ============================================================================
+// Campaign Summary Types (Story 2-9: Dashboard Campaign Summary)
+// ============================================================================
+
+/**
+ * Top Campaign Item (for Dashboard Campaign Summary)
+ * Ranked by click rate
+ */
+export interface TopCampaignItem {
+  campaignId: number;
+  campaignName: string;
+  clickRate: number;          // percentage (0-100)
+}
+
+/**
+ * Campaign Summary (for Dashboard)
+ * Aggregated campaign metrics shown on main dashboard
+ */
+export interface CampaignSummary {
+  totalCampaigns: number;
+  totalDelivered: number;
+  avgOpenRate: number;        // percentage (0-100), weighted average
+  avgClickRate: number;       // percentage (0-100), weighted average
+  topCampaigns: TopCampaignItem[];  // max 3, sorted by clickRate desc
 }
 
 // ============================================================================

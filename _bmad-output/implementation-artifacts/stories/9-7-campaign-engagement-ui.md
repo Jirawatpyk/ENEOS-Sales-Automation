@@ -1,6 +1,6 @@
 # Story 9.7: Campaign Engagement Timeline UI
 
-Status: dev-complete
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -234,10 +234,24 @@ Claude Opus 4.6 (Amelia)
 - Full suite: 245 files, 3466 tests passed, 0 failed
 - Build: TypeScript compiles, Next.js build succeeds
 
+### Rex Code Review Fixes (Round 1)
+- **M1** Removed duplicate ExternalLink icon from inside URL link (was showing 2x for click events)
+- **M2** Added URL protocol validation (`event.url.startsWith('http')`) — XSS defense-in-depth
+- **M3** Added `aria-label` on URL link for screen reader accessibility
+- **M4** Changed timestamp `<span>` to semantic `<time dateTime={...}>` — consistent with StatusHistory pattern
+- **L1** Added invalid date edge case test (pre-review checklist Section 1)
+- **L2** Removed redundant `'use client'` from campaign-engagement.tsx (child of client boundary)
+- **L3** Split lead-detail-sheet.tsx (453 → 292 lines): extracted `DetailItem`, `LeadCompanyInfo`, `LeadTimeline`
+- Added 3 new tests: XSS prevention, aria-label validation, invalid date edge case
+- Post-fix: 46/46 tests passing, TypeScript compiles clean
+
 ### File List
 | File | Action |
 |------|--------|
 | `eneos-admin-dashboard/src/components/leads/campaign-engagement.tsx` | Created |
 | `eneos-admin-dashboard/src/__tests__/campaign-engagement.test.tsx` | Created |
-| `eneos-admin-dashboard/src/components/leads/lead-detail-sheet.tsx` | Modified (Campaign section replaced) |
+| `eneos-admin-dashboard/src/components/leads/lead-detail-sheet.tsx` | Modified (Campaign section replaced + split to 292 lines) |
 | `eneos-admin-dashboard/src/__tests__/lead-detail-sheet.test.tsx` | Modified (mocks + AC#7 tests updated) |
+| `eneos-admin-dashboard/src/components/leads/detail-item.tsx` | Created (extracted from lead-detail-sheet) |
+| `eneos-admin-dashboard/src/components/leads/lead-company-info.tsx` | Created (extracted from lead-detail-sheet) |
+| `eneos-admin-dashboard/src/components/leads/lead-timeline.tsx` | Created (extracted from lead-detail-sheet) |

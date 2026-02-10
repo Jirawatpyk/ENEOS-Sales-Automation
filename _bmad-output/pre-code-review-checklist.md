@@ -2,9 +2,9 @@
 
 > **Purpose:** Catch common issues BEFORE code review to reduce review cycles.
 > **Created:** Epic 4 Retrospective Action Item #2
-> **Updated:** Epic 5 Retrospective Action Items #1, #2, #3
+> **Updated:** Epic 5 Action Items #1, #2, #3 | Epic 9 Action Items #1, #2
 > **Owner:** Bob (SM Agent)
-> **Last Updated:** 2026-01-31
+> **Last Updated:** 2026-02-10
 
 ---
 
@@ -162,8 +162,9 @@ export function TimeDisplay() {
 
 ### Data Transformation
 - [ ] **Time values** - Are time values in MINUTES (not seconds)?
-- [ ] **Row ID** - Is row number used as primary key (starts at 2)?
+- [ ] **UUID primary key** - Use UUID (string) as lead identifier, not row number
 - [ ] **Date format** - Are dates in ISO 8601 format?
+- [ ] **Type boundaries** - camelCase (app) ↔ snake_case (Supabase) mapped correctly?
 
 ---
 
@@ -222,6 +223,17 @@ export function TimeDisplay() {
 | Naming conflict | Check existing component names before creating new ones |
 | Missing TEA guardrail | Run TEA after every story approval |
 
+### From Epic 9 (Supabase Migration)
+| Issue | How to Avoid |
+|-------|--------------|
+| PostgREST filter injection | Never pass user input directly to `.eq()`, `.ilike()` — sanitize `%`, `_`, `\` |
+| Type boundary mismatch (camelCase ↔ snake_case) | Use mapper functions at service boundaries (e.g., `toSupabaseLead()`, `fromSupabaseLead()`) |
+| Stale references after migration | Search entire codebase for old patterns (imports, comments, docs, scripts) |
+| Cleanup stories underestimated | Budget 2x review time — orphaned code, stale docs, CI/CD config always lurk |
+| LIKE wildcard escaping | Escape `%` and `_` in user-supplied search strings before `.ilike()` |
+| Supabase chainable mock complexity | Use `vi.hoisted()` pattern — see `src/__tests__/mocks/` for template |
+| Missing integration testing | Migration/infrastructure epics MUST include a live integration test story |
+
 ---
 
 ## Checklist Summary
@@ -234,9 +246,10 @@ Before requesting code review, confirm:
 [ ] Edge cases handled (null, undefined, empty, whitespace, NaN)
 [ ] Accessibility complete (keyboard, screen reader, touch)
 [ ] UI states covered (loading, empty, error, responsive)
-[ ] API integration correct (param names, response handling)
+[ ] API integration correct (param names, response handling, UUID keys)
 [ ] Code quality verified (TypeScript, React patterns, tests)
 [ ] Documentation updated (story file, comments)
+[ ] Migration checks done - integration test story, type boundaries, RLS (Epic 9 Action #1, #2)
 ```
 
 After code review APPROVED, confirm:
@@ -277,6 +290,24 @@ After code review APPROVED, confirm:
 
 ---
 
+## 8. Migration & Infrastructure Epics (Epic 9 Action Items #1, #2)
+
+> **Why:** Epic 9 revealed that migration epics have unique risks: mocked unit tests don't prove integration works, and cleanup stories always take longer than expected.
+
+### Story Planning Conventions
+- [ ] **Integration test story** - Migration/infrastructure epics MUST include a dedicated story for live integration testing (not just mocked unit tests)
+- [ ] **Cleanup story sizing** - Budget 2x review cycles for deletion/documentation cleanup stories (orphaned code, stale docs, CI/CD config always lurk)
+- [ ] **Smoke test checklist** - Define end-to-end smoke test scenarios before marking migration epic as production-ready
+
+### Supabase-Specific Checks
+- [ ] **RLS policies** - Are Row Level Security policies restrictive (not allow-all)?
+- [ ] **Chainable mock** - Use `vi.hoisted()` pattern for Supabase client mocks
+- [ ] **Type mapper** - camelCase ↔ snake_case mapper functions at every service boundary
+- [ ] **Filter sanitization** - User input sanitized before `.eq()`, `.ilike()`, `.in()` filters
+- [ ] **Error codes** - Handle Supabase error codes (e.g., `23505` = UNIQUE violation)
+
+---
+
 ## Version History
 
 | Date | Change | Author |
@@ -286,3 +317,6 @@ After code review APPROVED, confirm:
 | 2026-01-31 | Added Section 0b: SSR/Hydration Safety (Epic 5 Action #2) | Amelia (Dev Agent) |
 | 2026-01-31 | Added Section 7: TEA Guardrail post-implementation step (Epic 5 Action #3) | Amelia (Dev Agent) |
 | 2026-01-31 | Added Epic 5 Common Issues to Quick Reference | Amelia (Dev Agent) |
+| 2026-02-10 | Added Section 8: Migration & Infrastructure Epics (Epic 9 Action #1, #2) | Bob (SM Agent) |
+| 2026-02-10 | Added Epic 9 Common Issues to Quick Reference | Bob (SM Agent) |
+| 2026-02-10 | Updated Section 4: UUID primary key + type boundaries (replaces Row ID) | Bob (SM Agent) |

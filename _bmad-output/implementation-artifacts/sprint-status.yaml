@@ -191,7 +191,7 @@ development_status:
   # Source: ADR-002-supabase-migration.md
   # Scope: Backend API only (Admin Dashboard unchanged)
   # ============================================================
-  epic-9: in-progress
+  epic-9: done  # Completed 2026-02-10 — All 8 stories + retrospective done
   9-0-supabase-setup-schema-client: done    # Setup + Schema + Client — prerequisite for all - Code review APPROVED (2026-02-09)
   9-1a-migrate-leads-dedup-data-layer: done      # Leads + Dedup Service (Data Layer) — Code review APPROVED + 5 fixes applied (2026-02-09)
   9-1b-migrate-controllers-line-postback: done  # Controllers + LINE Postback (Integration Layer) — Code review APPROVED (2026-02-09)
@@ -200,7 +200,8 @@ development_status:
   9-4-cleanup-google-sheets-docs: done                    # Remove Google Sheets + update docs — Code review APPROVED (2026-02-10)
   9-5-lead-detail-campaign-timeline: done              # Lead Detail + Campaign Engagement Timeline - Code review APPROVED (2026-02-10) — 1423 tests, 4 review fixes
   9-6-frontend-type-updates: done                        # Dashboard TypeScript type updates for UUID — Code review APPROVED (2026-02-10) — Backend 1423 + Dashboard 3453 tests pass
-  epic-9-retrospective: optional
+  9-7-campaign-engagement-ui: done                        # Frontend: Campaign events timeline in Lead Detail sheet — Code review APPROVED + 4 fixes (2026-02-10)
+  epic-9-retrospective: done  # Retrospective completed 2026-02-10
 
   # ============================================================
   # TECH DEBT

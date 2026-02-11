@@ -2,8 +2,8 @@
  * ENEOS Sales Automation - Admin Dashboard Routes
  * Routes for Admin Dashboard API endpoints
  *
- * ใช้ Google OAuth authentication และ RBAC
- * เฉพาะ email domain @eneos.co.th เท่านั้น
+ * ใช้ Supabase JWT authentication และ RBAC
+ * Invite-only — ต้องมี account ใน sales_team table
  */
 
 import { Router } from 'express';
@@ -101,8 +101,9 @@ router.get('/me', (req, res) => {
     success: true,
     data: {
       email: req.user?.email || '',
-      name: req.user?.name || '',
       role: req.user?.role || 'viewer',
+      authUserId: req.user?.authUserId || '',
+      memberId: req.user?.memberId || '',
     },
   });
 });

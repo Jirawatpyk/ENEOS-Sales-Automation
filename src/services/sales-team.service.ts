@@ -93,11 +93,11 @@ export async function getSalesTeamMember(lineUserId: string): Promise<SalesTeamM
 /**
  * Get user by email — for admin auth middleware (AC #2)
  * SELECT * FROM sales_team WHERE email = $1
- * Returns role + status for login control
+ * Returns role + status + id + authUserId for login control and auto-link
  */
 export async function getUserByEmail(
   email: string
-): Promise<(SalesTeamMember & { role: string; status: 'active' | 'inactive' }) | null> {
+): Promise<(SalesTeamMember & { id: string; role: string; status: 'active' | 'inactive'; authUserId: string | null }) | null> {
   const { data, error } = await supabase
     .from('sales_team')
     .select('*')
@@ -108,6 +108,7 @@ export async function getUserByEmail(
   if (!data) {return null;}
 
   return {
+    id: data.id,
     lineUserId: data.line_user_id || '',
     name: data.name,
     email: data.email,
@@ -115,6 +116,7 @@ export async function getUserByEmail(
     role: data.role,
     createdAt: data.created_at,
     status: data.status as 'active' | 'inactive',
+    authUserId: data.auth_user_id || null,
   };
 }
 
@@ -342,5 +344,35 @@ export async function getUnlinkedDashboardMembers(): Promise<SalesTeamMemberFull
   if (error) {throw error;}
 
   return (data || []).map(mapToSalesTeamMemberFull);
+}
+
+/**
+ * Auto-link auth_user_id to sales_team member on first login (AC #6)
+ * Race-safe: UPDATE ... WHERE auth_user_id IS NULL
+ * Fire-and-forget: catches ALL errors internally, never throws
+ * Same pattern as linkLINEAccount — atomic conditional update
+ */
+export async function autoLinkAuthUser(memberId: string, authUserId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('sales_team')
+      .update({ auth_user_id: authUserId })
+      .eq('id', memberId)
+      .is('auth_user_id', null);
+
+    if (error) {
+      logger.warn('autoLinkAuthUser: DB update failed (non-fatal)', {
+        memberId,
+        errorCode: error.code,
+        errorMessage: error.message,
+      });
+    }
+  } catch (err) {
+    // Fire-and-forget — never throw to caller
+    logger.warn('autoLinkAuthUser failed (non-fatal)', {
+      memberId,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
 }
 

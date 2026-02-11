@@ -44,7 +44,7 @@ function createMockRequest(overrides: Partial<Request> = {}): Request {
   return {
     query: {},
     params: {},
-    user: { email: 'test@eneos.co.th', name: 'Test User', role: 'admin' },
+    user: { email: 'test@eneos.co.th', role: 'admin', authUserId: 'auth-123', memberId: 'member-123' },
     ...overrides,
   } as Request;
 }
@@ -710,7 +710,7 @@ describe('campaign-stats.controller', () => {
 
     it('[P2] should not crash when req.user.email is undefined', async () => {
       const req = createMockRequest({
-        user: { name: 'Test', role: 'admin' } as any, // Missing email
+        user: { role: 'admin', authUserId: 'auth-123', memberId: 'member-123' } as any, // Missing email
       });
       const res = createMockResponse();
 

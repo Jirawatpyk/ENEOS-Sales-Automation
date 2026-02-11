@@ -51,6 +51,7 @@ import {
   getUnlinkedLINEAccounts,
   linkLINEAccount,
   getUnlinkedDashboardMembers,
+  autoLinkAuthUser,
 } from '../../services/sales-team.service.js';
 
 // ===========================================
@@ -212,6 +213,7 @@ describe('Sales Team Service (Supabase)', () => {
       const result = await getUserByEmail('admin@eneos.co.th');
 
       expect(result).toEqual({
+        id: 'uuid-002',
         lineUserId: 'U0000000001',
         name: 'Admin User',
         email: 'admin@eneos.co.th',
@@ -219,6 +221,7 @@ describe('Sales Team Service (Supabase)', () => {
         role: 'admin',
         createdAt: '2026-01-01T00:00:00Z',
         status: 'active',
+        authUserId: null,
       });
       expect(mockSupabase.eq).toHaveBeenCalledWith('email', 'admin@eneos.co.th');
     });
@@ -619,6 +622,56 @@ describe('Sales Team Service (Supabase)', () => {
       const result = await getUnlinkedDashboardMembers();
 
       expect(result).toEqual([]);
+    });
+  });
+
+  // =========================================
+  // autoLinkAuthUser()
+  // =========================================
+
+  describe('autoLinkAuthUser', () => {
+    it('should update auth_user_id with race-safe IS NULL guard', async () => {
+      mockSupabase.is.mockResolvedValueOnce({ data: null, error: null });
+
+      await autoLinkAuthUser('member-uuid-001', 'auth-uuid-abc');
+
+      expect(mockSupabase.from).toHaveBeenCalledWith('sales_team');
+      expect(mockSupabase.update).toHaveBeenCalledWith({ auth_user_id: 'auth-uuid-abc' });
+      expect(mockSupabase.eq).toHaveBeenCalledWith('id', 'member-uuid-001');
+      expect(mockSupabase.is).toHaveBeenCalledWith('auth_user_id', null);
+    });
+
+    it('should not throw on Supabase error (fire-and-forget)', async () => {
+      mockSupabase.is.mockResolvedValueOnce({
+        data: null,
+        error: { code: '42P01', message: 'relation does not exist' },
+      });
+
+      await expect(autoLinkAuthUser('member-001', 'auth-001')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'autoLinkAuthUser: DB update failed (non-fatal)',
+        expect.objectContaining({ memberId: 'member-001' }),
+      );
+    });
+
+    it('should catch unexpected exceptions and not throw', async () => {
+      mockSupabase.is.mockRejectedValueOnce(new Error('Network timeout'));
+
+      await expect(autoLinkAuthUser('member-002', 'auth-002')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'autoLinkAuthUser failed (non-fatal)',
+        expect.objectContaining({ memberId: 'member-002', error: 'Network timeout' }),
+      );
+    });
+
+    it('should handle non-Error exceptions gracefully', async () => {
+      mockSupabase.is.mockRejectedValueOnce('string error');
+
+      await expect(autoLinkAuthUser('member-003', 'auth-003')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'autoLinkAuthUser failed (non-fatal)',
+        expect.objectContaining({ error: 'Unknown' }),
+      );
     });
   });
 

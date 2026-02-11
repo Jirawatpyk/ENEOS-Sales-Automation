@@ -75,7 +75,7 @@ describe('Team Management Controller', () => {
       query: {},
       params: {},
       body: {},
-      user: { email: 'admin@eneos.co.th', name: 'Admin', role: 'admin', googleId: '123' },
+      user: { email: 'admin@eneos.co.th', role: 'admin', authUserId: '123', memberId: '123' },
       requestId: 'test-request-id',
     };
 

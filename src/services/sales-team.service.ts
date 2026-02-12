@@ -16,6 +16,8 @@ import type {
   SalesTeamMemberUpdate,
 } from '../types/index.js';
 
+export type InviteRole = 'admin' | 'viewer';
+
 const logger = createModuleLogger('sales-team');
 
 // ===========================================
@@ -28,7 +30,7 @@ function mapToSalesTeamMemberFull(row: Record<string, unknown>): SalesTeamMember
     name: row.name as string,
     email: (row.email as string) || null,
     phone: (row.phone as string) || null,
-    role: row.role as 'admin' | 'sales',
+    role: row.role as 'admin' | 'sales' | 'viewer',
     createdAt: row.created_at as string,
     status: row.status as 'active' | 'inactive',
   };
@@ -223,7 +225,7 @@ export async function updateSalesTeamMember(
  * INSERT INTO sales_team with duplicate email check (23505)
  */
 export async function createSalesTeamMember(
-  data: { name: string; email: string; phone?: string; role: 'admin' | 'sales' }
+  data: { name: string; email: string; phone?: string; role: 'admin' | 'sales' | 'viewer' }
 ): Promise<SalesTeamMemberFull> {
   const { data: member, error } = await supabase
     .from('sales_team')
@@ -371,6 +373,109 @@ export async function autoLinkAuthUser(memberId: string, authUserId: string): Pr
     // Fire-and-forget — never throw to caller
     logger.warn('autoLinkAuthUser failed (non-fatal)', {
       memberId,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
+}
+
+// ===========================================
+// Admin Invite & Role Sync (Story 13-1)
+// ===========================================
+
+/**
+ * Invite a new sales team member (AC-1)
+ * 1. Create sales_team record FIRST (prevents "user can login but no DB record")
+ * 2. Then invite via Supabase Auth (sends email)
+ * 3. If step 2 fails, sales_team record persists (admin can retry)
+ *
+ * Re-invite: If email exists in sales_team but has no auth_user_id,
+ * skip record creation and retry Supabase invite only (Task 1.5)
+ */
+export async function inviteSalesTeamMember(
+  email: string,
+  name: string,
+  role: InviteRole
+): Promise<{ member: SalesTeamMemberFull; authInviteSent: boolean }> {
+  // Normalize role: 'sales' → 'viewer' for backward compat
+  const normalizedRole = role === 'admin' ? 'admin' : 'viewer';
+
+  // Check if email already exists in sales_team (Task 1.5: re-invite flow)
+  const existing = await getUserByEmail(email);
+
+  let member: SalesTeamMemberFull;
+
+  if (existing) {
+    // Email exists — check if this is a re-invite (no auth_user_id)
+    if (existing.authUserId) {
+      // User already fully registered — throw duplicate
+      const err = new AppError('User already exists', 409, 'DUPLICATE_EMAIL');
+      err.name = 'DUPLICATE_EMAIL';
+      throw err;
+    }
+
+    // Re-invite: skip record creation, just retry Supabase invite
+    member = mapToSalesTeamMemberFull({
+      line_user_id: existing.lineUserId || null,
+      name: existing.name,
+      email: existing.email,
+      phone: existing.phone || null,
+      role: existing.role,
+      created_at: existing.createdAt || '',
+      status: existing.status,
+    });
+  } else {
+    // Step 1: Create sales_team record FIRST
+    member = await createSalesTeamMember({
+      name,
+      email,
+      role: normalizedRole as 'admin' | 'sales',
+    });
+  }
+
+  // Step 2: Invite via Supabase Auth
+  let authInviteSent = false;
+  try {
+    const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
+      data: { role: normalizedRole },
+    });
+    if (error) {
+      logger.warn('Supabase invite failed, sales_team record kept', { email, error: error.message });
+    } else {
+      authInviteSent = true;
+    }
+  } catch (err) {
+    logger.warn('Supabase invite error, sales_team record kept', {
+      email,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
+
+  return { member, authInviteSent };
+}
+
+/**
+ * Sync role to Supabase Auth app_metadata (AC-2)
+ * Fire-and-forget — don't block the update response
+ * Only syncs when auth_user_id exists (user has logged in at least once)
+ */
+export async function syncRoleToSupabaseAuth(
+  authUserId: string | null,
+  role: string
+): Promise<void> {
+  if (!authUserId) {return;} // User hasn't logged in yet — skip
+
+  try {
+    const { error } = await supabase.auth.admin.updateUserById(authUserId, {
+      app_metadata: { role },
+    });
+    if (error) {
+      logger.warn('Failed to sync role to Supabase Auth', { authUserId, role, error: error.message });
+    }
+  } catch (err) {
+    // Non-fatal — sales_team.role is the source of truth for middleware
+    logger.warn('syncRoleToSupabaseAuth failed (non-fatal)', {
+      authUserId,
+      role,
       error: err instanceof Error ? err.message : 'Unknown',
     });
   }

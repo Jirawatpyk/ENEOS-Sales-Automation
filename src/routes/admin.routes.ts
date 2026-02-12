@@ -37,6 +37,8 @@ import {
   getUnlinkedLINEAccounts,
   getUnlinkedDashboardMembers,
   linkLINEAccount,
+  // Story 13-1: Admin invite
+  inviteSalesTeamMember,
 } from '../controllers/admin/team-management.controller.js';
 import {
   adminAuthMiddleware,
@@ -220,6 +222,27 @@ router.get('/sales-team/list', requireAdmin, asyncHandler(getSalesTeamList));
  * Access: admin only (Story 7-4b AC#1-7)
  */
 router.post('/sales-team', requireAdmin, asyncHandler(createSalesTeamMember));
+
+/**
+ * POST /api/admin/sales-team/invite (Story 13-1 AC-1)
+ * Invite a new user via Supabase Auth
+ *
+ * Body:
+ * - email: string (required, any domain — admin invite-only is the gate)
+ * - name: string (required, min 2 chars)
+ * - role: 'admin' | 'viewer' (required)
+ *
+ * Flow:
+ * 1. Create sales_team record FIRST
+ * 2. Invite via Supabase Auth (sends email)
+ * 3. If invite fails, record persists (admin can retry)
+ *
+ * Response:
+ * - data: { member: SalesTeamMemberFull, authInviteSent: boolean }
+ *
+ * Access: admin only
+ */
+router.post('/sales-team/invite', requireAdmin, asyncHandler(inviteSalesTeamMember));
 
 /**
  * GET /api/admin/sales-team/unlinked-line-accounts

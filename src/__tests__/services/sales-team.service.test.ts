@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock Setup (Hoisted)
 // ===========================================
 
-const { mockSupabase, mockLogger } = vi.hoisted(() => {
+const { mockSupabase, mockLogger, mockAuthAdmin } = vi.hoisted(() => {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
   const methods = [
     'from', 'select', 'insert', 'upsert', 'update', 'delete',
@@ -20,6 +20,14 @@ const { mockSupabase, mockLogger } = vi.hoisted(() => {
     chain[method] = vi.fn().mockReturnValue(chain);
   }
 
+  // Story 13-1: Mock Supabase Auth Admin API
+  const mockAuthAdmin = {
+    inviteUserByEmail: vi.fn(),
+    updateUserById: vi.fn(),
+  };
+  // Attach auth.admin to the chain so supabase.auth.admin.* works
+  (chain as Record<string, unknown>).auth = { admin: mockAuthAdmin };
+
   const mockLogger = {
     info: vi.fn(),
     debug: vi.fn(),
@@ -27,7 +35,7 @@ const { mockSupabase, mockLogger } = vi.hoisted(() => {
     error: vi.fn(),
   };
 
-  return { mockSupabase: chain, mockLogger };
+  return { mockSupabase: chain, mockLogger, mockAuthAdmin };
 });
 
 vi.mock('../../lib/supabase.js', () => ({
@@ -52,6 +60,8 @@ import {
   linkLINEAccount,
   getUnlinkedDashboardMembers,
   autoLinkAuthUser,
+  inviteSalesTeamMember,
+  syncRoleToSupabaseAuth,
 } from '../../services/sales-team.service.js';
 
 // ===========================================
@@ -89,7 +99,10 @@ describe('Sales Team Service (Supabase)', () => {
     vi.clearAllMocks();
     // Reset chain to return self for method chaining
     for (const key of Object.keys(mockSupabase)) {
-      mockSupabase[key].mockReturnValue(mockSupabase);
+      // Skip non-function properties (e.g., 'auth' object)
+      if (typeof mockSupabase[key]?.mockReturnValue === 'function') {
+        mockSupabase[key].mockReturnValue(mockSupabase);
+      }
     }
   });
 
@@ -694,6 +707,207 @@ describe('Sales Team Service (Supabase)', () => {
       expect(result).toHaveLength(2);
       expect(result[0].lineUserId).toBe('U111');
       expect(result[1].email).toBe('sales2@eneos.co.th');
+    });
+  });
+
+  // =========================================
+  // inviteSalesTeamMember() — Story 13-1
+  // =========================================
+
+  describe('inviteSalesTeamMember', () => {
+    it('should create sales_team record FIRST then invite via Supabase Auth', async () => {
+      // getUserByEmail returns null (new user)
+      mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      // createSalesTeamMember: insert().select().single()
+      mockSupabase.single.mockResolvedValueOnce({
+        data: {
+          line_user_id: null,
+          name: 'New User',
+          email: 'new@example.com',
+          phone: null,
+          role: 'viewer',
+          status: 'active',
+          created_at: '2026-02-12T10:00:00Z',
+        },
+        error: null,
+      });
+      // Supabase Auth invite succeeds
+      mockAuthAdmin.inviteUserByEmail.mockResolvedValueOnce({ data: {}, error: null });
+
+      const result = await inviteSalesTeamMember('new@example.com', 'New User', 'viewer');
+
+      expect(result.member.email).toBe('new@example.com');
+      expect(result.member.role).toBe('viewer');
+      expect(result.authInviteSent).toBe(true);
+      expect(mockAuthAdmin.inviteUserByEmail).toHaveBeenCalledWith('new@example.com', {
+        data: { role: 'viewer' },
+      });
+    });
+
+    it('should return authInviteSent=false when Supabase invite fails', async () => {
+      // getUserByEmail returns null (new user)
+      mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      // createSalesTeamMember succeeds
+      mockSupabase.single.mockResolvedValueOnce({
+        data: {
+          line_user_id: null,
+          name: 'User',
+          email: 'user@example.com',
+          phone: null,
+          role: 'viewer',
+          status: 'active',
+          created_at: '2026-02-12T10:00:00Z',
+        },
+        error: null,
+      });
+      // Supabase Auth invite fails
+      mockAuthAdmin.inviteUserByEmail.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Email rate limit exceeded' },
+      });
+
+      const result = await inviteSalesTeamMember('user@example.com', 'User', 'viewer');
+
+      expect(result.member.email).toBe('user@example.com');
+      expect(result.authInviteSent).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Supabase invite failed, sales_team record kept',
+        expect.objectContaining({ email: 'user@example.com' }),
+      );
+    });
+
+    it('should return authInviteSent=false when Supabase invite throws', async () => {
+      // getUserByEmail returns null (new user)
+      mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      // createSalesTeamMember succeeds
+      mockSupabase.single.mockResolvedValueOnce({
+        data: {
+          line_user_id: null,
+          name: 'User',
+          email: 'user@example.com',
+          phone: null,
+          role: 'viewer',
+          status: 'active',
+          created_at: '2026-02-12T10:00:00Z',
+        },
+        error: null,
+      });
+      // Supabase Auth invite throws exception
+      mockAuthAdmin.inviteUserByEmail.mockRejectedValueOnce(new Error('Network error'));
+
+      const result = await inviteSalesTeamMember('user@example.com', 'User', 'viewer');
+
+      expect(result.authInviteSent).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Supabase invite error, sales_team record kept',
+        expect.objectContaining({ email: 'user@example.com' }),
+      );
+    });
+
+    it('should throw DUPLICATE_EMAIL when user already fully registered', async () => {
+      // getUserByEmail returns existing user WITH authUserId
+      mockSupabase.maybeSingle.mockResolvedValueOnce({
+        data: {
+          ...mockSalesTeamRow,
+          auth_user_id: 'auth-uuid-existing',
+        },
+        error: null,
+      });
+
+      await expect(
+        inviteSalesTeamMember('test@eneos.co.th', 'Test', 'viewer')
+      ).rejects.toThrow('User already exists');
+    });
+
+    it('should re-invite when email exists but no auth_user_id (Task 1.5)', async () => {
+      // getUserByEmail returns existing user WITHOUT authUserId
+      mockSupabase.maybeSingle.mockResolvedValueOnce({
+        data: {
+          ...mockSalesTeamRow,
+          auth_user_id: null,
+        },
+        error: null,
+      });
+      // Supabase Auth invite succeeds (re-invite)
+      mockAuthAdmin.inviteUserByEmail.mockResolvedValueOnce({ data: {}, error: null });
+
+      const result = await inviteSalesTeamMember('test@eneos.co.th', 'Test', 'viewer');
+
+      // Should NOT call createSalesTeamMember (skip record creation)
+      expect(mockSupabase.insert).not.toHaveBeenCalled();
+      expect(result.member.email).toBe('test@eneos.co.th');
+      expect(result.authInviteSent).toBe(true);
+    });
+
+    it('should normalize admin role correctly', async () => {
+      // getUserByEmail returns null
+      mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      // createSalesTeamMember succeeds
+      mockSupabase.single.mockResolvedValueOnce({
+        data: {
+          line_user_id: null,
+          name: 'Admin',
+          email: 'admin@example.com',
+          phone: null,
+          role: 'admin',
+          status: 'active',
+          created_at: '2026-02-12T10:00:00Z',
+        },
+        error: null,
+      });
+      mockAuthAdmin.inviteUserByEmail.mockResolvedValueOnce({ data: {}, error: null });
+
+      const result = await inviteSalesTeamMember('admin@example.com', 'Admin', 'admin');
+
+      expect(result.member.role).toBe('admin');
+      expect(mockAuthAdmin.inviteUserByEmail).toHaveBeenCalledWith('admin@example.com', {
+        data: { role: 'admin' },
+      });
+    });
+  });
+
+  // =========================================
+  // syncRoleToSupabaseAuth() — Story 13-1
+  // =========================================
+
+  describe('syncRoleToSupabaseAuth', () => {
+    it('should update app_metadata.role via Supabase Auth Admin', async () => {
+      mockAuthAdmin.updateUserById.mockResolvedValueOnce({ data: {}, error: null });
+
+      await syncRoleToSupabaseAuth('auth-uuid-123', 'admin');
+
+      expect(mockAuthAdmin.updateUserById).toHaveBeenCalledWith('auth-uuid-123', {
+        app_metadata: { role: 'admin' },
+      });
+    });
+
+    it('should skip when authUserId is null', async () => {
+      await syncRoleToSupabaseAuth(null, 'admin');
+
+      expect(mockAuthAdmin.updateUserById).not.toHaveBeenCalled();
+    });
+
+    it('should not throw on Supabase error (fire-and-forget)', async () => {
+      mockAuthAdmin.updateUserById.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'User not found' },
+      });
+
+      await expect(syncRoleToSupabaseAuth('auth-uuid-456', 'viewer')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Failed to sync role to Supabase Auth',
+        expect.objectContaining({ authUserId: 'auth-uuid-456', role: 'viewer' }),
+      );
+    });
+
+    it('should catch unexpected exceptions and not throw', async () => {
+      mockAuthAdmin.updateUserById.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(syncRoleToSupabaseAuth('auth-uuid-789', 'admin')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'syncRoleToSupabaseAuth failed (non-fatal)',
+        expect.objectContaining({ authUserId: 'auth-uuid-789' }),
+      );
     });
   });
 });

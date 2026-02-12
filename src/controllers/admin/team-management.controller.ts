@@ -22,6 +22,9 @@ import {
   getUnlinkedLINEAccounts as getUnlinkedLINEAccountsService,
   linkLINEAccount as linkLINEAccountService,
   getUnlinkedDashboardMembers as getUnlinkedDashboardMembersService,
+  inviteSalesTeamMember as inviteSalesTeamMemberService,
+  syncRoleToSupabaseAuth,
+  getUserByEmail as getUserByEmailService,
 } from '../../services/sales-team.service.js';
 import { formatPhone } from '../../utils/phone-formatter.js';
 import { SalesTeamFilter, SalesTeamMemberUpdate } from '../../types/index.js';
@@ -35,7 +38,7 @@ import { SalesTeamFilter, SalesTeamMemberUpdate } from '../../types/index.js';
  */
 const ListQuerySchema = z.object({
   status: z.enum(['active', 'inactive', 'all']).optional(),
-  role: z.enum(['admin', 'sales', 'all']).optional(),
+  role: z.enum(['admin', 'viewer', 'sales', 'all']).optional(),
 });
 
 /**
@@ -46,14 +49,10 @@ const UpdateMemberSchema = z.object({
   email: z
     .string()
     .email('Invalid email format')
-    .refine(
-      (val) => val.endsWith('@eneos.co.th'),
-      { message: 'Must be @eneos.co.th email' }
-    )
     .nullable()
     .optional(),
   phone: z.string().nullable().optional(),
-  role: z.enum(['admin', 'sales']).optional(),
+  role: z.enum(['admin', 'viewer']).optional(),
   status: z.enum(['active', 'inactive']).optional(),
 });
 
@@ -81,6 +80,20 @@ const CreateMemberSchema = z.object({
     .or(z.literal('')),
   role: z.enum(['admin', 'sales'], {
     required_error: 'Role is required',
+  }),
+});
+
+/**
+ * Schema for POST /api/admin/sales-team/invite body (Story 13-1)
+ * Invite new user via Supabase Auth — any email domain accepted
+ */
+const InviteMemberSchema = z.object({
+  email: z
+    .string({ required_error: 'Email is required' })
+    .email('Invalid email format'),
+  name: z.string({ required_error: 'Name is required' }).min(2, 'Name must be at least 2 characters'),
+  role: z.enum(['admin', 'viewer'], {
+    errorMap: () => ({ message: 'Role must be admin or viewer' }),
   }),
 });
 
@@ -223,6 +236,22 @@ export async function updateSalesTeamMember(
       return;
     }
 
+    // Task 4 (AC-3): Self-disable prevention
+    // Check if admin is trying to disable their own account
+    if (bodyResult.data.status === 'inactive') {
+      const targetMember = await getSalesTeamMemberByIdService(lineUserId);
+      if (targetMember && targetMember.email === req.user?.email) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'SELF_DISABLE',
+            message: 'Cannot disable your own account',
+          },
+        });
+        return;
+      }
+    }
+
     // Build updates object - only include fields that were provided
     const updates: SalesTeamMemberUpdate = {};
     if (bodyResult.data.email !== undefined) {
@@ -246,6 +275,21 @@ export async function updateSalesTeamMember(
         error: 'Sales team member not found',
       });
       return;
+    }
+
+    // Task 2.2 (AC-2): Sync role to Supabase Auth when role changes
+    // Fire-and-forget — don't block the response
+    if (updates.role && updated.email) {
+      const newRole = updates.role;
+      getUserByEmailService(updated.email).then(member => {
+        if (member?.authUserId) {
+          syncRoleToSupabaseAuth(member.authUserId, newRole).catch(() => {
+            // Intentionally swallowed — syncRoleToSupabaseAuth logs internally
+          });
+        }
+      }).catch(() => {
+        // Non-fatal — role sync is best-effort
+      });
     }
 
     res.status(200).json({
@@ -456,6 +500,79 @@ export async function getUnlinkedDashboardMembers(
     logger.info('getUnlinkedDashboardMembers completed', { count: unlinkedMembers.length });
   } catch (error) {
     logger.error('getUnlinkedDashboardMembers failed', { error });
+    next(error);
+  }
+}
+
+/**
+ * POST /api/admin/sales-team/invite (Story 13-1 AC-1)
+ * Invite a new user via Supabase Auth
+ *
+ * Body:
+ * - email: string (required, any domain — admin invite-only is the security gate)
+ * - name: string (required, min 2 chars)
+ * - role: 'admin' | 'viewer' (required)
+ *
+ * Flow:
+ * 1. Create sales_team record FIRST
+ * 2. Then invite via Supabase Auth (sends email)
+ * 3. If Supabase invite fails, sales_team record persists (admin can retry)
+ *
+ * Access: Admin only (requireAdmin middleware)
+ */
+export async function inviteSalesTeamMember(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    logger.info('inviteSalesTeamMember called', { body: req.body, user: req.user?.email });
+
+    // Validate request body
+    const bodyResult = InviteMemberSchema.safeParse(req.body);
+    if (!bodyResult.success) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: bodyResult.error.errors.map((e) => e.message).join(', '),
+        },
+      });
+      return;
+    }
+
+    const { email, name, role } = bodyResult.data;
+
+    const result = await inviteSalesTeamMemberService(email, name, role);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        member: result.member,
+        authInviteSent: result.authInviteSent,
+      },
+    });
+
+    logger.info('inviteSalesTeamMember completed', {
+      email,
+      role,
+      authInviteSent: result.authInviteSent,
+    });
+  } catch (error) {
+    logger.error('inviteSalesTeamMember failed', { error, body: req.body });
+
+    // Map service error names to proper HTTP status codes
+    if (error instanceof Error && error.name === 'DUPLICATE_EMAIL') {
+      res.status(409).json({
+        success: false,
+        error: {
+          code: 'DUPLICATE_EMAIL',
+          message: 'User already exists',
+        },
+      });
+      return;
+    }
+
     next(error);
   }
 }

@@ -88,7 +88,7 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: test-token
           LINE_CHANNEL_SECRET: test-secret
           LINE_GROUP_ID: test-group-id
-          GOOGLE_OAUTH_CLIENT_ID: test-oauth-client-id
+          SUPABASE_JWT_SECRET: test-jwt-secret
 
       - name: Build
         run: npm run build
@@ -178,7 +178,7 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: test-token
           LINE_CHANNEL_SECRET: test-secret
           LINE_GROUP_ID: test-group-id
-          GOOGLE_OAUTH_CLIENT_ID: test-oauth-client-id
+          SUPABASE_JWT_SECRET: test-jwt-secret
 
       - name: Run full burn-in (no changed tests - run full suite 3x)
         if: steps.changed-tests.outputs.has_changes == 'false'
@@ -209,7 +209,7 @@ jobs:
           LINE_CHANNEL_ACCESS_TOKEN: test-token
           LINE_CHANNEL_SECRET: test-secret
           LINE_GROUP_ID: test-group-id
-          GOOGLE_OAUTH_CLIENT_ID: test-oauth-client-id
+          SUPABASE_JWT_SECRET: test-jwt-secret
 
   # ===========================================
   # Build Docker Image Job

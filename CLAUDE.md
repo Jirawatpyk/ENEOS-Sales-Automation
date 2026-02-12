@@ -226,7 +226,7 @@ src/
    - Key columns: email, customer_name, phone, company, industry_ai, status, sales_owner_id, sales_owner_name, campaign_id, talking_point, version, lead_uuid, created_at, updated_at, contacted_at
    - `version` column for optimistic locking (race condition protection)
 
-2. **deduplication_log** (Prevent duplicates)
+2. **dedup_log** (Prevent duplicates)
    - Key columns: key, email, campaign_id, processed_at
    - UNIQUE constraint on `key` for upsert-based dedup
 
@@ -249,7 +249,7 @@ src/
 ตัวแปรที่จำเป็นต้องตั้งค่า (ดูรายละเอียดครบใน `.env.example`):
 
 **Critical:**
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`
 - `GEMINI_API_KEY`
 - `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `LINE_GROUP_ID`
 - `BREVO_WEBHOOK_SECRET`

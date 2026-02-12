@@ -38,7 +38,7 @@ import { SalesTeamFilter, SalesTeamMemberUpdate } from '../../types/index.js';
  */
 const ListQuerySchema = z.object({
   status: z.enum(['active', 'inactive', 'all']).optional(),
-  role: z.enum(['admin', 'viewer', 'sales', 'all']).optional(),
+  role: z.enum(['admin', 'viewer', 'all']).optional(),
 });
 
 /**
@@ -78,8 +78,8 @@ const CreateMemberSchema = z.object({
     }, 'Invalid Thai phone number format (must be 10 digits starting with 06/08/09)')
     .optional()
     .or(z.literal('')),
-  role: z.enum(['admin', 'sales'], {
-    required_error: 'Role is required',
+  role: z.enum(['admin', 'viewer'], {
+    errorMap: () => ({ message: 'Role must be admin or viewer' }),
   }),
 });
 

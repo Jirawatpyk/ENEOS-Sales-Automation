@@ -327,7 +327,7 @@ describe('Team Management Controller', () => {
         name: 'สมชาย ทดสอบ',
         email: 'somchai.test@eneos.co.th',
         phone: '0812345678',
-        role: 'sales',
+        role: 'viewer',
       };
 
       const createdMember = {
@@ -335,7 +335,7 @@ describe('Team Management Controller', () => {
         name: 'สมชาย ทดสอบ',
         email: 'somchai.test@eneos.co.th',
         phone: '0812345678',
-        role: 'sales',
+        role: 'viewer',
         status: 'active',
         createdAt: '2026-01-27T10:00:00Z',
       };
@@ -348,7 +348,7 @@ describe('Team Management Controller', () => {
         name: 'สมชาย ทดสอบ',
         email: 'somchai.test@eneos.co.th',
         phone: '0812345678',
-        role: 'sales',
+        role: 'viewer',
       });
       expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -360,7 +360,7 @@ describe('Team Management Controller', () => {
     it('should reject missing required field: name (AC4)', async () => {
       mockReq.body = {
         email: 'test@eneos.co.th',
-        role: 'sales',
+        role: 'viewer',
       };
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
@@ -377,7 +377,7 @@ describe('Team Management Controller', () => {
     it('should reject missing required field: email (AC3)', async () => {
       mockReq.body = {
         name: 'Test User',
-        role: 'sales',
+        role: 'viewer',
       };
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
@@ -395,7 +395,7 @@ describe('Team Management Controller', () => {
       mockReq.body = {
         name: 'Test User',
         email: 'test@gmail.com',
-        role: 'sales',
+        role: 'viewer',
       };
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
@@ -414,7 +414,7 @@ describe('Team Management Controller', () => {
         name: 'Test User',
         email: 'test@eneos.co.th',
         phone: '123',
-        role: 'sales',
+        role: 'viewer',
       };
 
       await createSalesTeamMember(mockReq as Request, mockRes as Response, mockNext);
@@ -432,7 +432,7 @@ describe('Team Management Controller', () => {
       mockReq.body = {
         name: 'Test User',
         email: 'test@eneos.co.th',
-        role: 'sales',
+        role: 'viewer',
       };
 
       const createdMember = {
@@ -440,7 +440,7 @@ describe('Team Management Controller', () => {
         name: 'Test User',
         email: 'test@eneos.co.th',
         phone: null,
-        role: 'sales',
+        role: 'viewer',
         status: 'active',
         createdAt: '2026-01-27T10:00:00Z',
       };
@@ -460,7 +460,7 @@ describe('Team Management Controller', () => {
       mockReq.body = {
         name: 'Test User',
         email: 'duplicate@eneos.co.th',
-        role: 'sales',
+        role: 'viewer',
       };
 
       const error = new Error('Email already exists');
@@ -527,7 +527,7 @@ describe('Team Management Controller', () => {
         name: 'Test User',
         email: 'test@eneos.co.th',
         phone: '081-234-5678',
-        role: 'sales',
+        role: 'viewer',
       };
 
       const createdMember = {
@@ -535,7 +535,7 @@ describe('Team Management Controller', () => {
         name: 'Test User',
         email: 'test@eneos.co.th',
         phone: '0812345678', // Normalized
-        role: 'sales',
+        role: 'viewer',
         status: 'active',
         createdAt: '2026-01-27T10:00:00Z',
       };

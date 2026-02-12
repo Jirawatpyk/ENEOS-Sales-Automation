@@ -224,11 +224,11 @@ development_status:
   # Frontend login, OAuth, password reset, session management
   # Dependencies: Epic 10 must be done first
   # ============================================================
-  epic-11: backlog  # Blocked by Epic 10. Stories created 2026-02-11
-  11-1-frontend-login-auth-pages: ready-for-dev           # MERGED: Stories 11-1 to 11-3 — Supabase client + Login + OAuth + Password Reset + Role simplify
+  epic-11: done  # All stories done 2026-02-11 (11-1 + 11-4, with 11-2/3/5 merged)
+  11-1-frontend-login-auth-pages: done                    # MERGED: Stories 11-1 to 11-3 — Rex APPROVED 2026-02-11, 3465 tests pass
   11-2-google-oauth-login-callback: merged                # Merged into 11-1-frontend-login-auth-pages
   11-3-password-reset-flow: merged                        # Merged into 11-1-frontend-login-auth-pages
-  11-4-frontend-auth-middleware-session: backlog           # MERGED: Stories 11-4 + 11-5 — Middleware + Providers + Session Sync + Smoke Test
+  11-4-frontend-auth-middleware-session: done                 # MERGED: Stories 11-4 + 11-5 — Rex APPROVED 2026-02-11, 246 files 3456 tests, 12 review fixes (4H+5M+3L)
   11-5-frontend-auth-smoke-test: merged                   # Merged into 11-4-frontend-auth-middleware-session
   epic-11-retrospective: optional
 
@@ -238,8 +238,8 @@ development_status:
   # Migrate all 16 API proxy routes from NextAuth to Supabase session
   # Dependencies: Epic 11 must be done first
   # ============================================================
-  epic-12: backlog  # Blocked by Epic 11. Story created 2026-02-11
-  12-1-proxy-migration: ready-for-dev                      # MERGED: Stories 12-1 to 12-3 — Auth helper + 17 routes migration + Smoke test
+  epic-12: done  # Completed 2026-02-12 — Rex APPROVED, all routes migrated
+  12-1-proxy-migration: done                               # MERGED: Stories 12-1 to 12-3 — Rex APPROVED 2026-02-12, 19 routes migrated, 251 files 3449 tests pass, 7 review fixes
   12-2-migrate-all-api-proxy-routes: merged                # Merged into 12-1-proxy-migration
   12-3-proxy-migration-smoke-test: merged                  # Merged into 12-1-proxy-migration
   epic-12-retrospective: optional
@@ -250,8 +250,8 @@ development_status:
   # Admin invite, role assignment, user disable
   # Dependencies: Epic 11 must be done first (parallel with Epic 12)
   # ============================================================
-  epic-13: backlog  # Blocked by Epic 11. Parallel with Epic 12. Story created 2026-02-11
-  13-1-admin-user-management: ready-for-dev                # MERGED: Stories 13-1 to 13-3 — Invite flow + Role sync + Disable + Smoke test
+  epic-13: done  # Completed 2026-02-12 — All stories done (13-1 merged with 13-2+13-3)
+  13-1-admin-user-management: done                         # MERGED: Stories 13-1 to 13-3 — Rex APPROVED 2026-02-12, 1460 tests pass, 7 review fixes (2C+2H+3M)
   13-2-role-assignment-user-disable: merged                # Merged into 13-1-admin-user-management
   13-3-user-management-smoke-test: merged                  # Merged into 13-1-admin-user-management
   epic-13-retrospective: optional
@@ -297,13 +297,15 @@ development_status:
 #   EPIC-10: Backend Auth Foundation — in-progress (1 merged story done, 4 merged into it)
 #     - 10-1: Backend Auth Foundation (MERGED: 10-1+10-2+10-3+10-4+10-5) — done
 #     Rex APPROVED 2026-02-11, 1432 tests pass
-#   EPIC-11: User Login & Auth Experience — backlog (2 stories, merged from 5)
-#     - 11-1: Frontend Login & Auth Pages (MERGED: 11-1+11-2+11-3) — ready-for-dev
-#     - 11-4: Frontend Auth Middleware & Session (MERGED: 11-4+11-5) — backlog
-#   EPIC-12: Dashboard Data Access (Proxy) — backlog (1 story, merged from 3)
-#     - 12-1: Proxy Migration (MERGED: 12-1+12-2+12-3) — ready-for-dev
-#   EPIC-13: Admin User Management — backlog (1 story, merged from 3)
-#     - 13-1: Admin User Management (MERGED: 13-1+13-2+13-3) — ready-for-dev
+#   EPIC-11: User Login & Auth Experience — in-progress (2 stories done, merged from 5)
+#     - 11-1: Frontend Login & Auth Pages (MERGED: 11-1+11-2+11-3) — done
+#     - 11-4: Frontend Auth Middleware & Session (MERGED: 11-4+11-5) — done
+#     Rex APPROVED 2026-02-11, 3456 tests pass, 12 review fixes applied
+#   EPIC-12: Dashboard Data Access (Proxy) — done (1 story, merged from 3)
+#     - 12-1: Proxy Migration (MERGED: 12-1+12-2+12-3) — done (Rex APPROVED 2026-02-12)
+#   EPIC-13: Admin User Management — done (1 story, merged from 3)
+#     - 13-1: Admin User Management (MERGED: 13-1+13-2+13-3) — done
+#     Rex APPROVED 2026-02-12, 1460 tests pass, 7 review fixes (2C+2H+3M)
 #   EPIC-14: Cleanup & Production Verification — backlog (1 story, merged from 3)
 #     - 14-1: Cleanup & Production Verification (MERGED: 14-1+14-2+14-3) — ready-for-dev
 #

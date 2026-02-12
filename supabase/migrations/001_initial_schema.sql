@@ -174,10 +174,6 @@ ALTER TABLE status_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaign_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaign_stats ENABLE ROW LEVEL SECURITY;
 
--- Allow-all policies (service role bypasses anyway, but defense-in-depth)
-CREATE POLICY "Allow all for service role" ON leads FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for service role" ON dedup_log FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for service role" ON sales_team FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for service role" ON status_history FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for service role" ON campaign_events FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for service role" ON campaign_stats FOR ALL USING (true) WITH CHECK (true);
+-- NOTE: Allow-all policies replaced by deny-all in 002_harden_rls_policies.sql
+-- Service role key bypasses RLS — backend operations unaffected.
+-- Anon key is denied access to all tables (defense-in-depth).

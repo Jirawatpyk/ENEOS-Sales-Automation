@@ -362,7 +362,7 @@ describe('Sales Team Service (Supabase)', () => {
         name: 'Test Sales',
         email: 'test@eneos.co.th',
         phone: '0812345678',
-        role: 'sales',
+        role: 'viewer', // mapToSalesTeamMemberFull normalizes 'sales' → 'viewer'
         createdAt: '2026-01-01T00:00:00Z',
         status: 'active',
       });

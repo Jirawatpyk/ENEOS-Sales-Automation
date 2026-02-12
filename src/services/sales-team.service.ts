@@ -25,12 +25,16 @@ const logger = createModuleLogger('sales-team');
 // ===========================================
 
 function mapToSalesTeamMemberFull(row: Record<string, unknown>): SalesTeamMemberFull {
+  // Normalize legacy 'sales' → 'viewer' (defense-in-depth, migration 004 handles DB)
+  const rawRole = row.role as string;
+  const role: 'admin' | 'viewer' = rawRole === 'admin' ? 'admin' : 'viewer';
+
   return {
     lineUserId: (row.line_user_id as string) || null,
     name: row.name as string,
     email: (row.email as string) || null,
     phone: (row.phone as string) || null,
-    role: row.role as 'admin' | 'sales' | 'viewer',
+    role,
     createdAt: row.created_at as string,
     status: row.status as 'active' | 'inactive',
   };
@@ -225,7 +229,7 @@ export async function updateSalesTeamMember(
  * INSERT INTO sales_team with duplicate email check (23505)
  */
 export async function createSalesTeamMember(
-  data: { name: string; email: string; phone?: string; role: 'admin' | 'sales' | 'viewer' }
+  data: { name: string; email: string; phone?: string; role: 'admin' | 'viewer' }
 ): Promise<SalesTeamMemberFull> {
   const { data: member, error } = await supabase
     .from('sales_team')
@@ -428,7 +432,7 @@ export async function inviteSalesTeamMember(
     member = await createSalesTeamMember({
       name,
       email,
-      role: normalizedRole as 'admin' | 'sales',
+      role: normalizedRole,
     });
   }
 

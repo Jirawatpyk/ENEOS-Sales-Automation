@@ -152,6 +152,7 @@ export async function getAllStatusHistory(options: {
       id: row.id,
       leadUUID: row.lead_id,
       rowNumber: leadRow?.rowNumber ?? 0,
+      companyName: leadRow?.company ?? '',
       status: row.status as LeadStatus,
       changedById: row.changed_by_id || '',
       changedByName: row.changed_by_name || '',

@@ -279,6 +279,7 @@ describe('Status History Service (Supabase)', () => {
       expect(result.entries).toHaveLength(1);
       expect(result.total).toBe(1);
       expect(result.entries[0].leadUUID).toBe('lead-uuid-1');
+      expect(result.entries[0].companyName).toBe('Test Corp');
       expect(result.entries[0].lead).toBeDefined();
       expect(result.changedByOptions).toHaveLength(2);
       expect(result.changedByOptions[0]).toEqual({ id: 'U1234567890', name: 'Sales Person' });

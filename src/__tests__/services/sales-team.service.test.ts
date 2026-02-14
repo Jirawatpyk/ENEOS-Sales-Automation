@@ -535,34 +535,33 @@ describe('Sales Team Service (Supabase)', () => {
   // =========================================
 
   describe('linkLINEAccount', () => {
-    it('should link LINE account and delete old row', async () => {
-      // linkLINEAccount makes 3 supabase calls:
+    it('should delete LINE-only row first then update dashboard member', async () => {
+      // linkLINEAccount flow (UNIQUE constraint aware):
       // 1. select().eq().maybeSingle() → find LINE account
-      // 2. update().eq().is().select().single() → update dashboard member
-      // 3. delete().eq() → delete LINE-only row
-      mockSupabase.maybeSingle.mockImplementation(() => {
-        // Only the first maybeSingle call (step 1)
-        return Promise.resolve({
+      // 2. delete().eq() → delete LINE-only row (free UNIQUE constraint)
+      // 3. update().eq().is().select().single() → update dashboard member
+      mockSupabase.maybeSingle.mockImplementation(() =>
+        Promise.resolve({
           data: { id: 'line-row-id', line_user_id: 'U111', email: null, name: 'LINE User' },
           error: null,
-        });
+        }),
+      );
+      // Step 2: delete succeeds (returns { data, error: null })
+      mockSupabase.delete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
       });
-      mockSupabase.single.mockImplementation(() => {
-        // Step 2: update result
-        return Promise.resolve({
+      // Step 3: update result
+      mockSupabase.single.mockImplementation(() =>
+        Promise.resolve({
           data: { ...mockSalesTeamRow, line_user_id: 'U111' },
           error: null,
-        });
-      });
-      // Step 3: delete — eq at the end of delete chain returns a resolved value
-      // But eq is also called in steps 1 and 2, so we can't use mockResolvedValueOnce on it.
-      // The delete() chain ends with .eq() which should resolve. We mock delete chain to just resolve.
-      mockSupabase.delete.mockReturnValue(mockSupabase);
+        }),
+      );
 
       const result = await linkLINEAccount('test@eneos.co.th', 'U111');
 
       expect(result).not.toBeNull();
-      expect(result?.lineUserId).toBe('U111'); // Updated from mockSalesTeamRow with line_user_id: 'U111'
+      expect(result?.lineUserId).toBe('U111');
       expect(mockSupabase.delete).toHaveBeenCalled();
     });
 
@@ -588,21 +587,94 @@ describe('Sales Team Service (Supabase)', () => {
       ).rejects.toThrow('LINE account already linked to another member');
     });
 
-    it('should throw LINK_FAILED when update fails (race condition)', async () => {
+    it('should throw DELETE_FAILED when delete LINE-only row fails', async () => {
       // 1. Target found (no email → not linked)
       mockSupabase.maybeSingle.mockResolvedValueOnce({
         data: { id: 'line-row-id', line_user_id: 'U111', email: null, name: 'LINE User' },
         error: null,
       });
-      // 2. Update fails (race: someone already linked)
+      // 2. Delete fails
+      mockSupabase.delete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({
+          data: null,
+          error: { code: '42501', message: 'permission denied' },
+        }),
+      });
+
+      await expect(
+        linkLINEAccount('test@eneos.co.th', 'U111')
+      ).rejects.toThrow('Failed to prepare link operation');
+    });
+
+    it('should throw LINK_FAILED and rollback when update fails after delete', async () => {
+      // 1. Target found
+      mockSupabase.maybeSingle.mockImplementation(() =>
+        Promise.resolve({
+          data: { id: 'line-row-id', line_user_id: 'U111', email: null, name: 'LINE User', role: 'viewer', status: 'active' },
+          error: null,
+        }),
+      );
+      // 2. Delete succeeds
+      mockSupabase.delete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+      });
+      // 3. Update fails (race: someone already linked)
       mockSupabase.single.mockResolvedValueOnce({
         data: null,
         error: { code: 'PGRST116', message: 'No rows' },
+      });
+      // Rollback: insert should be called to re-insert LINE-only row
+      mockSupabase.insert.mockReturnValue(mockSupabase);
+
+      await expect(
+        linkLINEAccount('test@eneos.co.th', 'U111')
+      ).rejects.toThrow('Member not found or already linked');
+
+      // Verify rollback insert was attempted
+      expect(mockSupabase.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ line_user_id: 'U111', name: 'LINE User' }),
+      );
+    });
+
+    it('should log error when rollback insert itself fails', async () => {
+      // 1. Target found
+      mockSupabase.maybeSingle.mockImplementation(() =>
+        Promise.resolve({
+          data: { id: 'line-row-id', line_user_id: 'U111', email: null, name: 'LINE User', role: 'viewer', status: 'active' },
+          error: null,
+        }),
+      );
+      // 2. Delete succeeds
+      mockSupabase.delete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+      });
+      // 3. Update fails
+      mockSupabase.single.mockResolvedValueOnce({
+        data: null,
+        error: { code: 'PGRST116', message: 'No rows' },
+      });
+      // 4. Rollback insert also fails (returns Supabase { error })
+      mockSupabase.insert.mockReturnValue({
+        ...mockSupabase,
+        // Supabase returns { data, error } — NOT throw
+        then: (_resolve: (v: unknown) => void) =>
+          _resolve({ data: null, error: { code: '23505', message: 'duplicate key' } }),
       });
 
       await expect(
         linkLINEAccount('test@eneos.co.th', 'U111')
       ).rejects.toThrow('Member not found or already linked');
+
+      // Verify rollback was attempted
+      expect(mockSupabase.insert).toHaveBeenCalled();
+      // Verify error was logged (rollback failure)
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Rollback failed: could not re-insert LINE-only row',
+        expect.objectContaining({
+          lineUserId: 'U111',
+          errorCode: '23505',
+        }),
+      );
     });
   });
 

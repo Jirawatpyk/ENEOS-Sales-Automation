@@ -336,7 +336,9 @@ const mockEventItem = {
 };
 
 describe('Campaign Stats Admin Routes (Story 5-2)', () => {
-  const validToken = 'valid-admin-token';
+  // Fake HS256 JWT (header.payload.signature — jwt.verify is mocked)
+  const hs256Header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url');
+  const validToken = `${hs256Header}.fakepayload.fakesig`;
 
   beforeEach(() => {
     vi.clearAllMocks();

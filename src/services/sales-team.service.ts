@@ -278,6 +278,11 @@ export async function getUnlinkedLINEAccounts(): Promise<Array<{ lineUserId: str
 /**
  * Link a LINE account to a Dashboard member (AC #3)
  * Race-safe: UPDATE ... WHERE line_user_id IS NULL
+ *
+ * Order: Delete LINE-only row FIRST → then update dashboard member
+ * Reason: line_user_id has UNIQUE constraint — setting it on the dashboard
+ * member while the LINE-only row still holds the same value causes 23505.
+ * If the update fails after delete, rollback by re-inserting the LINE-only row.
  */
 export async function linkLINEAccount(
   dashboardMemberEmail: string,
@@ -298,7 +303,23 @@ export async function linkLINEAccount(
     throw err;
   }
 
-  // 2. Update dashboard member to set line_user_id (atomic: WHERE line_user_id IS NULL)
+  // 2. Delete the LINE-only row FIRST (free up UNIQUE constraint on line_user_id)
+  const { error: deleteError } = await supabase
+    .from('sales_team')
+    .delete()
+    .eq('id', lineAccount.id);
+
+  if (deleteError) {
+    logger.error('Failed to delete LINE-only row before linking', {
+      lineAccountId: lineAccount.id,
+      email: dashboardMemberEmail,
+      errorCode: deleteError.code,
+      errorMessage: deleteError.message,
+    });
+    throw new AppError('Failed to prepare link operation', 500, 'DELETE_FAILED');
+  }
+
+  // 3. Update dashboard member to set line_user_id (atomic: WHERE line_user_id IS NULL)
   const { data: updated, error } = await supabase
     .from('sales_team')
     .update({ line_user_id: targetLineUserId })
@@ -308,24 +329,26 @@ export async function linkLINEAccount(
     .single();
 
   if (error || !updated) {
+    // Rollback: re-insert the LINE-only row since update failed
+    const { error: rollbackError } = await supabase
+      .from('sales_team')
+      .insert({
+        line_user_id: lineAccount.line_user_id,
+        name: lineAccount.name,
+        role: lineAccount.role,
+        status: lineAccount.status,
+      });
+    if (rollbackError) {
+      logger.error('Rollback failed: could not re-insert LINE-only row', {
+        lineUserId: targetLineUserId,
+        errorCode: rollbackError.code,
+        errorMessage: rollbackError.message,
+      });
+    }
+
     const err = new AppError('Member not found or already linked', 409, 'LINK_FAILED');
     err.name = 'LINK_FAILED';
     throw err;
-  }
-
-  // 3. Delete the LINE-only row (it's now merged into the dashboard member)
-  // Wrapped in try-catch: the link (step 2) already succeeded — delete is cleanup
-  try {
-    await supabase
-      .from('sales_team')
-      .delete()
-      .eq('id', lineAccount.id);
-  } catch (deleteError) {
-    logger.error('Failed to delete LINE-only row after linking (non-fatal)', {
-      lineAccountId: lineAccount.id,
-      email: dashboardMemberEmail,
-      error: deleteError instanceof Error ? deleteError.message : String(deleteError),
-    });
   }
 
   logger.info('LINE account linked', {

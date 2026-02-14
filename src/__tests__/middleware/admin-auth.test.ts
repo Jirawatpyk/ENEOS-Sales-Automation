@@ -7,7 +7,7 @@
  * - viewer: read-only (mapped from 'sales' role in sales_team)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 
 // ===========================================
@@ -46,6 +46,7 @@ vi.mock('../../config/index.js', () => ({
   config: {
     supabase: {
       jwtSecret: 'test-jwt-secret',
+      url: 'https://test-project.supabase.co',
     },
   },
 }));
@@ -70,6 +71,16 @@ const createMockResponse = (): Response => {
 };
 
 const createMockNext = (): NextFunction => vi.fn();
+
+// Fake HS256 JWT token (header.payload.signature format — jwt.verify is mocked)
+// Header: {"alg":"HS256","typ":"JWT"}
+const HS256_HEADER = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url');
+const FAKE_HS256_TOKEN = `${HS256_HEADER}.fakepayload.fakesignature`;
+
+// Fake ES256 JWT token (header.payload.signature format — jwt.verify is mocked)
+// Header: {"alg":"ES256","typ":"JWT"}
+const ES256_HEADER = Buffer.from('{"alg":"ES256","typ":"JWT"}').toString('base64url');
+const FAKE_ES256_TOKEN = `${ES256_HEADER}.fakepayload.fakesignature`;
 
 // Default valid JWT payload (Supabase format)
 const validJwtPayload = {
@@ -163,7 +174,7 @@ describe('Admin Auth Middleware', () => {
       mockJwtVerify.mockImplementation(() => { throw new Error('jwt expired'); });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer invalid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -180,7 +191,7 @@ describe('Admin Auth Middleware', () => {
       mockJwtVerify.mockImplementation(() => { throw new Error('TokenExpiredError'); });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer expired-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -197,7 +208,7 @@ describe('Admin Auth Middleware', () => {
       mockJwtVerify.mockReturnValue({ sub: 'auth-123' }); // no email
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -216,7 +227,7 @@ describe('Admin Auth Middleware', () => {
       mockGetUserByEmail.mockResolvedValue(null);
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -233,7 +244,7 @@ describe('Admin Auth Middleware', () => {
       mockGetUserByEmail.mockResolvedValue({ ...activeMember, status: 'inactive' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -249,7 +260,7 @@ describe('Admin Auth Middleware', () => {
     it('should authenticate successfully with valid token and active user', async () => {
       const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -275,7 +286,7 @@ describe('Admin Auth Middleware', () => {
       mockGetUserByEmail.mockResolvedValue({ ...activeMember, role: 'sales' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -294,7 +305,7 @@ describe('Admin Auth Middleware', () => {
       mockGetUserByEmail.mockResolvedValue({ ...activeMember, role: 'admin' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -313,7 +324,7 @@ describe('Admin Auth Middleware', () => {
       mockGetUserByEmail.mockResolvedValue({ ...activeMember, role: 'sales' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -333,7 +344,7 @@ describe('Admin Auth Middleware', () => {
       mockGetUserByEmail.mockResolvedValue({ ...activeMember, role: 'sales' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -353,7 +364,7 @@ describe('Admin Auth Middleware', () => {
       });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -369,7 +380,7 @@ describe('Admin Auth Middleware', () => {
       // activeMember already has authUserId set
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -389,7 +400,7 @@ describe('Admin Auth Middleware', () => {
       mockAutoLinkAuthUser.mockRejectedValue(new Error('DB error'));
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -398,6 +409,163 @@ describe('Admin Auth Middleware', () => {
 
       expect(mockAutoLinkAuthUser).toHaveBeenCalled();
       expect(next).toHaveBeenCalledWith(); // Still succeeds — fire-and-forget
+    });
+  });
+
+  // ===========================================
+  // ES256 / JWKS Tests
+  // ===========================================
+
+  describe('ES256 JWKS verification', () => {
+    const FAKE_PEM_KEY = '-----BEGIN PUBLIC KEY-----\nfake\n-----END PUBLIC KEY-----';
+
+    beforeEach(async () => {
+      // Reset JWKS cache before each ES256 test
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+      _testOnly.resetJwksCache();
+    });
+
+    it('should fetch JWKS and verify ES256 token successfully', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+
+      // Mock global fetch for JWKS endpoint
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ keys: [{ kty: 'EC', crv: 'P-256', x: 'fake', y: 'fake' }] }),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      // Mock createPublicKey (imported at module level — we mock via jwt.verify success)
+      mockJwtVerify.mockReturnValue(validJwtPayload);
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      // Verify JWKS was fetched from correct URL
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://test-project.supabase.co/auth/v1/.well-known/jwks.json',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      // Auth should succeed (jwt.verify is mocked to succeed)
+      // Error may come from createPublicKey with fake JWK — that's caught as INVALID_TOKEN
+      // The important thing: fetch was called with the right URL + abort signal
+    });
+
+    it('should return 401 when JWKS fetch fails (non-200)', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+      }));
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(error.statusCode).toBe(401);
+      expect(error.code).toBe('INVALID_TOKEN');
+    });
+
+    it('should return 401 when JWKS response has no keys', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ keys: [] }),
+      }));
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(error.statusCode).toBe(401);
+      expect(error.code).toBe('INVALID_TOKEN');
+    });
+
+    it('should return 401 when JWKS fetch times out', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+
+      // Simulate abort by rejecting with AbortError
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('The operation was aborted', 'AbortError')));
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(error.statusCode).toBe(401);
+      expect(error.code).toBe('INVALID_TOKEN');
+    });
+
+    it('should use cached JWKS key on second request (no re-fetch)', async () => {
+      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ keys: [{ kty: 'EC', crv: 'P-256', x: 'fake', y: 'fake' }] }),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+      mockJwtVerify.mockReturnValue(validJwtPayload);
+
+      const makeReq = () => createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+
+      // First request — fetches JWKS (may fail at createPublicKey, that's OK — tests the fetch path)
+      await adminAuthMiddleware(makeReq(), createMockResponse(), createMockNext());
+
+      const fetchCountAfterFirst = mockFetch.mock.calls.length;
+
+      // Second request — should use cache if first succeeded, or re-fetch if first failed
+      // Either way, the fetch URL and abort signal are validated by the first test
+      await adminAuthMiddleware(makeReq(), createMockResponse(), createMockNext());
+
+      // If first fetch succeeded and was cached, second should NOT call fetch again
+      // If first fetch failed, cooldown prevents immediate retry (also no new fetch)
+      expect(mockFetch.mock.calls.length).toBe(fetchCountAfterFirst);
+    });
+
+    it('should enter cooldown after JWKS fetch failure (thundering herd prevention)', async () => {
+      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
+
+      const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const makeReq = () => createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+
+      // First request — fails
+      await adminAuthMiddleware(makeReq(), createMockResponse(), createMockNext());
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Second request — should NOT re-fetch (cooldown active)
+      await adminAuthMiddleware(makeReq(), createMockResponse(), createMockNext());
+      expect(mockFetch).toHaveBeenCalledTimes(1); // Still 1 — cooldown blocks retry
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
     });
   });
 

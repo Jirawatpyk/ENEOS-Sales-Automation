@@ -6,10 +6,75 @@
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { createPublicKey } from 'crypto';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../types/index.js';
 import { getUserByEmail, autoLinkAuthUser } from '../services/sales-team.service.js';
+
+// ===========================================
+// JWKS Cache for ES256 verification
+// ===========================================
+
+let cachedJwksKey: string | null = null;
+let jwksFetchedAt = 0;
+let jwksErrorAt = 0;
+const JWKS_CACHE_TTL_MS = 3600_000; // 1 hour
+const JWKS_ERROR_COOLDOWN_MS = 30_000; // 30 seconds — prevent thundering herd on failure
+const JWKS_FETCH_TIMEOUT_MS = 5_000; // 5 seconds
+
+/**
+ * Fetch JWKS public key from Supabase and convert to PEM for jwt.verify()
+ * Cached for 1 hour to avoid repeated network calls.
+ * On failure: cools down for 30s to prevent thundering herd.
+ */
+async function getJwksPublicKey(): Promise<string> {
+  const now = Date.now();
+  if (cachedJwksKey && now - jwksFetchedAt < JWKS_CACHE_TTL_MS) {
+    return cachedJwksKey;
+  }
+
+  // Prevent thundering herd: if last fetch failed recently, throw immediately
+  if (jwksErrorAt && now - jwksErrorAt < JWKS_ERROR_COOLDOWN_MS) {
+    throw new Error('JWKS fetch in cooldown after recent failure');
+  }
+
+  const jwksUrl = `${config.supabase.url}/auth/v1/.well-known/jwks.json`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), JWKS_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(jwksUrl, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch JWKS: ${response.status}`);
+    }
+
+    const jwks = await response.json() as { keys: Array<Record<string, unknown>> };
+    if (!jwks.keys?.length) {
+      throw new Error('JWKS response contains no keys');
+    }
+
+    const publicKey = createPublicKey({ key: jwks.keys[0], format: 'jwk' });
+    cachedJwksKey = publicKey.export({ type: 'spki', format: 'pem' }) as string;
+    jwksFetchedAt = now;
+    jwksErrorAt = 0; // Clear error state on success
+
+    logger.info('JWKS public key fetched and cached', { url: jwksUrl });
+    return cachedJwksKey;
+  } catch (error) {
+    jwksErrorAt = now; // Set cooldown
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Reset JWKS cache (for testing) */
+function resetJwksCache(): void {
+  cachedJwksKey = null;
+  jwksFetchedAt = 0;
+  jwksErrorAt = 0;
+}
 
 // ===========================================
 // Types
@@ -54,7 +119,7 @@ declare global {
  *
  * Flow:
  * 1. ดึง Bearer token จาก Authorization header
- * 2. Verify JWT locally with jsonwebtoken + SUPABASE_JWT_SECRET (~0.1ms)
+ * 2. Verify JWT locally — auto-detects HS256 (symmetric) or ES256 (JWKS)
  * 3. Extract email, authUserId (sub), app_metadata.role from JWT
  * 4. Query sales_team by email — require status: 'active' (defense in depth)
  * 5. Auto-link auth_user_id on first login (fire-and-forget)
@@ -95,11 +160,22 @@ export async function adminAuthMiddleware(
       );
     }
 
-    // 2. Verify JWT locally with SUPABASE_JWT_SECRET
+    // 2. Verify JWT — auto-detect algorithm (HS256 or ES256)
     let decoded: SupabaseJwtPayload;
     try {
-      decoded = jwt.verify(token, config.supabase.jwtSecret) as SupabaseJwtPayload;
+      const header = JSON.parse(
+        Buffer.from(token.split('.')[0], 'base64url').toString()
+      ) as { alg?: string };
+
+      if (header.alg === 'ES256') {
+        const publicKey = await getJwksPublicKey();
+        decoded = jwt.verify(token, publicKey, { algorithms: ['ES256'] }) as SupabaseJwtPayload;
+      } else {
+        decoded = jwt.verify(token, config.supabase.jwtSecret, { algorithms: ['HS256'] }) as SupabaseJwtPayload;
+      }
     } catch (_error) {
+      const errMsg = _error instanceof Error ? _error.message : String(_error);
+      logger.error('JWT verify failed', { error: errMsg });
       throw new AppError(
         'Invalid or expired token',
         401,
@@ -256,4 +332,5 @@ function mapRole(jwtRole: string | undefined, dbRole: string): UserRole {
 
 export const _testOnly = {
   mapRole,
+  resetJwksCache,
 };

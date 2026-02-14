@@ -372,7 +372,7 @@ export interface SalesTeamMemberFull {
   name: string;
   email: string | null;
   phone: string | null;
-  role: 'admin' | 'sales';
+  role: 'admin' | 'viewer'; // Story 13-1 AC-5: simplified to admin|viewer only
   createdAt: string;
   status: 'active' | 'inactive';
 }
@@ -382,7 +382,7 @@ export interface SalesTeamMemberFull {
  */
 export interface SalesTeamFilter {
   status?: 'active' | 'inactive' | 'all';
-  role?: 'admin' | 'sales' | 'all';
+  role?: 'admin' | 'viewer' | 'all';
 }
 
 /**
@@ -391,7 +391,7 @@ export interface SalesTeamFilter {
 export interface SalesTeamMemberUpdate {
   email?: string | null;
   phone?: string | null;
-  role?: 'admin' | 'sales';
+  role?: 'admin' | 'viewer';
   status?: 'active' | 'inactive';
 }
 

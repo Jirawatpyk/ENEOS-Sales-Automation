@@ -49,15 +49,15 @@ vi.mock('../../services/sales-team.service.js', () => ({
 // Mock leadsService (getAllLeads moved from sheetsService)
 vi.mock('../../services/leads.service.js', () => mockLeadsService);
 
-// Mock admin-auth middleware to bypass Google OAuth
+// Mock admin-auth middleware to bypass Supabase JWT verification
 vi.mock('../../middleware/admin-auth.js', () => ({
   adminAuthMiddleware: (req: Request, _res: Response, next: NextFunction) => {
     // Simulate authenticated manager user
     req.user = {
       email: 'manager@eneos.co.th',
-      name: 'Test Manager',
       role: 'manager',
-      googleId: 'google-123',
+      authUserId: 'auth-uuid-123',
+      memberId: 'member-uuid-123',
     };
     next();
   },

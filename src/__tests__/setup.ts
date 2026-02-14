@@ -23,6 +23,7 @@ process.env.LINE_GROUP_ID = 'test_group_id';
 // Supabase
 process.env.SUPABASE_URL = 'https://test-project.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test_supabase_service_role_key';
+process.env.SUPABASE_JWT_SECRET = 'test-jwt-secret-for-supabase-auth';
 
 // ===========================================
 // Global Hooks

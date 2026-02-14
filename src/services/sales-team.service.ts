@@ -16,6 +16,8 @@ import type {
   SalesTeamMemberUpdate,
 } from '../types/index.js';
 
+export type InviteRole = 'admin' | 'viewer';
+
 const logger = createModuleLogger('sales-team');
 
 // ===========================================
@@ -23,12 +25,16 @@ const logger = createModuleLogger('sales-team');
 // ===========================================
 
 function mapToSalesTeamMemberFull(row: Record<string, unknown>): SalesTeamMemberFull {
+  // Normalize legacy 'sales' → 'viewer' (defense-in-depth, migration 004 handles DB)
+  const rawRole = row.role as string;
+  const role: 'admin' | 'viewer' = rawRole === 'admin' ? 'admin' : 'viewer';
+
   return {
     lineUserId: (row.line_user_id as string) || null,
     name: row.name as string,
     email: (row.email as string) || null,
     phone: (row.phone as string) || null,
-    role: row.role as 'admin' | 'sales',
+    role,
     createdAt: row.created_at as string,
     status: row.status as 'active' | 'inactive',
   };
@@ -93,11 +99,11 @@ export async function getSalesTeamMember(lineUserId: string): Promise<SalesTeamM
 /**
  * Get user by email — for admin auth middleware (AC #2)
  * SELECT * FROM sales_team WHERE email = $1
- * Returns role + status for login control
+ * Returns role + status + id + authUserId for login control and auto-link
  */
 export async function getUserByEmail(
   email: string
-): Promise<(SalesTeamMember & { role: string; status: 'active' | 'inactive' }) | null> {
+): Promise<(SalesTeamMember & { id: string; role: string; status: 'active' | 'inactive'; authUserId: string | null }) | null> {
   const { data, error } = await supabase
     .from('sales_team')
     .select('*')
@@ -108,6 +114,7 @@ export async function getUserByEmail(
   if (!data) {return null;}
 
   return {
+    id: data.id,
     lineUserId: data.line_user_id || '',
     name: data.name,
     email: data.email,
@@ -115,6 +122,7 @@ export async function getUserByEmail(
     role: data.role,
     createdAt: data.created_at,
     status: data.status as 'active' | 'inactive',
+    authUserId: data.auth_user_id || null,
   };
 }
 
@@ -221,7 +229,7 @@ export async function updateSalesTeamMember(
  * INSERT INTO sales_team with duplicate email check (23505)
  */
 export async function createSalesTeamMember(
-  data: { name: string; email: string; phone?: string; role: 'admin' | 'sales' }
+  data: { name: string; email: string; phone?: string; role: 'admin' | 'viewer' }
 ): Promise<SalesTeamMemberFull> {
   const { data: member, error } = await supabase
     .from('sales_team')
@@ -270,6 +278,11 @@ export async function getUnlinkedLINEAccounts(): Promise<Array<{ lineUserId: str
 /**
  * Link a LINE account to a Dashboard member (AC #3)
  * Race-safe: UPDATE ... WHERE line_user_id IS NULL
+ *
+ * Order: Delete LINE-only row FIRST → then update dashboard member
+ * Reason: line_user_id has UNIQUE constraint — setting it on the dashboard
+ * member while the LINE-only row still holds the same value causes 23505.
+ * If the update fails after delete, rollback by re-inserting the LINE-only row.
  */
 export async function linkLINEAccount(
   dashboardMemberEmail: string,
@@ -290,7 +303,23 @@ export async function linkLINEAccount(
     throw err;
   }
 
-  // 2. Update dashboard member to set line_user_id (atomic: WHERE line_user_id IS NULL)
+  // 2. Delete the LINE-only row FIRST (free up UNIQUE constraint on line_user_id)
+  const { error: deleteError } = await supabase
+    .from('sales_team')
+    .delete()
+    .eq('id', lineAccount.id);
+
+  if (deleteError) {
+    logger.error('Failed to delete LINE-only row before linking', {
+      lineAccountId: lineAccount.id,
+      email: dashboardMemberEmail,
+      errorCode: deleteError.code,
+      errorMessage: deleteError.message,
+    });
+    throw new AppError('Failed to prepare link operation', 500, 'DELETE_FAILED');
+  }
+
+  // 3. Update dashboard member to set line_user_id (atomic: WHERE line_user_id IS NULL)
   const { data: updated, error } = await supabase
     .from('sales_team')
     .update({ line_user_id: targetLineUserId })
@@ -300,24 +329,26 @@ export async function linkLINEAccount(
     .single();
 
   if (error || !updated) {
+    // Rollback: re-insert the LINE-only row since update failed
+    const { error: rollbackError } = await supabase
+      .from('sales_team')
+      .insert({
+        line_user_id: lineAccount.line_user_id,
+        name: lineAccount.name,
+        role: lineAccount.role,
+        status: lineAccount.status,
+      });
+    if (rollbackError) {
+      logger.error('Rollback failed: could not re-insert LINE-only row', {
+        lineUserId: targetLineUserId,
+        errorCode: rollbackError.code,
+        errorMessage: rollbackError.message,
+      });
+    }
+
     const err = new AppError('Member not found or already linked', 409, 'LINK_FAILED');
     err.name = 'LINK_FAILED';
     throw err;
-  }
-
-  // 3. Delete the LINE-only row (it's now merged into the dashboard member)
-  // Wrapped in try-catch: the link (step 2) already succeeded — delete is cleanup
-  try {
-    await supabase
-      .from('sales_team')
-      .delete()
-      .eq('id', lineAccount.id);
-  } catch (deleteError) {
-    logger.error('Failed to delete LINE-only row after linking (non-fatal)', {
-      lineAccountId: lineAccount.id,
-      email: dashboardMemberEmail,
-      error: deleteError instanceof Error ? deleteError.message : String(deleteError),
-    });
   }
 
   logger.info('LINE account linked', {
@@ -342,5 +373,138 @@ export async function getUnlinkedDashboardMembers(): Promise<SalesTeamMemberFull
   if (error) {throw error;}
 
   return (data || []).map(mapToSalesTeamMemberFull);
+}
+
+/**
+ * Auto-link auth_user_id to sales_team member on first login (AC #6)
+ * Race-safe: UPDATE ... WHERE auth_user_id IS NULL
+ * Fire-and-forget: catches ALL errors internally, never throws
+ * Same pattern as linkLINEAccount — atomic conditional update
+ */
+export async function autoLinkAuthUser(memberId: string, authUserId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('sales_team')
+      .update({ auth_user_id: authUserId })
+      .eq('id', memberId)
+      .is('auth_user_id', null);
+
+    if (error) {
+      logger.warn('autoLinkAuthUser: DB update failed (non-fatal)', {
+        memberId,
+        errorCode: error.code,
+        errorMessage: error.message,
+      });
+    }
+  } catch (err) {
+    // Fire-and-forget — never throw to caller
+    logger.warn('autoLinkAuthUser failed (non-fatal)', {
+      memberId,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
+}
+
+// ===========================================
+// Admin Invite & Role Sync (Story 13-1)
+// ===========================================
+
+/**
+ * Invite a new sales team member (AC-1)
+ * 1. Create sales_team record FIRST (prevents "user can login but no DB record")
+ * 2. Then invite via Supabase Auth (sends email)
+ * 3. If step 2 fails, sales_team record persists (admin can retry)
+ *
+ * Re-invite: If email exists in sales_team but has no auth_user_id,
+ * skip record creation and retry Supabase invite only (Task 1.5)
+ */
+export async function inviteSalesTeamMember(
+  email: string,
+  name: string,
+  role: InviteRole
+): Promise<{ member: SalesTeamMemberFull; authInviteSent: boolean }> {
+  // Normalize role: 'sales' → 'viewer' for backward compat
+  const normalizedRole = role === 'admin' ? 'admin' : 'viewer';
+
+  // Check if email already exists in sales_team (Task 1.5: re-invite flow)
+  const existing = await getUserByEmail(email);
+
+  let member: SalesTeamMemberFull;
+
+  if (existing) {
+    // Email exists — check if this is a re-invite (no auth_user_id)
+    if (existing.authUserId) {
+      // User already fully registered — throw duplicate
+      const err = new AppError('User already exists', 409, 'DUPLICATE_EMAIL');
+      err.name = 'DUPLICATE_EMAIL';
+      throw err;
+    }
+
+    // Re-invite: skip record creation, just retry Supabase invite
+    member = mapToSalesTeamMemberFull({
+      line_user_id: existing.lineUserId || null,
+      name: existing.name,
+      email: existing.email,
+      phone: existing.phone || null,
+      role: existing.role,
+      created_at: existing.createdAt || '',
+      status: existing.status,
+    });
+  } else {
+    // Step 1: Create sales_team record FIRST
+    member = await createSalesTeamMember({
+      name,
+      email,
+      role: normalizedRole,
+    });
+  }
+
+  // Step 2: Invite via Supabase Auth
+  let authInviteSent = false;
+  try {
+    const { error } = await supabase.auth.admin.inviteUserByEmail(email, {
+      data: { role: normalizedRole },
+    });
+    if (error) {
+      logger.warn('Supabase invite failed, sales_team record kept', { email, error: error.message });
+    } else {
+      authInviteSent = true;
+    }
+  } catch (err) {
+    logger.warn('Supabase invite error, sales_team record kept', {
+      email,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
+
+  return { member, authInviteSent };
+}
+
+/**
+ * Sync role to Supabase Auth app_metadata (AC-2)
+ * Fire-and-forget — don't block the update response
+ * Only syncs when auth_user_id exists (user has logged in at least once)
+ */
+export async function syncRoleToSupabaseAuth(
+  authUserId: string | null,
+  role: string
+): Promise<void> {
+  if (!authUserId) {return;} // User hasn't logged in yet — skip
+
+  try {
+    const { error } = await supabase.auth.admin.updateUserById(authUserId, {
+      app_metadata: { role },
+    });
+    if (error) {
+      logger.warn('Failed to sync role to Supabase Auth', { authUserId, role, error: error.message });
+    }
+  } catch (err) {
+    // Non-fatal — sales_team.role is the source of truth for middleware
+    logger.warn('syncRoleToSupabaseAuth failed (non-fatal)', {
+      authUserId,
+      role,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
 }
 

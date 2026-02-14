@@ -1,5 +1,5 @@
-# Sprint Status - ENEOS Admin Dashboard
-# generated: 2026-01-31
+# Sprint Status - ENEOS Sales Automation
+# generated: 2026-02-11
 # project: eneos-sales-automation
 # project_key: eneos-admin-dashboard
 # tracking_system: file-system
@@ -29,7 +29,7 @@
 # - SM typically creates next story ONLY after previous one is 'done'
 # - Dev moves story to 'review', then runs code-review workflow
 
-generated: "2026-01-31"
+generated: "2026-02-11"
 project: "eneos-sales-automation"
 project_key: "eneos-admin-dashboard"
 tracking_system: "file-system"
@@ -121,11 +121,11 @@ development_status:
   4-7-sort-columns: done  # Code review passed 2026-01-18
   4-8-lead-detail-modal: done  # Code review passed 2026-01-18
   4-9-bulk-select: done  # Code review passed 2026-01-18
-  4-10-quick-export: done  # ✅ Completed 2026-01-18 with code review fixes
-  4-11-additional-columns: done  # Should Have - รวม F-04.11/12/13: leadSource, jobTitle, city columns (Code review passed 2026-01-18)
+  4-10-quick-export: done  # Completed 2026-01-18 with code review fixes
+  4-11-additional-columns: done  # Should Have - leadSource, jobTitle, city columns (Code review passed 2026-01-18)
   4-12-job-title-column: merged           # Merged into 4-11-additional-columns
   4-13-city-column: merged                # Merged into 4-11-additional-columns
-  4-14-filter-by-lead-source: done  # Could Have - กรองตาม Lead Source (Completed 2026-01-19)
+  4-14-filter-by-lead-source: done  # Could Have - Filter by Lead Source (Completed 2026-01-19)
   4-15-grounding-fields-ui: done  # Display DBD Sector, Capital, Location columns + Full Address in detail - Completed 2026-01-26
   epic-4-retrospective: done  # Retrospective completed 2026-01-19, API Contract created
 
@@ -205,98 +205,126 @@ development_status:
   epic-9-retrospective: done  # Retrospective completed 2026-02-10
 
   # ============================================================
+  # EPIC-10: Backend Auth Foundation (Supabase Auth Migration)
+  # Source: epics.md — Supabase Auth Migration
+  # Backend ready for Supabase JWT token verification
+  # Dependencies: None (starting epic)
+  # ============================================================
+  epic-10: in-progress  # First story created 2026-02-11
+  10-1-backend-auth-foundation: done  # MERGED: Stories 10-1 to 10-5 combined — Rex approved 2026-02-11
+  10-2-rewrite-backend-jwt-verification-middleware: merged  # Merged into 10-1-backend-auth-foundation
+  10-3-auto-link-auth-user-id: merged                      # Merged into 10-1-backend-auth-foundation
+  10-4-backend-auth-tests-rewrite: merged                  # Merged into 10-1-backend-auth-foundation
+  10-5-backend-package-cleanup-smoke-test: merged          # Merged into 10-1-backend-auth-foundation
+  epic-10-retrospective: optional
+
+  # ============================================================
+  # EPIC-11: User Login & Authentication Experience (Supabase Auth Migration)
+  # Source: epics.md — Supabase Auth Migration
+  # Frontend login, OAuth, password reset, session management
+  # Dependencies: Epic 10 must be done first
+  # ============================================================
+  epic-11: done  # All stories done 2026-02-11 (11-1 + 11-4, with 11-2/3/5 merged)
+  11-1-frontend-login-auth-pages: done                    # MERGED: Stories 11-1 to 11-3 — Rex APPROVED 2026-02-11, 3465 tests pass
+  11-2-google-oauth-login-callback: merged                # Merged into 11-1-frontend-login-auth-pages
+  11-3-password-reset-flow: merged                        # Merged into 11-1-frontend-login-auth-pages
+  11-4-frontend-auth-middleware-session: done                 # MERGED: Stories 11-4 + 11-5 — Rex APPROVED 2026-02-11, 246 files 3456 tests, 12 review fixes (4H+5M+3L)
+  11-5-frontend-auth-smoke-test: merged                   # Merged into 11-4-frontend-auth-middleware-session
+  epic-11-retrospective: optional
+
+  # ============================================================
+  # EPIC-12: Dashboard Data Access — Proxy Migration (Supabase Auth Migration)
+  # Source: epics.md — Supabase Auth Migration
+  # Migrate all 16 API proxy routes from NextAuth to Supabase session
+  # Dependencies: Epic 11 must be done first
+  # ============================================================
+  epic-12: done  # Completed 2026-02-12 — Rex APPROVED, all routes migrated
+  12-1-proxy-migration: done                               # MERGED: Stories 12-1 to 12-3 — Rex APPROVED 2026-02-12, 19 routes migrated, 251 files 3449 tests pass, 7 review fixes
+  12-2-migrate-all-api-proxy-routes: merged                # Merged into 12-1-proxy-migration
+  12-3-proxy-migration-smoke-test: merged                  # Merged into 12-1-proxy-migration
+  epic-12-retrospective: optional
+
+  # ============================================================
+  # EPIC-13: Admin User Management (Supabase Auth Migration)
+  # Source: epics.md — Supabase Auth Migration
+  # Admin invite, role assignment, user disable
+  # Dependencies: Epic 11 must be done first (parallel with Epic 12)
+  # ============================================================
+  epic-13: done  # Completed 2026-02-12 — All stories done (13-1 merged with 13-2+13-3)
+  13-1-admin-user-management: done                         # MERGED: Stories 13-1 to 13-3 — Rex APPROVED 2026-02-12, 1460 tests pass, 7 review fixes (2C+2H+3M)
+  13-2-role-assignment-user-disable: merged                # Merged into 13-1-admin-user-management
+  13-3-user-management-smoke-test: merged                  # Merged into 13-1-admin-user-management
+  epic-13-retrospective: optional
+
+  # ============================================================
+  # EPIC-14: Cleanup & Production Verification (Supabase Auth Migration)
+  # Source: epics.md — Supabase Auth Migration
+  # Remove legacy auth, update docs, full E2E verification
+  # Dependencies: Epics 12 + 13 must be done first
+  # ============================================================
+  epic-14: backlog  # Blocked by Epics 12+13. Final gate. Story created 2026-02-11
+  14-1-cleanup-production-verification: ready-for-dev      # MERGED: Stories 14-1 to 14-3 — Remove legacy + Update docs + Full E2E verification
+  14-2-update-documentation-configuration: merged          # Merged into 14-1-cleanup-production-verification
+  14-3-full-end-to-end-production-verification: merged     # Merged into 14-1-cleanup-production-verification
+  epic-14-retrospective: optional
+
+  # ============================================================
   # TECH DEBT
   # Non-critical improvements to address when time permits
   # ============================================================
   tech-debt:
-    lib-barrel-export: done  # ✅ Completed 2026-01-17 - Created src/lib/index.ts barrel export
+    lib-barrel-export: done  # Completed 2026-01-17 - Created src/lib/index.ts barrel export
 
 # ============================================================
 # SPRINT SUMMARY
 # ============================================================
-# Total Epics: 9 (EPIC-00 to EPIC-09, EPIC-08 superseded)
-# Total Stories: 72 (64 existing + 8 new from EPIC-09)
+# Total Epics: 14 (EPIC-00 to EPIC-14, EPIC-08 superseded)
+# Total Stories: 91 (72 existing + 19 new from Supabase Auth Migration)
 #
-# EPIC-00 Status: ✅ COMPLETED (All 10 stories)
-#   - 0-1 to 0-10: All done (2026-01-12)
+# COMPLETED EPICS:
+#   EPIC-00: Backend API — done (15 stories)
+#   EPIC-01: Authentication & Authorization — done (5 stories + 1 deferred)
+#   EPIC-02: Dashboard Overview — in-progress (8 done + 1 ready-for-dev)
+#   EPIC-03: Sales Team Performance — done (8 stories)
+#   EPIC-04: Lead Management — done (15 stories)
+#   EPIC-05: Campaign Analytics — in-progress (11 stories done)
+#   EPIC-06: Export & Reports — in-progress (6 done + 2 backlog)
+#   EPIC-07: System Settings — in-progress (6 done + 1 backlog)
+#   EPIC-08: Superseded by EPIC-09
+#   EPIC-09: Supabase DB Migration — done (8 stories)
 #
-# EPIC-01 Status: ✅ COMPLETED (5/5 stories done)
-#   - 1-1 Google OAuth Login: ✅ done
-#   - 1-2 Domain Restriction: ✅ done (merged into 1-1)
-#   - 1-3 Session Management: ✅ done
-#   - 1-4 Logout: ✅ done (2026-01-13)
-#   - 1-5 Role-Based Access: ✅ done (2026-01-13) - Code review passed
-#   - 1-6 Audit Log: deferred (post-MVP)
+# NEW — SUPABASE AUTH MIGRATION (Epics 10-14):
+#   EPIC-10: Backend Auth Foundation — in-progress (1 merged story done, 4 merged into it)
+#     - 10-1: Backend Auth Foundation (MERGED: 10-1+10-2+10-3+10-4+10-5) — done
+#     Rex APPROVED 2026-02-11, 1432 tests pass
+#   EPIC-11: User Login & Auth Experience — in-progress (2 stories done, merged from 5)
+#     - 11-1: Frontend Login & Auth Pages (MERGED: 11-1+11-2+11-3) — done
+#     - 11-4: Frontend Auth Middleware & Session (MERGED: 11-4+11-5) — done
+#     Rex APPROVED 2026-02-11, 3456 tests pass, 12 review fixes applied
+#   EPIC-12: Dashboard Data Access (Proxy) — done (1 story, merged from 3)
+#     - 12-1: Proxy Migration (MERGED: 12-1+12-2+12-3) — done (Rex APPROVED 2026-02-12)
+#   EPIC-13: Admin User Management — done (1 story, merged from 3)
+#     - 13-1: Admin User Management (MERGED: 13-1+13-2+13-3) — done
+#     Rex APPROVED 2026-02-12, 1460 tests pass, 7 review fixes (2C+2H+3M)
+#   EPIC-14: Cleanup & Production Verification — backlog (1 story, merged from 3)
+#     - 14-1: Cleanup & Production Verification (MERGED: 14-1+14-2+14-3) — ready-for-dev
 #
-# EPIC-02 Status: ✅ COMPLETED (8/8 stories done)
-#   - 2-1 to 2-8: All done (2026-01-13)
-#
-# EPIC-03 Status: ✅ COMPLETED (8/8 stories done + retrospective)
-#   - 3-1 Performance Table: ✅ done (2026-01-16)
-#   - 3-2 Conversion Rate: ✅ done (2026-01-16)
-#   - 3-3 Performance Bar Chart: ✅ done (2026-01-16)
-#   - 3-4 Response Time: ✅ done (2026-01-16)
-#   - 3-5 Trend by Person: ✅ done (2026-01-16) - Code review passed
-#   - 3-6 Period Filter: ✅ done (2026-01-16) - Code review passed
-#   - 3-7 Target vs Actual: ✅ done (2026-01-16) - Code review passed
-#   - 3-8 Export Individual: ✅ done (2026-01-17) - Code review passed
-#   - Retrospective: ✅ done (2026-01-17)
-#
-# EPIC-04 Status: ✅ COMPLETED (14/14 stories done + retrospective)
-#   - All stories completed 2026-01-27 (including grounding fields UI)
-#
-# EPIC-05 Status: ✅ COMPLETED (9/9 stories done)
-#   - Backend: 5-1, 5-2 done
-#   - Frontend: 5-3, 5-4, 5-5, 5-6, 5-7, 5-8, 5-9 all done (2026-01-31)
-#
-# Completed Epics: 6 (EPIC-00, EPIC-01, EPIC-02, EPIC-03, EPIC-04, EPIC-05)
-# Completed Stories: 62 (15 + 5 + 9 + 8 + 14 + 9 + 2)  # E0:15, E1:5, E2:9, E3:8, E4:14, E5:9, E6:2
-# In Progress: Epic-6 (2 done, 6 backlog)
-#
-# COMPLETED: Epic-5 Campaign Analytics (9/9 stories done - 2026-01-31)
-#   - 5-1 Campaign Webhook Backend: ✅ done (2026-01-30) + TEA guardrails (2026-01-31)
-#   - 5-2 Campaign Stats API: ✅ done (2026-01-30) + TEA guardrails (175 tests) 2026-01-31
-#   - 5-3 Campaign Summary Cards: ✅ done (2026-01-31)
-#   - 5-4 Campaign Table: ✅ done (2026-01-31) - Code review APPROVED
-#   - 5-5 Open/Click Rates: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (172 tests)
-#   - 5-6 Campaign Performance Chart: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (92 tests)
-#   - 5-7 Campaign Detail Sheet: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (125 tests, 12 files)
-#   - 5-8 Campaign Date Filter: ✅ done (2026-01-31) - Code review APPROVED + 6 fixes applied
-#   - 5-9 Campaign Export: ✅ done (2026-01-31) - Code review APPROVED + TEA guardrails (58 tests)
-#
-# EPIC-08 Status: ⛔ SUPERSEDED (by ADR-002 / EPIC-09)
-#   - ADR-001 objectives absorbed into Supabase migration
-#
-# EPIC-09 Status: 🚧 IN-PROGRESS (8 stories)
-#   - 9-0 Supabase Setup + Schema + Client: ✅ done (Code review APPROVED 2026-02-09)
-#   - 9-1a Migrate Leads + Dedup (Data Layer): ✅ done (Code review APPROVED 2026-02-09) — 1512 tests, 5 review fixes
-#   - 9-1b Migrate Controllers + LINE Postback: ✅ done (Code review APPROVED 2026-02-09) — 1550 tests, 6 review fixes
-#   - 9-2 Migrate Campaign Services: ✅ done (Code review APPROVED 2026-02-09) — 1472 tests, 4 review fixes
-#   - 9-3 Migrate Sales_Team + Status_History: ✅ done (Code review APPROVED 2026-02-09) — 1505 tests, 9 review fixes
-#   - 9-4 Cleanup Google Sheets + Docs: ✅ done (Code review APPROVED 2026-02-10) — 1412 tests, 10 review fixes
-#   - 9-5 Lead Detail + Campaign Timeline: ✅ done (Code review APPROVED 2026-02-10) — 1423 tests, 4 review fixes
-#   - 9-6 Frontend Type Updates: ✅ done (Code review APPROVED 2026-02-10) — Backend 1423 + Dashboard 3453 tests, all review fixes applied
-#
-# RECOMMENDED MVP (Phase 1):
-# - EPIC-01: Authentication (5 stories) - ✅ COMPLETED
-# - EPIC-02: Dashboard Overview (8 stories) - ✅ COMPLETED
-# - EPIC-03: Sales Performance (8 stories) - ✅ COMPLETED
-# - EPIC-04: Lead Management (14 stories) - ✅ COMPLETED
-# Total MVP Stories: ~27 stories (53 done)
+# DEPENDENCY CHAIN (Supabase Auth Migration):
+#   Epic 10 → Epic 11 → Epic 12 (parallel with Epic 13) → Epic 14
 #
 # ALL BACKEND APIs READY:
-# - /api/admin/dashboard ✅
-# - /api/admin/leads ✅
-# - /api/admin/leads/:id ✅
-# - /api/admin/sales-performance ✅
-# - /api/admin/campaigns ✅
-# - /api/admin/campaigns/:id ✅
-# - /api/admin/export ✅
-# - /api/admin/activity-log ✅ (added 2026-01-20)
-# - /api/admin/campaigns/stats ✅ (added 2026-01-30)
-# - /api/admin/campaigns/:id/stats ✅ (added 2026-01-30)
-# - /api/admin/campaigns/:id/events ✅ (added 2026-01-30)
-# - /webhook/brevo/campaign ✅ (added 2026-01-30)
+# - /api/admin/dashboard
+# - /api/admin/leads
+# - /api/admin/leads/:id
+# - /api/admin/sales-performance
+# - /api/admin/campaigns
+# - /api/admin/campaigns/:id
+# - /api/admin/export
+# - /api/admin/activity-log (added 2026-01-20)
+# - /api/admin/campaigns/stats (added 2026-01-30)
+# - /api/admin/campaigns/:id/stats (added 2026-01-30)
+# - /api/admin/campaigns/:id/events (added 2026-01-30)
+# - /webhook/brevo/campaign (added 2026-01-30)
 #
 # ============================================================
 # CRITICAL ISSUES (Process Improvements Needed)

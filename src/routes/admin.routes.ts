@@ -2,8 +2,8 @@
  * ENEOS Sales Automation - Admin Dashboard Routes
  * Routes for Admin Dashboard API endpoints
  *
- * ใช้ Google OAuth authentication และ RBAC
- * เฉพาะ email domain @eneos.co.th เท่านั้น
+ * ใช้ Supabase JWT authentication และ RBAC
+ * Invite-only — ต้องมี account ใน sales_team table
  */
 
 import { Router } from 'express';
@@ -37,6 +37,8 @@ import {
   getUnlinkedLINEAccounts,
   getUnlinkedDashboardMembers,
   linkLINEAccount,
+  // Story 13-1: Admin invite
+  inviteSalesTeamMember,
 } from '../controllers/admin/team-management.controller.js';
 import {
   adminAuthMiddleware,
@@ -101,8 +103,9 @@ router.get('/me', (req, res) => {
     success: true,
     data: {
       email: req.user?.email || '',
-      name: req.user?.name || '',
       role: req.user?.role || 'viewer',
+      authUserId: req.user?.authUserId || '',
+      memberId: req.user?.memberId || '',
     },
   });
 });
@@ -219,6 +222,27 @@ router.get('/sales-team/list', requireAdmin, asyncHandler(getSalesTeamList));
  * Access: admin only (Story 7-4b AC#1-7)
  */
 router.post('/sales-team', requireAdmin, asyncHandler(createSalesTeamMember));
+
+/**
+ * POST /api/admin/sales-team/invite (Story 13-1 AC-1)
+ * Invite a new user via Supabase Auth
+ *
+ * Body:
+ * - email: string (required, any domain — admin invite-only is the gate)
+ * - name: string (required, min 2 chars)
+ * - role: 'admin' | 'viewer' (required)
+ *
+ * Flow:
+ * 1. Create sales_team record FIRST
+ * 2. Invite via Supabase Auth (sends email)
+ * 3. If invite fails, record persists (admin can retry)
+ *
+ * Response:
+ * - data: { member: SalesTeamMemberFull, authInviteSent: boolean }
+ *
+ * Access: admin only
+ */
+router.post('/sales-team/invite', requireAdmin, asyncHandler(inviteSalesTeamMember));
 
 /**
  * GET /api/admin/sales-team/unlinked-line-accounts

@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock Setup (Hoisted)
 // ===========================================
 
-const { mockSupabase, mockLogger } = vi.hoisted(() => {
+const { mockSupabase, mockLogger, mockAuthAdmin } = vi.hoisted(() => {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
   const methods = [
     'from', 'select', 'insert', 'upsert', 'update', 'delete',
@@ -20,6 +20,14 @@ const { mockSupabase, mockLogger } = vi.hoisted(() => {
     chain[method] = vi.fn().mockReturnValue(chain);
   }
 
+  // Story 13-1: Mock Supabase Auth Admin API
+  const mockAuthAdmin = {
+    inviteUserByEmail: vi.fn(),
+    updateUserById: vi.fn(),
+  };
+  // Attach auth.admin to the chain so supabase.auth.admin.* works
+  (chain as Record<string, unknown>).auth = { admin: mockAuthAdmin };
+
   const mockLogger = {
     info: vi.fn(),
     debug: vi.fn(),
@@ -27,7 +35,7 @@ const { mockSupabase, mockLogger } = vi.hoisted(() => {
     error: vi.fn(),
   };
 
-  return { mockSupabase: chain, mockLogger };
+  return { mockSupabase: chain, mockLogger, mockAuthAdmin };
 });
 
 vi.mock('../../lib/supabase.js', () => ({
@@ -51,6 +59,9 @@ import {
   getUnlinkedLINEAccounts,
   linkLINEAccount,
   getUnlinkedDashboardMembers,
+  autoLinkAuthUser,
+  inviteSalesTeamMember,
+  syncRoleToSupabaseAuth,
 } from '../../services/sales-team.service.js';
 
 // ===========================================
@@ -88,7 +99,10 @@ describe('Sales Team Service (Supabase)', () => {
     vi.clearAllMocks();
     // Reset chain to return self for method chaining
     for (const key of Object.keys(mockSupabase)) {
-      mockSupabase[key].mockReturnValue(mockSupabase);
+      // Skip non-function properties (e.g., 'auth' object)
+      if (typeof mockSupabase[key]?.mockReturnValue === 'function') {
+        mockSupabase[key].mockReturnValue(mockSupabase);
+      }
     }
   });
 
@@ -212,6 +226,7 @@ describe('Sales Team Service (Supabase)', () => {
       const result = await getUserByEmail('admin@eneos.co.th');
 
       expect(result).toEqual({
+        id: 'uuid-002',
         lineUserId: 'U0000000001',
         name: 'Admin User',
         email: 'admin@eneos.co.th',
@@ -219,6 +234,7 @@ describe('Sales Team Service (Supabase)', () => {
         role: 'admin',
         createdAt: '2026-01-01T00:00:00Z',
         status: 'active',
+        authUserId: null,
       });
       expect(mockSupabase.eq).toHaveBeenCalledWith('email', 'admin@eneos.co.th');
     });
@@ -346,7 +362,7 @@ describe('Sales Team Service (Supabase)', () => {
         name: 'Test Sales',
         email: 'test@eneos.co.th',
         phone: '0812345678',
-        role: 'sales',
+        role: 'viewer', // mapToSalesTeamMemberFull normalizes 'sales' → 'viewer'
         createdAt: '2026-01-01T00:00:00Z',
         status: 'active',
       });
@@ -519,34 +535,33 @@ describe('Sales Team Service (Supabase)', () => {
   // =========================================
 
   describe('linkLINEAccount', () => {
-    it('should link LINE account and delete old row', async () => {
-      // linkLINEAccount makes 3 supabase calls:
+    it('should delete LINE-only row first then update dashboard member', async () => {
+      // linkLINEAccount flow (UNIQUE constraint aware):
       // 1. select().eq().maybeSingle() → find LINE account
-      // 2. update().eq().is().select().single() → update dashboard member
-      // 3. delete().eq() → delete LINE-only row
-      mockSupabase.maybeSingle.mockImplementation(() => {
-        // Only the first maybeSingle call (step 1)
-        return Promise.resolve({
+      // 2. delete().eq() → delete LINE-only row (free UNIQUE constraint)
+      // 3. update().eq().is().select().single() → update dashboard member
+      mockSupabase.maybeSingle.mockImplementation(() =>
+        Promise.resolve({
           data: { id: 'line-row-id', line_user_id: 'U111', email: null, name: 'LINE User' },
           error: null,
-        });
+        }),
+      );
+      // Step 2: delete succeeds (returns { data, error: null })
+      mockSupabase.delete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
       });
-      mockSupabase.single.mockImplementation(() => {
-        // Step 2: update result
-        return Promise.resolve({
+      // Step 3: update result
+      mockSupabase.single.mockImplementation(() =>
+        Promise.resolve({
           data: { ...mockSalesTeamRow, line_user_id: 'U111' },
           error: null,
-        });
-      });
-      // Step 3: delete — eq at the end of delete chain returns a resolved value
-      // But eq is also called in steps 1 and 2, so we can't use mockResolvedValueOnce on it.
-      // The delete() chain ends with .eq() which should resolve. We mock delete chain to just resolve.
-      mockSupabase.delete.mockReturnValue(mockSupabase);
+        }),
+      );
 
       const result = await linkLINEAccount('test@eneos.co.th', 'U111');
 
       expect(result).not.toBeNull();
-      expect(result?.lineUserId).toBe('U111'); // Updated from mockSalesTeamRow with line_user_id: 'U111'
+      expect(result?.lineUserId).toBe('U111');
       expect(mockSupabase.delete).toHaveBeenCalled();
     });
 
@@ -572,21 +587,94 @@ describe('Sales Team Service (Supabase)', () => {
       ).rejects.toThrow('LINE account already linked to another member');
     });
 
-    it('should throw LINK_FAILED when update fails (race condition)', async () => {
+    it('should throw DELETE_FAILED when delete LINE-only row fails', async () => {
       // 1. Target found (no email → not linked)
       mockSupabase.maybeSingle.mockResolvedValueOnce({
         data: { id: 'line-row-id', line_user_id: 'U111', email: null, name: 'LINE User' },
         error: null,
       });
-      // 2. Update fails (race: someone already linked)
+      // 2. Delete fails
+      mockSupabase.delete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({
+          data: null,
+          error: { code: '42501', message: 'permission denied' },
+        }),
+      });
+
+      await expect(
+        linkLINEAccount('test@eneos.co.th', 'U111')
+      ).rejects.toThrow('Failed to prepare link operation');
+    });
+
+    it('should throw LINK_FAILED and rollback when update fails after delete', async () => {
+      // 1. Target found
+      mockSupabase.maybeSingle.mockImplementation(() =>
+        Promise.resolve({
+          data: { id: 'line-row-id', line_user_id: 'U111', email: null, name: 'LINE User', role: 'viewer', status: 'active' },
+          error: null,
+        }),
+      );
+      // 2. Delete succeeds
+      mockSupabase.delete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+      });
+      // 3. Update fails (race: someone already linked)
       mockSupabase.single.mockResolvedValueOnce({
         data: null,
         error: { code: 'PGRST116', message: 'No rows' },
+      });
+      // Rollback: insert should be called to re-insert LINE-only row
+      mockSupabase.insert.mockReturnValue(mockSupabase);
+
+      await expect(
+        linkLINEAccount('test@eneos.co.th', 'U111')
+      ).rejects.toThrow('Member not found or already linked');
+
+      // Verify rollback insert was attempted
+      expect(mockSupabase.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ line_user_id: 'U111', name: 'LINE User' }),
+      );
+    });
+
+    it('should log error when rollback insert itself fails', async () => {
+      // 1. Target found
+      mockSupabase.maybeSingle.mockImplementation(() =>
+        Promise.resolve({
+          data: { id: 'line-row-id', line_user_id: 'U111', email: null, name: 'LINE User', role: 'viewer', status: 'active' },
+          error: null,
+        }),
+      );
+      // 2. Delete succeeds
+      mockSupabase.delete.mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+      });
+      // 3. Update fails
+      mockSupabase.single.mockResolvedValueOnce({
+        data: null,
+        error: { code: 'PGRST116', message: 'No rows' },
+      });
+      // 4. Rollback insert also fails (returns Supabase { error })
+      mockSupabase.insert.mockReturnValue({
+        ...mockSupabase,
+        // Supabase returns { data, error } — NOT throw
+        then: (_resolve: (v: unknown) => void) =>
+          _resolve({ data: null, error: { code: '23505', message: 'duplicate key' } }),
       });
 
       await expect(
         linkLINEAccount('test@eneos.co.th', 'U111')
       ).rejects.toThrow('Member not found or already linked');
+
+      // Verify rollback was attempted
+      expect(mockSupabase.insert).toHaveBeenCalled();
+      // Verify error was logged (rollback failure)
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Rollback failed: could not re-insert LINE-only row',
+        expect.objectContaining({
+          lineUserId: 'U111',
+          errorCode: '23505',
+        }),
+      );
     });
   });
 
@@ -623,6 +711,56 @@ describe('Sales Team Service (Supabase)', () => {
   });
 
   // =========================================
+  // autoLinkAuthUser()
+  // =========================================
+
+  describe('autoLinkAuthUser', () => {
+    it('should update auth_user_id with race-safe IS NULL guard', async () => {
+      mockSupabase.is.mockResolvedValueOnce({ data: null, error: null });
+
+      await autoLinkAuthUser('member-uuid-001', 'auth-uuid-abc');
+
+      expect(mockSupabase.from).toHaveBeenCalledWith('sales_team');
+      expect(mockSupabase.update).toHaveBeenCalledWith({ auth_user_id: 'auth-uuid-abc' });
+      expect(mockSupabase.eq).toHaveBeenCalledWith('id', 'member-uuid-001');
+      expect(mockSupabase.is).toHaveBeenCalledWith('auth_user_id', null);
+    });
+
+    it('should not throw on Supabase error (fire-and-forget)', async () => {
+      mockSupabase.is.mockResolvedValueOnce({
+        data: null,
+        error: { code: '42P01', message: 'relation does not exist' },
+      });
+
+      await expect(autoLinkAuthUser('member-001', 'auth-001')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'autoLinkAuthUser: DB update failed (non-fatal)',
+        expect.objectContaining({ memberId: 'member-001' }),
+      );
+    });
+
+    it('should catch unexpected exceptions and not throw', async () => {
+      mockSupabase.is.mockRejectedValueOnce(new Error('Network timeout'));
+
+      await expect(autoLinkAuthUser('member-002', 'auth-002')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'autoLinkAuthUser failed (non-fatal)',
+        expect.objectContaining({ memberId: 'member-002', error: 'Network timeout' }),
+      );
+    });
+
+    it('should handle non-Error exceptions gracefully', async () => {
+      mockSupabase.is.mockRejectedValueOnce('string error');
+
+      await expect(autoLinkAuthUser('member-003', 'auth-003')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'autoLinkAuthUser failed (non-fatal)',
+        expect.objectContaining({ error: 'Unknown' }),
+      );
+    });
+  });
+
+  // =========================================
   // getSalesTeamAll()
   // =========================================
 
@@ -641,6 +779,207 @@ describe('Sales Team Service (Supabase)', () => {
       expect(result).toHaveLength(2);
       expect(result[0].lineUserId).toBe('U111');
       expect(result[1].email).toBe('sales2@eneos.co.th');
+    });
+  });
+
+  // =========================================
+  // inviteSalesTeamMember() — Story 13-1
+  // =========================================
+
+  describe('inviteSalesTeamMember', () => {
+    it('should create sales_team record FIRST then invite via Supabase Auth', async () => {
+      // getUserByEmail returns null (new user)
+      mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      // createSalesTeamMember: insert().select().single()
+      mockSupabase.single.mockResolvedValueOnce({
+        data: {
+          line_user_id: null,
+          name: 'New User',
+          email: 'new@example.com',
+          phone: null,
+          role: 'viewer',
+          status: 'active',
+          created_at: '2026-02-12T10:00:00Z',
+        },
+        error: null,
+      });
+      // Supabase Auth invite succeeds
+      mockAuthAdmin.inviteUserByEmail.mockResolvedValueOnce({ data: {}, error: null });
+
+      const result = await inviteSalesTeamMember('new@example.com', 'New User', 'viewer');
+
+      expect(result.member.email).toBe('new@example.com');
+      expect(result.member.role).toBe('viewer');
+      expect(result.authInviteSent).toBe(true);
+      expect(mockAuthAdmin.inviteUserByEmail).toHaveBeenCalledWith('new@example.com', {
+        data: { role: 'viewer' },
+      });
+    });
+
+    it('should return authInviteSent=false when Supabase invite fails', async () => {
+      // getUserByEmail returns null (new user)
+      mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      // createSalesTeamMember succeeds
+      mockSupabase.single.mockResolvedValueOnce({
+        data: {
+          line_user_id: null,
+          name: 'User',
+          email: 'user@example.com',
+          phone: null,
+          role: 'viewer',
+          status: 'active',
+          created_at: '2026-02-12T10:00:00Z',
+        },
+        error: null,
+      });
+      // Supabase Auth invite fails
+      mockAuthAdmin.inviteUserByEmail.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'Email rate limit exceeded' },
+      });
+
+      const result = await inviteSalesTeamMember('user@example.com', 'User', 'viewer');
+
+      expect(result.member.email).toBe('user@example.com');
+      expect(result.authInviteSent).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Supabase invite failed, sales_team record kept',
+        expect.objectContaining({ email: 'user@example.com' }),
+      );
+    });
+
+    it('should return authInviteSent=false when Supabase invite throws', async () => {
+      // getUserByEmail returns null (new user)
+      mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      // createSalesTeamMember succeeds
+      mockSupabase.single.mockResolvedValueOnce({
+        data: {
+          line_user_id: null,
+          name: 'User',
+          email: 'user@example.com',
+          phone: null,
+          role: 'viewer',
+          status: 'active',
+          created_at: '2026-02-12T10:00:00Z',
+        },
+        error: null,
+      });
+      // Supabase Auth invite throws exception
+      mockAuthAdmin.inviteUserByEmail.mockRejectedValueOnce(new Error('Network error'));
+
+      const result = await inviteSalesTeamMember('user@example.com', 'User', 'viewer');
+
+      expect(result.authInviteSent).toBe(false);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Supabase invite error, sales_team record kept',
+        expect.objectContaining({ email: 'user@example.com' }),
+      );
+    });
+
+    it('should throw DUPLICATE_EMAIL when user already fully registered', async () => {
+      // getUserByEmail returns existing user WITH authUserId
+      mockSupabase.maybeSingle.mockResolvedValueOnce({
+        data: {
+          ...mockSalesTeamRow,
+          auth_user_id: 'auth-uuid-existing',
+        },
+        error: null,
+      });
+
+      await expect(
+        inviteSalesTeamMember('test@eneos.co.th', 'Test', 'viewer')
+      ).rejects.toThrow('User already exists');
+    });
+
+    it('should re-invite when email exists but no auth_user_id (Task 1.5)', async () => {
+      // getUserByEmail returns existing user WITHOUT authUserId
+      mockSupabase.maybeSingle.mockResolvedValueOnce({
+        data: {
+          ...mockSalesTeamRow,
+          auth_user_id: null,
+        },
+        error: null,
+      });
+      // Supabase Auth invite succeeds (re-invite)
+      mockAuthAdmin.inviteUserByEmail.mockResolvedValueOnce({ data: {}, error: null });
+
+      const result = await inviteSalesTeamMember('test@eneos.co.th', 'Test', 'viewer');
+
+      // Should NOT call createSalesTeamMember (skip record creation)
+      expect(mockSupabase.insert).not.toHaveBeenCalled();
+      expect(result.member.email).toBe('test@eneos.co.th');
+      expect(result.authInviteSent).toBe(true);
+    });
+
+    it('should normalize admin role correctly', async () => {
+      // getUserByEmail returns null
+      mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null });
+      // createSalesTeamMember succeeds
+      mockSupabase.single.mockResolvedValueOnce({
+        data: {
+          line_user_id: null,
+          name: 'Admin',
+          email: 'admin@example.com',
+          phone: null,
+          role: 'admin',
+          status: 'active',
+          created_at: '2026-02-12T10:00:00Z',
+        },
+        error: null,
+      });
+      mockAuthAdmin.inviteUserByEmail.mockResolvedValueOnce({ data: {}, error: null });
+
+      const result = await inviteSalesTeamMember('admin@example.com', 'Admin', 'admin');
+
+      expect(result.member.role).toBe('admin');
+      expect(mockAuthAdmin.inviteUserByEmail).toHaveBeenCalledWith('admin@example.com', {
+        data: { role: 'admin' },
+      });
+    });
+  });
+
+  // =========================================
+  // syncRoleToSupabaseAuth() — Story 13-1
+  // =========================================
+
+  describe('syncRoleToSupabaseAuth', () => {
+    it('should update app_metadata.role via Supabase Auth Admin', async () => {
+      mockAuthAdmin.updateUserById.mockResolvedValueOnce({ data: {}, error: null });
+
+      await syncRoleToSupabaseAuth('auth-uuid-123', 'admin');
+
+      expect(mockAuthAdmin.updateUserById).toHaveBeenCalledWith('auth-uuid-123', {
+        app_metadata: { role: 'admin' },
+      });
+    });
+
+    it('should skip when authUserId is null', async () => {
+      await syncRoleToSupabaseAuth(null, 'admin');
+
+      expect(mockAuthAdmin.updateUserById).not.toHaveBeenCalled();
+    });
+
+    it('should not throw on Supabase error (fire-and-forget)', async () => {
+      mockAuthAdmin.updateUserById.mockResolvedValueOnce({
+        data: null,
+        error: { message: 'User not found' },
+      });
+
+      await expect(syncRoleToSupabaseAuth('auth-uuid-456', 'viewer')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Failed to sync role to Supabase Auth',
+        expect.objectContaining({ authUserId: 'auth-uuid-456', role: 'viewer' }),
+      );
+    });
+
+    it('should catch unexpected exceptions and not throw', async () => {
+      mockAuthAdmin.updateUserById.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(syncRoleToSupabaseAuth('auth-uuid-789', 'admin')).resolves.toBeUndefined();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'syncRoleToSupabaseAuth failed (non-fatal)',
+        expect.objectContaining({ authUserId: 'auth-uuid-789' }),
+      );
     });
   });
 });

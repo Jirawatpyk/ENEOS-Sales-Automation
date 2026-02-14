@@ -46,9 +46,9 @@ const createMockRequest = (overrides: Partial<Request> = {}): Request =>
     params: {},
     user: {
       email: 'admin@eneos.co.th',
-      name: 'Admin User',
       role: 'admin',
-      googleId: 'google-admin',
+      authUserId: 'auth-uuid-admin',
+      memberId: 'member-uuid-admin',
     },
     ...overrides,
   }) as Request;

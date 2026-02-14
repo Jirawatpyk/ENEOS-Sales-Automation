@@ -29,30 +29,32 @@ vi.mock('../../services/campaign-stats.service.js', () => ({
 }));
 
 const { mockGetUserByEmail } = vi.hoisted(() => ({
-  mockGetUserByEmail: vi.fn().mockResolvedValue({ role: 'admin', status: 'active' }),
+  mockGetUserByEmail: vi.fn().mockResolvedValue({ id: 'member-uuid-admin', role: 'admin', status: 'active', authUserId: 'auth-admin-123' }),
 }));
 
 vi.mock('../../services/sales-team.service.js', () => ({
   getSalesTeamMember: vi.fn().mockResolvedValue(null),
   getUserByEmail: mockGetUserByEmail,
+  autoLinkAuthUser: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock Google Auth for admin routes
-const { mockGoogleVerifyIdToken } = vi.hoisted(() => ({
-  mockGoogleVerifyIdToken: vi.fn().mockResolvedValue({
-    getPayload: () => ({
+// JWT mock for Supabase Auth
+vi.mock('jsonwebtoken', () => ({
+  default: {
+    verify: vi.fn().mockReturnValue({
+      sub: 'auth-admin-123',
       email: 'admin@eneos.co.th',
-      name: 'Admin User',
-      sub: 'google-admin-123',
+      app_metadata: { role: 'admin' },
     }),
+  },
+  verify: vi.fn().mockReturnValue({
+    sub: 'auth-admin-123',
+    email: 'admin@eneos.co.th',
+    app_metadata: { role: 'admin' },
   }),
 }));
 
-vi.mock('google-auth-library', () => ({
-  OAuth2Client: vi.fn().mockImplementation(() => ({
-    verifyIdToken: mockGoogleVerifyIdToken,
-  })),
-}));
+// Config is loaded from environment (setup.ts provides all required env vars)
 
 vi.mock('../../services/gemini.service.js', () => ({
   geminiService: {
@@ -334,19 +336,14 @@ const mockEventItem = {
 };
 
 describe('Campaign Stats Admin Routes (Story 5-2)', () => {
-  const validToken = 'valid-admin-token';
+  // Fake HS256 JWT (header.payload.signature — jwt.verify is mocked)
+  const hs256Header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url');
+  const validToken = `${hs256Header}.fakepayload.fakesig`;
 
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset auth mocks
-    mockGoogleVerifyIdToken.mockResolvedValue({
-      getPayload: () => ({
-        email: 'admin@eneos.co.th',
-        name: 'Admin User',
-        sub: 'google-admin-123',
-      }),
-    });
-    mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'active' });
+    mockGetUserByEmail.mockResolvedValue({ id: 'member-uuid-admin', role: 'admin', status: 'active', authUserId: 'auth-admin-123' });
   });
 
   describe('GET /api/admin/campaigns/stats', () => {

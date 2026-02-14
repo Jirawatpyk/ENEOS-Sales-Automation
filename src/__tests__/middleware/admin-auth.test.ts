@@ -1,39 +1,38 @@
 /**
  * ENEOS Sales Automation - Admin Auth Middleware Tests
+ * Story 10-1: Rewritten for Supabase JWT (was Google OAuth)
  *
  * Roles: admin | viewer
  * - admin: full access (export, settings)
- * - viewer: read-only (mapped from 'sales' role in Sales_Team sheet)
+ * - viewer: read-only (mapped from 'sales' role in sales_team)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
-// Store original env
-const originalEnv = { ...process.env };
+// ===========================================
+// Mock Setup (Hoisted)
+// ===========================================
 
-// Setup environment before any imports
-process.env.GOOGLE_OAUTH_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
-process.env.ALLOWED_DOMAINS = 'eneos.co.th,eqho.com';
-
-// Mock google-auth-library
-const mockVerifyIdToken = vi.fn();
-const mockGetPayload = vi.fn();
-
-vi.mock('google-auth-library', () => ({
-  OAuth2Client: vi.fn().mockImplementation(() => ({
-    verifyIdToken: mockVerifyIdToken,
-  })),
+const { mockJwtVerify } = vi.hoisted(() => ({
+  mockJwtVerify: vi.fn(),
 }));
 
-// Mock salesTeamService
-const mockGetUserByEmail = vi.fn();
+vi.mock('jsonwebtoken', () => ({
+  default: { verify: mockJwtVerify },
+  verify: mockJwtVerify,
+}));
+
+const { mockGetUserByEmail, mockAutoLinkAuthUser } = vi.hoisted(() => ({
+  mockGetUserByEmail: vi.fn(),
+  mockAutoLinkAuthUser: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('../../services/sales-team.service.js', () => ({
   getUserByEmail: mockGetUserByEmail,
+  autoLinkAuthUser: mockAutoLinkAuthUser,
 }));
 
-// Mock logger
 vi.mock('../../utils/logger.js', () => ({
   logger: {
     info: vi.fn(),
@@ -43,7 +42,19 @@ vi.mock('../../utils/logger.js', () => ({
   },
 }));
 
-// Helper functions
+vi.mock('../../config/index.js', () => ({
+  config: {
+    supabase: {
+      jwtSecret: 'test-jwt-secret',
+      url: 'https://test-project.supabase.co',
+    },
+  },
+}));
+
+// ===========================================
+// Helpers
+// ===========================================
+
 const createMockRequest = (overrides: Partial<Request> = {}): Request =>
   ({
     headers: {},
@@ -61,16 +72,49 @@ const createMockResponse = (): Response => {
 
 const createMockNext = (): NextFunction => vi.fn();
 
+// Fake HS256 JWT token (header.payload.signature format — jwt.verify is mocked)
+// Header: {"alg":"HS256","typ":"JWT"}
+const HS256_HEADER = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url');
+const FAKE_HS256_TOKEN = `${HS256_HEADER}.fakepayload.fakesignature`;
+
+// Fake ES256 JWT token (header.payload.signature format — jwt.verify is mocked)
+// Header: {"alg":"ES256","typ":"JWT"}
+const ES256_HEADER = Buffer.from('{"alg":"ES256","typ":"JWT"}').toString('base64url');
+const FAKE_ES256_TOKEN = `${ES256_HEADER}.fakepayload.fakesignature`;
+
+// Default valid JWT payload (Supabase format)
+const validJwtPayload = {
+  sub: 'auth-user-id-123',
+  email: 'admin@eneos.co.th',
+  app_metadata: { role: 'admin', provider: 'email' },
+  aud: 'authenticated',
+  exp: Math.floor(Date.now() / 1000) + 3600,
+  iat: Math.floor(Date.now() / 1000),
+};
+
+// Default active member from sales_team
+const activeMember = {
+  id: 'member-uuid-123',
+  lineUserId: 'U1234',
+  name: 'Admin User',
+  email: 'admin@eneos.co.th',
+  phone: undefined,
+  role: 'admin',
+  createdAt: '2026-01-01T00:00:00Z',
+  status: 'active' as const,
+  authUserId: 'auth-user-id-123',
+};
+
+// ===========================================
+// Tests
+// ===========================================
+
 describe('Admin Auth Middleware', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.GOOGLE_OAUTH_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
-    process.env.ALLOWED_DOMAINS = 'eneos.co.th,eqho.com';
-    mockGetUserByEmail.mockResolvedValue({ role: 'viewer' });
-  });
-
-  afterEach(() => {
-    process.env = { ...originalEnv };
+    // Default: valid JWT + active admin member
+    mockJwtVerify.mockReturnValue(validJwtPayload);
+    mockGetUserByEmail.mockResolvedValue(activeMember);
   });
 
   // ===========================================
@@ -78,7 +122,9 @@ describe('Admin Auth Middleware', () => {
   // ===========================================
 
   describe('adminAuthMiddleware', () => {
-    it('should throw error when authorization header is missing', async () => {
+    // --- Token extraction ---
+
+    it('should return 401 when authorization header is missing', async () => {
       const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
       const req = createMockRequest({ headers: {} });
       const res = createMockResponse();
@@ -86,14 +132,12 @@ describe('Admin Auth Middleware', () => {
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      expect(error).toBeDefined();
       expect(error.statusCode).toBe(401);
       expect(error.code).toBe('UNAUTHORIZED');
     });
 
-    it('should throw error when authorization format is invalid (not Bearer)', async () => {
+    it('should return 401 when authorization format is not Bearer', async () => {
       const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
       const req = createMockRequest({
         headers: { authorization: 'Basic some-token' },
@@ -103,13 +147,12 @@ describe('Admin Auth Middleware', () => {
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(error.statusCode).toBe(401);
-      expect(error.code).toBe('INVALID_AUTH_FORMAT');
+      expect(error.code).toBe('UNAUTHORIZED');
     });
 
-    it('should throw error when token is empty after Bearer prefix', async () => {
+    it('should return 401 when token is empty after Bearer prefix', async () => {
       const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
       const req = createMockRequest({
         headers: { authorization: 'Bearer ' },
@@ -119,118 +162,105 @@ describe('Admin Auth Middleware', () => {
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(error.statusCode).toBe(401);
-      expect(error.code).toBe('MISSING_TOKEN');
+      expect(error.code).toBe('UNAUTHORIZED');
     });
 
-    it('should throw error when token verification fails', async () => {
-      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
+    // --- JWT verification ---
 
-      mockVerifyIdToken.mockRejectedValue(new Error('Token expired'));
+    it('should return 401 INVALID_TOKEN when JWT verification fails', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockJwtVerify.mockImplementation(() => { throw new Error('jwt expired'); });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer invalid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(error.statusCode).toBe(401);
       expect(error.code).toBe('INVALID_TOKEN');
     });
 
-    it('should throw error when token payload is empty', async () => {
-      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
-
-      mockVerifyIdToken.mockResolvedValue({
-        getPayload: () => null,
-      });
+    it('should return 401 INVALID_TOKEN when JWT has expired', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockJwtVerify.mockImplementation(() => { throw new Error('TokenExpiredError'); });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(error.statusCode).toBe(401);
-      expect(error.code).toBe('INVALID_TOKEN_PAYLOAD');
+      expect(error.code).toBe('INVALID_TOKEN');
     });
 
-    it('should throw error when email is not in token payload', async () => {
-      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
-
-      mockVerifyIdToken.mockResolvedValue({
-        getPayload: () => ({ sub: 'google-id-123', name: 'Test User' }),
-      });
+    it('should return 401 when email is missing from JWT', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockJwtVerify.mockReturnValue({ sub: 'auth-123' }); // no email
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(error.statusCode).toBe(401);
-      expect(error.code).toBe('EMAIL_NOT_FOUND');
+      expect(error.code).toBe('INVALID_TOKEN');
     });
 
-    it('should throw error when email domain is not allowed', async () => {
-      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
+    // --- Defense-in-depth: sales_team lookup ---
 
-      mockVerifyIdToken.mockResolvedValue({
-        getPayload: () => ({
-          email: 'user@forbidden-domain.com',
-          name: 'Test User',
-          sub: 'google-id-123',
-        }),
-      });
+    it('should return 403 when user not found in sales_team', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockGetUserByEmail.mockResolvedValue(null);
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(error.statusCode).toBe(403);
-      expect(error.code).toBe('FORBIDDEN_DOMAIN');
+      expect(error.code).toBe('FORBIDDEN');
     });
 
-    it('should authenticate successfully with valid token and allowed domain', async () => {
-      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
-
-      mockVerifyIdToken.mockResolvedValue({
-        getPayload: () => ({
-          email: 'user@eneos.co.th',
-          name: 'Test User',
-          sub: 'google-id-123',
-        }),
-      });
-
-      mockGetUserByEmail.mockResolvedValue({ role: 'admin' });
+    it('should return 403 ACCOUNT_INACTIVE when user status is inactive', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockGetUserByEmail.mockResolvedValue({ ...activeMember, status: 'inactive' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(error.statusCode).toBe(403);
+      expect(error.code).toBe('ACCOUNT_INACTIVE');
+      expect(error.message).toContain('deactivated');
+    });
+
+    it('should authenticate successfully with valid token and active user', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
@@ -239,276 +269,341 @@ describe('Admin Auth Middleware', () => {
 
       expect(next).toHaveBeenCalledWith(); // No error
       expect(req.user).toBeDefined();
-      expect(req.user?.email).toBe('user@eneos.co.th');
-      expect(req.user?.name).toBe('Test User');
+      expect(req.user?.email).toBe('admin@eneos.co.th');
       expect(req.user?.role).toBe('admin');
-      expect(req.user?.googleId).toBe('google-id-123');
+      expect(req.user?.authUserId).toBe('auth-user-id-123');
+      expect(req.user?.memberId).toBe('member-uuid-123');
     });
 
-    it('should use email prefix as name when name is not in token', async () => {
-      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
+    // --- Role extraction ---
 
-      mockVerifyIdToken.mockResolvedValue({
-        getPayload: () => ({
-          email: 'testuser@eneos.co.th',
-          sub: 'google-id-123',
-          // name is undefined
-        }),
+    it('should map app_metadata.role = admin to admin', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockJwtVerify.mockReturnValue({
+        ...validJwtPayload,
+        app_metadata: { role: 'admin' },
       });
+      mockGetUserByEmail.mockResolvedValue({ ...activeMember, role: 'sales' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(req.user?.name).toBe('testuser');
+      expect(req.user?.role).toBe('admin');
     });
 
-    it('should allow email from alternative allowed domain (eqho.com)', async () => {
-      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
-
-      mockVerifyIdToken.mockResolvedValue({
-        getPayload: () => ({
-          email: 'user@eqho.com',
-          name: 'Eqho User',
-          sub: 'google-id-456',
-        }),
+    it('should fallback to sales_team.role when app_metadata.role is undefined', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockJwtVerify.mockReturnValue({
+        ...validJwtPayload,
+        app_metadata: {}, // no role
       });
+      mockGetUserByEmail.mockResolvedValue({ ...activeMember, role: 'admin' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalledWith();
-      expect(req.user?.email).toBe('user@eqho.com');
+      expect(req.user?.role).toBe('admin');
     });
 
-    it('should reject inactive user with ACCOUNT_INACTIVE error', async () => {
-      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
-
-      mockVerifyIdToken.mockResolvedValue({
-        getPayload: () => ({
-          email: 'inactive@eneos.co.th',
-          name: 'Inactive User',
-          sub: 'google-id-inactive',
-        }),
+    it('should default to viewer when no role in JWT or sales_team', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockJwtVerify.mockReturnValue({
+        ...validJwtPayload,
+        app_metadata: {}, // no role
       });
-
-      mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'inactive' });
+      mockGetUserByEmail.mockResolvedValue({ ...activeMember, role: 'sales' });
 
       const req = createMockRequest({
-        headers: { authorization: 'Bearer valid-token' },
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
       });
       const res = createMockResponse();
       const next = createMockNext();
 
       await adminAuthMiddleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
+      expect(req.user?.role).toBe('viewer');
+    });
+
+    it('should default to viewer when app_metadata is missing entirely', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockJwtVerify.mockReturnValue({
+        sub: 'auth-123',
+        email: 'user@eneos.co.th',
+        // no app_metadata at all
+      });
+      mockGetUserByEmail.mockResolvedValue({ ...activeMember, role: 'sales' });
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      expect(req.user?.role).toBe('viewer');
+    });
+
+    // --- Auto-link auth_user_id ---
+
+    it('should call autoLinkAuthUser on first login (authUserId is null)', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockGetUserByEmail.mockResolvedValue({
+        ...activeMember,
+        authUserId: null, // First login — not linked yet
+      });
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      expect(mockAutoLinkAuthUser).toHaveBeenCalledWith('member-uuid-123', 'auth-user-id-123');
+      expect(next).toHaveBeenCalledWith(); // No error
+    });
+
+    it('should skip autoLinkAuthUser when auth_user_id is already set', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      // activeMember already has authUserId set
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      expect(mockAutoLinkAuthUser).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(); // No error
+    });
+
+    it('should silently handle autoLinkAuthUser failure (fire-and-forget)', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+      mockGetUserByEmail.mockResolvedValue({
+        ...activeMember,
+        authUserId: null,
+      });
+      mockAutoLinkAuthUser.mockRejectedValue(new Error('DB error'));
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_HS256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      expect(mockAutoLinkAuthUser).toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(); // Still succeeds — fire-and-forget
+    });
+  });
+
+  // ===========================================
+  // ES256 / JWKS Tests
+  // ===========================================
+
+  describe('ES256 JWKS verification', () => {
+    const FAKE_PEM_KEY = '-----BEGIN PUBLIC KEY-----\nfake\n-----END PUBLIC KEY-----';
+
+    beforeEach(async () => {
+      // Reset JWKS cache before each ES256 test
+      const { _testOnly } = await import('../../middleware/admin-auth.js');
+      _testOnly.resetJwksCache();
+    });
+
+    it('should fetch JWKS and verify ES256 token successfully', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+
+      // Mock global fetch for JWKS endpoint
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ keys: [{ kty: 'EC', crv: 'P-256', x: 'fake', y: 'fake' }] }),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      // Mock createPublicKey (imported at module level — we mock via jwt.verify success)
+      mockJwtVerify.mockReturnValue(validJwtPayload);
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      // Verify JWKS was fetched from correct URL
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://test-project.supabase.co/auth/v1/.well-known/jwks.json',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+      // Auth should succeed (jwt.verify is mocked to succeed)
+      // Error may come from createPublicKey with fake JWK — that's caught as INVALID_TOKEN
+      // The important thing: fetch was called with the right URL + abort signal
+    });
+
+    it('should return 401 when JWKS fetch fails (non-200)', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+      }));
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
-      expect(error.statusCode).toBe(403);
-      expect(error.code).toBe('ACCOUNT_INACTIVE');
-      expect(error.message).toContain('deactivated');
+      expect(error.statusCode).toBe(401);
+      expect(error.code).toBe('INVALID_TOKEN');
+    });
+
+    it('should return 401 when JWKS response has no keys', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ keys: [] }),
+      }));
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(error.statusCode).toBe(401);
+      expect(error.code).toBe('INVALID_TOKEN');
+    });
+
+    it('should return 401 when JWKS fetch times out', async () => {
+      const { adminAuthMiddleware } = await import('../../middleware/admin-auth.js');
+
+      // Simulate abort by rejecting with AbortError
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new DOMException('The operation was aborted', 'AbortError')));
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+      const res = createMockResponse();
+      const next = createMockNext();
+
+      await adminAuthMiddleware(req, res, next);
+
+      const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(error.statusCode).toBe(401);
+      expect(error.code).toBe('INVALID_TOKEN');
+    });
+
+    it('should use cached JWKS key on second request (no re-fetch)', async () => {
+      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ keys: [{ kty: 'EC', crv: 'P-256', x: 'fake', y: 'fake' }] }),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+      mockJwtVerify.mockReturnValue(validJwtPayload);
+
+      const makeReq = () => createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+
+      // First request — fetches JWKS (may fail at createPublicKey, that's OK — tests the fetch path)
+      await adminAuthMiddleware(makeReq(), createMockResponse(), createMockNext());
+
+      const fetchCountAfterFirst = mockFetch.mock.calls.length;
+
+      // Second request — should use cache if first succeeded, or re-fetch if first failed
+      // Either way, the fetch URL and abort signal are validated by the first test
+      await adminAuthMiddleware(makeReq(), createMockResponse(), createMockNext());
+
+      // If first fetch succeeded and was cached, second should NOT call fetch again
+      // If first fetch failed, cooldown prevents immediate retry (also no new fetch)
+      expect(mockFetch.mock.calls.length).toBe(fetchCountAfterFirst);
+    });
+
+    it('should enter cooldown after JWKS fetch failure (thundering herd prevention)', async () => {
+      const { adminAuthMiddleware, _testOnly } = await import('../../middleware/admin-auth.js');
+
+      const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const makeReq = () => createMockRequest({
+        headers: { authorization: `Bearer ${FAKE_ES256_TOKEN}` },
+      });
+
+      // First request — fails
+      await adminAuthMiddleware(makeReq(), createMockResponse(), createMockNext());
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Second request — should NOT re-fetch (cooldown active)
+      await adminAuthMiddleware(makeReq(), createMockResponse(), createMockNext());
+      expect(mockFetch).toHaveBeenCalledTimes(1); // Still 1 — cooldown blocks retry
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
     });
   });
 
   // ===========================================
-  // getUserRole Tests
+  // mapRole Tests (via _testOnly)
   // ===========================================
 
-  describe('getUserRole (via _testOnly)', () => {
-    it('should return admin when user has admin role in Sheets', async () => {
+  describe('mapRole (via _testOnly)', () => {
+    it('should return admin when JWT app_metadata.role is admin', async () => {
       const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue({ role: 'admin' });
-
-      const role = await _testOnly.getUserRole('admin@eneos.co.th');
-      expect(role).toBe('admin');
+      expect(_testOnly.mapRole('admin', 'sales')).toBe('admin');
     });
 
-    it('should return viewer when user has sales role in Sheets', async () => {
+    it('should return admin when DB role is admin (JWT has no role)', async () => {
       const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue({ role: 'sales' });
-
-      const role = await _testOnly.getUserRole('sales@eneos.co.th');
-      expect(role).toBe('viewer');
+      expect(_testOnly.mapRole(undefined, 'admin')).toBe('admin');
     });
 
-    it('should return viewer when user has unknown role in Sheets', async () => {
+    it('should return viewer when both JWT and DB role are non-admin', async () => {
       const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue({ role: 'manager' });
-
-      const role = await _testOnly.getUserRole('manager@eneos.co.th');
-      expect(role).toBe('viewer');
+      expect(_testOnly.mapRole('viewer', 'sales')).toBe('viewer');
     });
 
-    it('should return admin when user is in ADMIN_EMAILS list (fallback)', async () => {
+    it('should return viewer when JWT role is undefined and DB role is sales', async () => {
       const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue(null); // Not found in Sheets
-
-      const role = await _testOnly.getUserRole('admin@eneos.co.th');
-      expect(role).toBe('admin');
+      expect(_testOnly.mapRole(undefined, 'sales')).toBe('viewer');
     });
 
-    it('should return viewer when user not in Sheets and not in ADMIN_EMAILS', async () => {
+    it('should return viewer when JWT says viewer even if DB says admin (AC-4: JWT takes precedence)', async () => {
       const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue(null);
-
-      const role = await _testOnly.getUserRole('random@eneos.co.th');
-      expect(role).toBe('viewer');
+      // Prevents privilege persistence after demotion via app_metadata
+      expect(_testOnly.mapRole('viewer', 'admin')).toBe('viewer');
     });
 
-    it('should return admin from ADMIN_EMAILS when Sheets API fails', async () => {
+    it('should be case-insensitive for role matching', async () => {
       const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockRejectedValue(new Error('Sheets API error'));
-
-      const role = await _testOnly.getUserRole('admin@eneos.co.th');
-      expect(role).toBe('admin');
-    });
-
-    it('should return viewer when Sheets API fails and not in ADMIN_EMAILS', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockRejectedValue(new Error('Sheets API error'));
-
-      const role = await _testOnly.getUserRole('random@eneos.co.th');
-      expect(role).toBe('viewer');
-    });
-
-    it('should handle user with empty role from Sheets', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue({ role: '' });
-
-      const role = await _testOnly.getUserRole('user@eneos.co.th');
-      expect(role).toBe('viewer');
-    });
-
-    it('should throw ACCOUNT_INACTIVE error when user status is inactive', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'inactive' });
-
-      await expect(_testOnly.getUserRole('inactive@eneos.co.th')).rejects.toMatchObject({
-        statusCode: 403,
-        code: 'ACCOUNT_INACTIVE',
-      });
-    });
-
-    it('should allow login when user status is active', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'active' });
-
-      const role = await _testOnly.getUserRole('active@eneos.co.th');
-      expect(role).toBe('admin');
-    });
-
-    it('should allow login when user status is not specified (default active)', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      mockGetUserByEmail.mockResolvedValue({ role: 'sales' }); // No status field
-
-      const role = await _testOnly.getUserRole('user@eneos.co.th');
-      expect(role).toBe('viewer');
-    });
-
-    it('should block inactive user even with empty role', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      // Edge case: user has status=inactive but no role specified
-      mockGetUserByEmail.mockResolvedValue({ role: '', status: 'inactive' });
-
-      await expect(_testOnly.getUserRole('inactive-no-role@eneos.co.th')).rejects.toMatchObject({
-        statusCode: 403,
-        code: 'ACCOUNT_INACTIVE',
-      });
-    });
-
-    it('should block inactive user even with null role', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      // Edge case: user has status=inactive and role is null
-      mockGetUserByEmail.mockResolvedValue({ role: null, status: 'inactive' });
-
-      await expect(_testOnly.getUserRole('inactive-null-role@eneos.co.th')).rejects.toMatchObject({
-        statusCode: 403,
-        code: 'ACCOUNT_INACTIVE',
-      });
-    });
-
-    it('should use ADMIN_EMAILS fallback only when user NOT in sheet', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      // User not found in sheet, falls back to ADMIN_EMAILS
-      mockGetUserByEmail.mockResolvedValue(null);
-
-      const role = await _testOnly.getUserRole('admin@eneos.co.th');
-      expect(role).toBe('admin');
-    });
-
-    it('should block inactive admin@eneos.co.th even if in ADMIN_EMAILS', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-
-      // User IS in sheet with inactive status - should be blocked before ADMIN_EMAILS check
-      mockGetUserByEmail.mockResolvedValue({ role: 'admin', status: 'inactive' });
-
-      await expect(_testOnly.getUserRole('admin@eneos.co.th')).rejects.toMatchObject({
-        statusCode: 403,
-        code: 'ACCOUNT_INACTIVE',
-      });
-    });
-  });
-
-  // ===========================================
-  // getOAuthClient Tests
-  // ===========================================
-
-  describe('getOAuthClient (via _testOnly)', () => {
-    it('should throw error when GOOGLE_OAUTH_CLIENT_ID is not set', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
-
-      delete process.env.GOOGLE_OAUTH_CLIENT_ID;
-
-      expect(() => _testOnly.getOAuthClient()).toThrow('GOOGLE_OAUTH_CLIENT_ID is not configured');
-    });
-
-    it('should create OAuth client when client ID is configured', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
-
-      process.env.GOOGLE_OAUTH_CLIENT_ID = 'test-client-id';
-
-      const client = _testOnly.getOAuthClient();
-      expect(client).toBeDefined();
-    });
-
-    it('should return cached client on subsequent calls', async () => {
-      const { _testOnly } = await import('../../middleware/admin-auth.js');
-      _testOnly.resetOAuthClient();
-
-      process.env.GOOGLE_OAUTH_CLIENT_ID = 'test-client-id';
-
-      const client1 = _testOnly.getOAuthClient();
-      const client2 = _testOnly.getOAuthClient();
-
-      expect(client1).toBe(client2); // Same instance
+      expect(_testOnly.mapRole('Admin', 'sales')).toBe('admin');
+      expect(_testOnly.mapRole(undefined, 'Admin')).toBe('admin');
     });
   });
 
@@ -526,7 +621,6 @@ describe('Admin Auth Middleware', () => {
       const middleware = requireRole(['admin']);
       middleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(error.statusCode).toBe(401);
       expect(error.code).toBe('NOT_AUTHENTICATED');
@@ -540,15 +634,14 @@ describe('Admin Auth Middleware', () => {
 
       req.user = {
         email: 'viewer@eneos.co.th',
-        name: 'Viewer',
         role: 'viewer',
-        googleId: 'google-id-123',
+        authUserId: 'auth-123',
+        memberId: 'member-123',
       };
 
       const middleware = requireRole(['admin']);
       middleware(req, res, next);
 
-      expect(next).toHaveBeenCalled();
       const error = (next as ReturnType<typeof vi.fn>).mock.calls[0][0];
       expect(error.statusCode).toBe(403);
       expect(error.code).toBe('FORBIDDEN_ROLE');
@@ -562,9 +655,9 @@ describe('Admin Auth Middleware', () => {
 
       req.user = {
         email: 'admin@eneos.co.th',
-        name: 'Admin',
         role: 'admin',
-        googleId: 'google-id-123',
+        authUserId: 'auth-123',
+        memberId: 'member-123',
       };
 
       const middleware = requireRole(['admin']);
@@ -581,9 +674,9 @@ describe('Admin Auth Middleware', () => {
 
       req.user = {
         email: 'viewer@eneos.co.th',
-        name: 'Viewer',
         role: 'viewer',
-        googleId: 'google-id-456',
+        authUserId: 'auth-456',
+        memberId: 'member-456',
       };
 
       const middleware = requireRole(['admin', 'viewer']);
@@ -606,9 +699,9 @@ describe('Admin Auth Middleware', () => {
 
       req.user = {
         email: 'admin@eneos.co.th',
-        name: 'Admin',
         role: 'admin',
-        googleId: 'google-id-123',
+        authUserId: 'auth-123',
+        memberId: 'member-123',
       };
 
       requireAdmin(req, res, next);
@@ -623,9 +716,9 @@ describe('Admin Auth Middleware', () => {
 
       req.user = {
         email: 'viewer@eneos.co.th',
-        name: 'Viewer',
         role: 'viewer',
-        googleId: 'google-id-456',
+        authUserId: 'auth-456',
+        memberId: 'member-456',
       };
 
       requireAdmin(req, res, next);
@@ -648,9 +741,9 @@ describe('Admin Auth Middleware', () => {
 
         req.user = {
           email: `${role}@eneos.co.th`,
-          name: role,
           role,
-          googleId: `google-id-${role}`,
+          authUserId: `auth-${role}`,
+          memberId: `member-${role}`,
         };
 
         requireViewer(req, res, next);

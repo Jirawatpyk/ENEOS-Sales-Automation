@@ -52,6 +52,7 @@ const envSchema = z.object({
   // Supabase
   SUPABASE_URL: z.string().url('Invalid Supabase URL'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
+  SUPABASE_JWT_SECRET: z.string().min(1, 'SUPABASE_JWT_SECRET is required'),
 
   // Sentry (optional - error tracking)
   SENTRY_DSN: z.string().optional(),
@@ -165,6 +166,7 @@ export const config = {
   supabase: {
     url: env.SUPABASE_URL,
     serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    jwtSecret: env.SUPABASE_JWT_SECRET,
   },
 
   // Sentry (Error Tracking)
